@@ -261,6 +261,8 @@ INTEGER, SAVE :: maxterms      ! maximum number of nonzero
 INTEGER, SAVE :: maxfterms     ! maximum number of terms
                                ! involving fractional  products
 
+INTEGER, ALLOCATABLE :: ncsteps_full(:,:,:)
+
 !---------------------------------------------------------------------
 ! Production and loss Arrays ALLOCATABLE to be able to use flexible
 ! Jacobian size. Must be saveable as only defined once in setup_spfuljac,
@@ -549,6 +551,11 @@ IF (method == int_method_NR) THEN
   IF (.NOT. ALLOCATED(modified_map))  ALLOCATE(modified_map(jpcspf, jpcspf))
   IF (.NOT. ALLOCATED(nonzero_map))  ALLOCATE(nonzero_map(jpcspf, jpcspf))
   IF (.NOT. ALLOCATED(reorder))  ALLOCATE(reorder(jpcspf))
+  IF (.NOT. ALLOCATED(ncsteps_full)) THEN
+    ALLOCATE(ncsteps_full(ukca_config%row_length, ukca_config%rows,            &
+                          ukca_config%model_levels /                           &
+                            ukca_config%ukca_chem_seg_size))
+  END IF
 
   ! allocate arrays required by solver. These should only be done once, and not
   ! deallocated (hence no matching deallocate statements).
@@ -816,5 +823,128 @@ IF (ALLOCATED(pd)) DEALLOCATE(pd)
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE asad_mod_dealloc_spatial_vars
+
+subroutine nc_store_int_3d(var_name, timestep, data_3d)
+    use netcdf
+    implicit none
+
+    ! Arguments
+    character(len=*), intent(in) :: var_name
+    integer, intent(in) :: timestep
+    integer, intent(in) :: data_3d(:,:,:)
+
+    ! Local variables
+    character(32) :: filename
+    integer(kind=4) :: ncid, varid, x_dimid, y_dimid, z_dimid, status
+    integer(kind=4), allocatable :: dimids(:)
+
+    ! Determine the filename
+    write(filename, "(a20,'_',i0,'.nc')") trim(var_name), timestep
+
+    ! Create NetCDF file
+    status = nf90_create(filename, NF90_CLOBBER, ncid)
+    call check(status)
+
+    ! Define dimensions
+    status = nf90_def_dim(ncid, "x", int(size(data_3d, 1), kind=4), x_dimid)
+    call check(status)
+    status = nf90_def_dim(ncid, "y", int(size(data_3d, 2), kind=4), y_dimid)
+    call check(status)
+    status = nf90_def_dim(ncid, "z", int(size(data_3d, 3), kind=4), z_dimid)
+    call check(status)
+
+    ! Define variable
+    dimids = [x_dimid, y_dimid, z_dimid]
+    status = nf90_def_var(ncid, var_name, NF90_REAL, dimids, varid)
+    call check(status)
+
+    ! End definition mode (required before writing data)
+    status = nf90_enddef(ncid)
+    call check(status)
+
+    ! Store
+    status = nf90_put_var(ncid, varid, data_3d)
+    call check(status)
+
+    ! Close
+    status = nf90_close(ncid)
+    call check(status)
+
+contains
+
+    ! Error handling
+    subroutine check(status)
+        integer(kind=4), intent(in) :: status
+        if (status /= nf90_noerr) then
+            print *, "Error in netCDF writer: ", nf90_strerror(status)
+            stop
+        end if
+    end subroutine
+end subroutine
+
+subroutine nc_load_int_3d(var_name, timestep, data_3d, found)
+    use netcdf
+    implicit none
+
+    ! Arguments
+    character(len=*), intent(in) :: var_name
+    integer, intent(in) :: timestep
+    integer, intent(out) :: data_3d(:,:,:)
+    logical, intent(out), optional :: found
+
+    ! Local variables
+    character(32) :: filename
+    integer(kind=4) :: ncid, varid, status, i
+    integer(kind=4) :: dimids(3), dim_lens(3)
+
+    ! Determine the filename
+    write(filename, "(a20,'_',i0,'.nc')") trim(var_name), timestep
+
+    ! Open NetCDF file
+    status = nf90_open(filename, NF90_NOWRITE, ncid)
+    if (present(found)) then
+      found = .true.
+      if (status /= nf90_noerr) then
+        found = .false.
+        return
+      end if
+    end if
+    call check(status)
+
+    ! Get the variable ID from its name
+    status = nf90_inq_varid(ncid, var_name, varid)
+    call check(status)
+
+    ! Get dimension IDs and lengths
+    status = nf90_inquire_variable(ncid, varid, dimids=dimids)
+    call check(status)
+
+    do i = 1, 3
+        status = nf90_inquire_dimension(ncid, dimids(i), len=dim_lens(i))
+        call check(status)
+    end do
+
+    ! Allocate
+    !allocate(data_3d(dim_lens(1), dim_lens(2), dim_lens(3)))
+
+    ! Load
+    status = nf90_get_var(ncid, varid, data_3d)
+    call check(status)
+
+    ! Close
+    status = nf90_close(ncid)
+    call check(status)
+
+contains
+
+    ! Error handling
+    subroutine check(status)
+        integer(kind=4), intent(in) :: status
+        if (status /= nf90_noerr) then
+            print *, "Error in netCDF writer: ", nf90_strerror(status)
+            stop
+        end if
+    end subroutine
+end subroutine 
 
 END MODULE asad_mod

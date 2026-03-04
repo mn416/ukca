@@ -69,8 +69,10 @@ USE asad_mod,             ONLY: advt, cdt_diag, ctype,                         &
                                 ihso3_h2o2, ihso3_o3, ih2so4_hv, iso2_oh,      &
                                 iso3_o3, jpctr, jpcspf, jpdd, jpdw, jpnr,      &
                                 jppj, jpro2, jpspec, nadvt, nlnaro2, nprkx,    &
+                                ncsteps_full, nc_store_int_3d, nc_load_int_3d, &
                                 o1d_in_ss, o3p_in_ss, prk, rk,                 &
-                                specf, speci, sph2o, sphno3, spro2, tnd, y, za
+                                specf, speci, sph2o, sphno3, spro2, tnd, y,    &
+                                za, ncsteps_factor, ncsteps, cdt
 USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_drydep,                             &
                                 l_asad_use_flux_rxns,                          &
@@ -233,12 +235,20 @@ LOGICAL :: have_nat1d(model_levels)
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
+INTEGER, SAVE :: timestep = 0
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_CHEMISTRY_CTL_COL'
 
 #if !defined(LFRIC)
 TYPE(autotune_type), ALLOCATABLE, SAVE :: autotune_state
 #endif
+
+! Have we found a file containing the correct number of chemistry steps
+! needed for each segment?
+logical :: ncsteps_found
+
+! Id of segment within column
+integer :: segment_id
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
@@ -276,6 +286,9 @@ IF (l_autotune_segments) THEN
   CALL autotune_start_region(autotune_state, row_length*rows)
 END IF
 #endif
+
+! Read in number of chemistry steps for current timestep
+call nc_load_int_3d("ncsteps", timestep, ncsteps_full, found=ncsteps_found)
 
 ! Model levels loop
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
@@ -492,6 +505,18 @@ DO i=1,rows
           sph2o(1:chunk_size) = qcf(j,i,kcs:kce)/c_h2o
         END IF
 
+        ! Determine ID of segment within column
+        segment_id = 1 + (kcs-1)/ukca_config%ukca_chem_seg_size
+
+        ! Setup chemistry solver time steps
+        if (ncsteps_found) then
+          ncsteps = ncsteps_full(j, i, segment_id)
+          ncsteps_factor = ncsteps
+          cdt = cdt_diag / real(ncsteps)
+          ! XXX: should we restore these variables to their original values
+          ! after the call to asad_cdrive()?
+        end if
+
         ! Call asad_cdrive with segmented arrays
         CALL asad_cdrive(zftr(kcs:kce,:),                                      &
                          zp(kcs:kce),                                          &
@@ -500,7 +525,7 @@ DO i=1,rows
                          co2_1d(kcs:kce),                                      &
                          zfcloud(kcs:kce),                                     &
                          zclw(kcs:kce),                                        &
-                         j,i,klevel,                                           &
+                         j,i,segment_id,                                       &
                          zdryrt2(kcs:kce,:),                                   &
                          zwetrt2(kcs:kce,:),                                   &
                          rc_het(kcs:kce,:),                                    &
@@ -716,6 +741,12 @@ END DO ! loop (j,i)
 IF (ALLOCATED(ystore)) DEALLOCATE(ystore)
 
 !$OMP END PARALLEL
+
+! Write out number of chemistry steps for current timestep
+if (.not. ncsteps_found) then
+  call nc_store_int_3d("ncsteps", timestep, ncsteps_full)
+end if
+timestep = timestep + 1
 
 #if !defined(LFRIC)
 IF (l_autotune_segments) THEN

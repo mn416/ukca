@@ -106,7 +106,7 @@ CONTAINS
 SUBROUTINE asad_spmjpdriv(ix,jy,nlev,n_points)
 
 USE asad_mod, ONLY: cdt, f, jpcspf, jpspec, ltrig,                             &
-                    ncsteps, ncsteps_factor, nitfg, speci, y
+                    ncsteps, ncsteps_factor, ncsteps_full, nitfg, speci, y
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -248,6 +248,9 @@ DO WHILE (iter <= iredo)
 
   END IF
 END DO
+
+! Stash the number of chemistry steps for current segment
+ncsteps_full(ix,jy,nlev) = ncsteps
 
 IF (iredo > 2) THEN
   WRITE(umMessage,"('   No. iterations =',i2)") iredo
