@@ -581,6 +581,10 @@ REAL(KIND=jprb)               :: zhook_handle
 TYPE(autotune_type), ALLOCATABLE, SAVE :: autotune_state
 #endif
 
+! Full domain mode namelist
+integer :: chunk_x, chunk_y, chunk_z
+namelist/ukca_full_opts/ chunk_x, chunk_y, chunk_z
+
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_MAIN1'
 
 !- End of header
@@ -596,6 +600,11 @@ error_code_ptr = 0
 IF (PRESENT(error_message)) error_message = ''
 IF (PRESENT(error_routine)) error_routine = ''
 
+! Load full domain mode namelist
+open(unit=25, file='SHARED', status='old', action='read')
+read(25, nml=ukca_full_opts)
+close(25)
+
 ! Create local copies of some frequently used configuration variables
 row_length = ukca_config%row_length
 rows = ukca_config%rows
@@ -604,7 +613,7 @@ model_levels = ukca_config%model_levels
 theta_field_size = row_length * rows
 tot_n_pnts = theta_field_size * model_levels
 IF (ukca_config%l_ukca_asad_full) THEN
-  n_pnts = tot_n_pnts
+  n_pnts = chunk_x * chunk_y * chunk_z
 ELSE IF (ukca_config%l_ukca_asad_columns) THEN
   n_pnts = ukca_config%ukca_chem_seg_size
 ELSE
@@ -2339,6 +2348,7 @@ IF (ukca_config%l_ukca_chem) THEN
 
       CALL ukca_chemistry_ctl_full(                                            &
            row_length, rows, model_levels,                                     &
+           chunk_x, chunk_y, chunk_z,                                          &
            theta_field_size, tot_n_pnts,                                       &
            n_chem_tracers+n_aero_tracers,                                      &
            istore_h2so4,                                                       &

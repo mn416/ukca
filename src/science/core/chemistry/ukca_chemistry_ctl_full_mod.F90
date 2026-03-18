@@ -36,7 +36,9 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='UKCA_CHEMISTRY_CTL_FULL_MOD'
 CONTAINS
 
 SUBROUTINE ukca_chemistry_ctl_full(                                            &
-                row_length, rows, model_levels, theta_field_size, tot_n_pnts,  &
+                row_length, rows, model_levels,                                &
+                chunk_x, chunk_y, chunk_z,                                     &
+                theta_field_size, tot_n_pnts,                                  &
                 ntracers,                                                      &
                 istore_h2so4,                                                  &
                 pres, temp, q,                                                 &
@@ -99,11 +101,14 @@ USE ukca_missing_data_mod, ONLY: rmdi
 
 USE errormessagelength_mod, ONLY: errormessagelength
 
+use ukca_chemistry_ctl_col_mod, only: ukca_reallocate_asad_arrays
+
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: row_length        ! size of UKCA x dimension
 INTEGER, INTENT(IN) :: rows              ! size of UKCA y dimension
 INTEGER, INTENT(IN) :: model_levels      ! size of UKCA z dimension
+integer, intent(in) :: chunk_x, chunk_y, chunk_z
 INTEGER, INTENT(IN) :: theta_field_size  ! no. of points in horizontal
 INTEGER, INTENT(IN) :: tot_n_pnts        ! no. of points in full domain
 INTEGER, INTENT(IN) :: ntracers          ! no. of tracers
@@ -111,20 +116,20 @@ INTEGER, INTENT(IN) :: uph2so4inaer      ! flag for H2SO4 updating
 INTEGER, INTENT(IN) :: istore_h2so4      ! location of H2SO4 in f array
 INTEGER, INTENT(IN) :: nlev_with_ddep(theta_field_size) ! No levs in bl
 
-REAL, INTENT(IN) :: pres(tot_n_pnts)                ! pressure
-REAL, INTENT(IN) :: temp(tot_n_pnts)                ! actual temperature
+REAL, INTENT(IN) :: pres(row_length, rows, model_levels) ! pressure
+REAL, INTENT(IN) :: temp(row_length, rows, model_levels) ! actual temperature
 REAL, INTENT(IN) :: volume(tot_n_pnts)              ! cell volume
-REAL, INTENT(IN) :: H_plus(tot_n_pnts)              ! pH array
+REAL, INTENT(IN) :: H_plus(row_length, rows, model_levels) ! pH array
 REAL, INTENT(IN) :: qcf(tot_n_pnts)
-REAL, INTENT(IN) :: qcl(tot_n_pnts)
-REAL, INTENT(IN) :: cloud_frac(tot_n_pnts)
+REAL, INTENT(IN) :: qcl(row_length, rows, model_levels)
+REAL, INTENT(IN) :: cloud_frac(row_length, rows, model_levels)
 REAL, INTENT(IN) :: so4_sa(tot_n_pnts)              ! aerosol surface area
 REAL, INTENT(IN) :: zdryrt(theta_field_size,jpdd)   ! dry dep rate
-REAL, INTENT(IN) :: zwetrt(tot_n_pnts,jpdw)         ! wet dep rate
+REAL, INTENT(IN) :: zwetrt(row_length, rows, model_levels, jpdw) ! wet dep rate
 REAL, INTENT(IN) :: photol_rates(tot_n_pnts,jppj)
 REAL, INTENT(IN) :: co2_interactive(tot_n_pnts)
 REAL, INTENT(OUT) :: shno3(tot_n_pnts)
-REAL, INTENT(IN OUT) :: q(tot_n_pnts)               ! water vapour
+REAL, INTENT(IN OUT) :: q(row_length, rows, model_levels) ! water vapour
 REAL, INTENT(IN OUT) :: tracer(tot_n_pnts,ntracers) ! tracer MMR
 
 ! SO2 increments
@@ -157,9 +162,9 @@ REAL, INTENT(IN OUT) :: atm_h2_mol(tot_n_pnts)
 TYPE(ntp_type), INTENT(IN OUT) :: all_ntp(dim_ntp)
 
 ! Mask to limit formation of Nat below specified height
-LOGICAL, INTENT(IN) :: have_nat(tot_n_pnts)
+LOGICAL, INTENT(IN) :: have_nat(row_length, rows, model_levels)
 ! Stratospheric mask
-LOGICAL, INTENT(IN) :: L_stratosphere(tot_n_pnts)
+LOGICAL, INTENT(IN) :: L_stratosphere(row_length, rows, model_levels)
 
 ! Flag for determining if this is the first chemistry call
 LOGICAL, INTENT(IN) :: firstcall
@@ -189,14 +194,14 @@ LOGICAL :: ddmask(theta_field_size)           ! mask
 REAL, ALLOCATABLE :: ystore(:)    ! array for H2SO4 when updated in MODE
 REAL :: zftr(tot_n_pnts,jpcspf)   ! 1-D array of chemically active species
                                   !   including RO2 species, in VMR
-REAL :: zq(tot_n_pnts)            ! 1-D water vapour vmr
+REAL :: zq(row_length, rows, model_levels) ! 1-D water vapour vmr
 REAL :: co2_1d(tot_n_pnts)        ! 1-D CO2
 REAL :: zprt1d(tot_n_pnts,jppj)   ! 1-D photolysis rates for ASAD
 REAL :: zdryrt2(tot_n_pnts,jpdd)  ! dry dep rate
 REAL :: rc_het(tot_n_pnts,2)      ! heterog rates for trop chem
 
 ! 1-D mask for stratosphere
-LOGICAL :: stratflag(tot_n_pnts)
+LOGICAL :: stratflag(row_length, rows, model_levels)
 
 ! Full ntp array
 REAL :: ntp_data(tot_n_pnts,dim_ntp)
@@ -205,10 +210,41 @@ INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
 
+! Full-domain versions of ASAD module variables
+real, dimension(tot_n_pnts,size(rk, dim=2)) :: full_rk
+real, dimension(tot_n_pnts) :: full_sph2o
+real, dimension(tot_n_pnts) :: full_sphno3
+real, dimension(tot_n_pnts) :: full_tnd
+real, dimension(tot_n_pnts,size(y, dim=2)) :: full_y
+real, dimension(tot_n_pnts) :: full_za
+real, dimension(tot_n_pnts,size(dpd, dim=2)) :: full_dpd
+real, dimension(tot_n_pnts,size(dpw, dim=2)) :: full_dpw
+real, dimension(tot_n_pnts,size(prk, dim=2)) :: full_prk
+real, dimension(tot_n_pnts) :: full_fpsc1
+real, dimension(tot_n_pnts) :: full_fpsc2
+
+! State for chunking
+integer :: begin_x, end_x, len_x
+integer :: begin_y, end_y, len_y
+integer :: begin_z, end_z, len_z
+integer :: begin_chunk, end_chunk
+integer :: begin_sub, end_sub
+integer :: i, j
+! TODO: these could be made 1D now that we have begin_sub and end_sub
+real, dimension(chunk_x*chunk_y*chunk_z, jpcspf) :: zftr_chunk
+real, dimension(chunk_x*chunk_y*chunk_z) :: co2_1d_chunk
+real, dimension(chunk_x*chunk_y*chunk_z, jpdd) :: zdryrt2_chunk
+real, dimension(chunk_x*chunk_y*chunk_z, 2) :: rc_het_chunk
+real, dimension(chunk_x*chunk_y*chunk_z, jppj) :: zprt1d_chunk
+
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_CHEMISTRY_CTL_FULL'
 
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+full_za(:) = 0.0
+full_y(:,:) = 0.0
+full_sph2o(:) = 0.0
 
 ! Dummy variables to satisfy expected numbers of arguments for ASAD_CDRIVE,
 ! ASAD_CHEMICAL_DIAGNOSTICS and ASAD_PSC_DIAGNOSTIC
@@ -222,7 +258,7 @@ IF (ukca_config%l_ukca_het_psc) THEN
 END IF
 
 ! Fill stratospheric flag indicator and ntp_data array
-stratflag(:) = (L_stratosphere(:))
+stratflag(:,:,:) = L_stratosphere(:,:,:)
 !$OMP PARALLEL DEFAULT(NONE) PRIVATE(l)                                        &
 !$OMP SHARED(all_ntp, ntp_data, tot_n_pnts)
 !$OMP DO SCHEDULE(DYNAMIC)
@@ -235,7 +271,7 @@ END DO
 !$OMP END PARALLEL
 
 ! Put tracer mmr into 1-D array for use in ASAD chemical solver
-zq(:) = q(:)/c_h2o
+zq(:,:,:) = q(:,:,:)/c_h2o
 
 ! Map photolysis rates onto 1-D array.
 IF (ukca_config%l_ukca_offline) THEN
@@ -352,11 +388,11 @@ IF (.NOT. ALLOCATED(ystore) .AND. uph2so4inaer == 1)                           &
 
 ! Copy water vapour and ice field into 1-D arrays
 IF (ukca_config%l_ukca_het_psc) THEN
-  sph2o(:) = qcf(:)/c_h2o
+  full_sph2o(:) = qcf(:)/c_h2o
 END IF
 
 ! Fill SO4 surface area
-za(:) = so4_sa(:)
+full_za(:) = so4_sa(:)
 
 IF (uph2so4inaer == 1) THEN
   ! H2SO4 will be updated in MODE, so store old value here
@@ -364,24 +400,111 @@ IF (uph2so4inaer == 1) THEN
      ! primary array passed is zftr, so save this, NOT y
     ystore(:) = zftr(:,istore_h2so4)
   ELSE
-    ystore(:) = y(:,nn_h2so4)
+    ystore(:) = full_y(:,nn_h2so4)
   END IF
 END IF
 
 ! Call ASAD routines to do chemistry integration.
-!
-! Note: unlike in the other chemistry_ctl variants, here we call asad_cdrive
-! once, passing in all data points from the current MPI process.
 
-CALL asad_cdrive(zftr, pres, temp, zq, co2_1d, cloud_frac, qcl, ix, jy, k,     &
-                 zdryrt2, zwetrt, rc_het, zprt1d, tot_n_pnts, have_nat,        &
-                 stratflag, H_plus)
+do begin_z = 1, model_levels, chunk_z
+  end_z = min(model_levels, begin_z + (chunk_z - 1))
+  len_z = 1 + end_z - begin_z
+
+  do begin_y = 1, rows, chunk_y
+    end_y = min(rows, begin_y + (chunk_y - 1))
+    len_y = 1 + end_y - begin_y
+
+    do begin_x = 1, row_length, chunk_x
+      end_x = min(row_length, begin_x + (chunk_x - 1))
+      len_x = 1 + end_x - begin_x
+
+      ! Make sure ASAD arrays match the chunk size
+      if (.not. allocated(rk) .OR. len_x*len_y*len_z /= size(rk, 1)) then
+        call ukca_reallocate_asad_arrays(len_x*len_y*len_z)
+      end if
+
+      ! Setup ASAD arguments and module variables
+      do j = 1, len_z
+        do i = 1, len_y
+          begin_chunk = row_length * rows * (begin_z-1+j-1)                    &
+                      + row_length * (begin_y-1+i-1)                           &
+                      + begin_x
+          end_chunk = begin_chunk + len_x - 1
+          begin_sub = len_x * len_y * (j-1)                                    &
+                    + len_x * (i-1) + 1
+          end_sub = begin_sub + len_x - 1
+
+          ! Chunked arguments to ASAD
+          zftr_chunk(begin_sub:end_sub, :) = zftr(begin_chunk:end_chunk, :)
+          co2_1d_chunk(begin_sub:end_sub) = co2_1d(begin_chunk:end_chunk)
+          zdryrt2_chunk(begin_sub:end_sub, :) =                                &
+            zdryrt2(begin_chunk:end_chunk, :)
+          rc_het_chunk(begin_sub:end_sub, :) = rc_het(begin_chunk:end_chunk, :)
+          zprt1d_chunk(begin_sub:end_sub, :) = zprt1d(begin_chunk:end_chunk, :)
+
+          ! Copy to ASAD module variables
+          sph2o(begin_sub:end_sub) = full_sph2o(begin_chunk:end_chunk)
+          za(begin_sub:end_sub) = full_za(begin_chunk:end_chunk)
+          y(begin_sub:end_sub,:) = full_y(begin_chunk:end_chunk,:)
+        end do
+      end do
+
+      call asad_cdrive(                                                        &
+        zftr_chunk,                                                            &
+        pres(begin_x:end_x, begin_y:end_y, begin_z:end_z),                     &
+        temp(begin_x:end_x, begin_y:end_y, begin_z:end_z),                     &
+        zq(begin_x:end_x, begin_y:end_y, begin_z:end_z),                       &
+        co2_1d_chunk,                                                          &
+        cloud_frac(begin_x:end_x, begin_y:end_y, begin_z:end_z),               &
+        qcl(begin_x:end_x, begin_y:end_y, begin_z:end_z),                      &
+        ix,                                                                    &
+        jy,                                                                    &
+        k,                                                                     &
+        zdryrt2_chunk,                                                         &
+        zwetrt(begin_x:end_x, begin_y:end_y, begin_z:end_z, :),                &
+        rc_het_chunk,                                                          &
+        zprt1d_chunk,                                                          &
+        len_x*len_y*len_z,                                                     &
+        have_nat(begin_x:end_x, begin_y:end_y, begin_z:end_z),                 &
+        stratflag(begin_x:end_x, begin_y:end_y, begin_z:end_z),                &
+        H_plus(begin_x:end_x, begin_y:end_y, begin_z:end_z))
+
+      ! Process ASAD arguments and module variables
+      do j = 1, len_z
+        do i = 1, len_y
+          begin_chunk = row_length * rows * (begin_z-1+j-1)                    &
+                      + row_length * (begin_y-1+i-1)                           &
+                      + begin_x
+          end_chunk = begin_chunk + len_x - 1
+          begin_sub = len_x * len_y * (j-1)                                    &
+                    + len_x * (i-1) + 1
+          end_sub = begin_sub + len_x - 1
+
+          ! Chunked output arguments from ASAD
+          zftr(begin_chunk:end_chunk, :) = zftr_chunk(begin_sub:end_sub, :)
+
+          ! Copy from ASAD module variables
+          full_dpd(begin_chunk:end_chunk, :) = dpd(begin_sub:end_sub, :)
+          full_prk(begin_chunk:end_chunk, :) = prk(begin_sub:end_sub, :)
+          full_fpsc1(begin_chunk:end_chunk) = fpsc1(begin_sub:end_sub)
+          full_y(begin_chunk:end_chunk,:) = y(begin_sub:end_sub,:)
+          full_rk(begin_chunk:end_chunk,:) = rk(begin_sub:end_sub,:)
+          full_tnd(begin_chunk:end_chunk) = tnd(begin_sub:end_sub)
+          full_sphno3(begin_chunk:end_chunk) = sphno3(begin_sub:end_sub)
+          full_fpsc2(begin_chunk:end_chunk) = fpsc2(begin_sub:end_sub)
+          full_dpw(begin_chunk:end_chunk,:) = dpw(begin_sub:end_sub,:)
+        end do
+      end do
+
+    end do
+  end do
+end do
 
 IF (ukca_config%l_ukca_het_psc) THEN
   ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
   ! Note that sphno3 is NAT in number density of HNO3.
-  IF (ANY(sphno3(:) > 0.0)) THEN
-    shno3(:) = sphno3(:)/tnd(:)*c_hono2
+  IF (ANY(full_sphno3(:) > 0.0)) THEN
+    shno3(:) = full_sphno3(:)/full_tnd(:)*c_hono2
   ELSE
     shno3(:) = 0.0
   END IF
@@ -391,26 +514,26 @@ IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
   ! Calculate chemical fluxes for MODE
   IF (ihso3_h2o2 > 0) THEN
     delSO2_wet_H2O2(:) = delSO2_wet_H2O2(:) +                                  &
-      rk(:,ihso3_h2o2)*y(:,nn_so2)*y(:,nn_h2o2)*cdt_diag
+      full_rk(:,ihso3_h2o2)*full_y(:,nn_so2)*full_y(:,nn_h2o2)*cdt_diag
   END IF
   IF (ihso3_o3 > 0) THEN
     delSO2_wet_O3(:) = delSO2_wet_O3(:) +                                      &
-      rk(:,ihso3_o3)*y(:,nn_so2)*y(:,nn_o3)*cdt_diag
+      full_rk(:,ihso3_o3)*full_y(:,nn_so2)*full_y(:,nn_o3)*cdt_diag
   END IF
   IF (iso3_o3 > 0) THEN
     delSO2_wet_O3(:) = delSO2_wet_O3(:) +                                      &
-      rk(:,iso3_o3)*y(:,nn_so2)*y(:,nn_o3)*cdt_diag
+      full_rk(:,iso3_o3)*full_y(:,nn_so2)*full_y(:,nn_o3)*cdt_diag
   END IF
   ! net H2SO4 production - note that this is affected by
   ! l_fix_ukca_h2so4_ystore above. Y value is concentration
   ! from chemistry prior to zftr being over-written below
   IF (iso2_oh > 0 .AND. ih2so4_hv > 0) THEN
     delh2so4_chem(:) = delh2so4_chem(:) +                                      &
-      (rk(:,iso2_oh)*y(:,nn_so2)*y(:,nn_oh) - rk(:,ih2so4_hv)*y(:,nn_h2so4))*  &
-      cdt_diag
+      (full_rk(:,iso2_oh)*full_y(:,nn_so2)*full_y(:,nn_oh) -                   &
+      full_rk(:,ih2so4_hv)*full_y(:,nn_h2so4))*cdt_diag
   ELSE IF (iso2_oh > 0) THEN
     delh2so4_chem(:) = delh2so4_chem(:) +                                      &
-      rk(:,iso2_oh)*y(:,nn_so2)*y(:,nn_oh)*cdt_diag
+      full_rk(:,iso2_oh)*full_y(:,nn_so2)*full_y(:,nn_oh)*cdt_diag
   END IF
 
   IF (uph2so4inaer == 1) THEN
@@ -424,7 +547,7 @@ IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
       ! primary array passed is zftr, so copy back to this, NOT y
       zftr(:,istore_h2so4) = ystore(:)
     ELSE
-      y(:,nn_h2so4) = ystore(:)
+      full_y(:,nn_h2so4) = ystore(:)
     END IF
   END IF
 END IF
@@ -434,13 +557,13 @@ IF (L_asad_use_chem_diags .AND.                                                &
   ((L_asad_use_flux_rxns .OR. L_asad_use_rxn_rates) .OR.                       &
   (L_asad_use_wetdep .OR. L_asad_use_drydep))) THEN
   CALL asad_chemical_diagnostics(row_length,rows,model_levels,tot_n_pnts,      &
-    dpd,dpw,prk,y,jy,ix,klevel,volume,ierr)
+    full_dpd,full_dpw,full_prk,full_y,jy,ix,klevel,volume,ierr)
 END IF
 
 ! PSC diagnostics
 IF (L_asad_use_chem_diags .AND. L_asad_use_psc_diagnostic) THEN
   CALL asad_psc_diagnostic(row_length,rows,model_levels,tot_n_pnts,            &
-                           fpsc1,fpsc2,jy,ix,klevel,ierr)
+                           full_fpsc1,full_fpsc2,jy,ix,klevel,ierr)
 END IF
 
 ! Set SS species concentrations for output (stratospheric configurations)
@@ -448,13 +571,13 @@ END IF
 ! O1D mmr
 IF (O1D_in_ss) THEN
   l = name2ntpindex('O(1D)     ')
-  ntp_data(:,l) = y(:,nn_o1d)/tnd(:)*c_o1d
+  ntp_data(:,l) = full_y(:,nn_o1d)/full_tnd(:)*c_o1d
 END IF
 
 ! O3P mmr
 IF (O3P_in_ss) THEN
   l = name2ntpindex('O(3P)     ')
-  ntp_data(:,l) = y(:,nn_o3p)/tnd(:)*c_o3p
+  ntp_data(:,l) = full_y(:,nn_o3p)/full_tnd(:)*c_o3p
 END IF
 
 ! First copy the concentrations from the zftr array to the
@@ -472,49 +595,49 @@ DO jspf = 1, jpcspf
 
   IF (n_ch4 > 0) THEN
     IF (specf(jspf) == advt(n_ch4)) THEN
-      atm_ch4_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_ch4_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! CO
   IF (n_co > 0) THEN
     IF (specf(jspf) == advt(n_co)) THEN
-      atm_co_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_co_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! N2O
   IF (n_n2o > 0) THEN
     IF (specf(jspf) == advt(n_n2o)) THEN
-      atm_n2o_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_n2o_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! CFC-12
   IF (n_cf2cl2 > 0) THEN
     IF (specf(jspf) == advt(n_cf2cl2)) THEN
-      atm_cf2cl2_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_cf2cl2_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! CFC-11
   IF (n_cfcl3 > 0) THEN
     IF (specf(jspf) == advt(n_cfcl3)) THEN
-      atm_cfcl3_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_cfcl3_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! CH3Br
   IF (n_mebr > 0) THEN
     IF (specf(jspf) == advt(n_mebr)) THEN
-      atm_mebr_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_mebr_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
   ! H2
   IF (n_h2 > 0) THEN
     IF (specf(jspf) == advt(n_h2)) THEN
-      atm_h2_mol(:) = zftr(:,jspf)*tnd(:)*volume(:)*1.0e6/avogadro
+      atm_h2_mol(:) = zftr(:,jspf)*full_tnd(:)*volume(:)*1.0e6/avogadro
     END IF
   END IF
 
