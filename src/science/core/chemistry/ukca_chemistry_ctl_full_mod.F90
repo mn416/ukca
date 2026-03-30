@@ -73,7 +73,9 @@ USE asad_mod,             ONLY: advt, cdt_diag, ctype,                         &
                                 jppj, jpro2, jpspec, nadvt, nlnaro2, nprkx,    &
                                 o1d_in_ss, o3p_in_ss, rk,                      &
                                 specf, speci, sph2o, sphno3, spro2, tnd, za,   &
-                                dpd, dpw, prk, y, fpsc1, fpsc2
+                                dpd, dpw, prk, y, fpsc1, fpsc2, ncsteps_full,  &
+                                nc_store_int_3d, nc_load_int_3d,               &
+                                ncsteps_factor, ncsteps, cdt
 USE asad_cdrive_mod,      ONLY: asad_cdrive
 USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_drydep,                             &
@@ -237,10 +239,22 @@ real, dimension(chunk_x*chunk_y*chunk_z, jpdd) :: zdryrt2_chunk
 real, dimension(chunk_x*chunk_y*chunk_z, 2) :: rc_het_chunk
 real, dimension(chunk_x*chunk_y*chunk_z, jppj) :: zprt1d_chunk
 
+INTEGER, SAVE :: timestep = 0
+
+! Have we found a file containing the correct number of chemistry steps
+! needed for each segment?
+logical :: ncsteps_found
+
+! Id of chunk within domain
+integer :: chunk_id_x, chunk_id_y, chunk_id_z
+
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_CHEMISTRY_CTL_FULL'
 
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+! Read in number of chemistry steps for current timestep
+call nc_load_int_3d("ncsteps", timestep, ncsteps_full, found=ncsteps_found)
 
 full_za(:) = 0.0
 full_y(:,:) = 0.0
@@ -449,6 +463,18 @@ do begin_z = 1, model_levels, chunk_z
         end do
       end do
 
+      ! Determine chunk id
+      chunk_id_x = 1 + (begin_x-1) / chunk_x
+      chunk_id_y = 1 + (begin_y-1) / chunk_y
+      chunk_id_z = 1 + (begin_z-1) / chunk_z
+
+      ! Setup chemistry solver time steps
+      if (ncsteps_found) then
+        ncsteps = ncsteps_full(chunk_id_x, chunk_id_y, chunk_id_z)
+        ncsteps_factor = ncsteps
+        cdt = cdt_diag / real(ncsteps)
+      end if
+
       call asad_cdrive(                                                        &
         zftr_chunk,                                                            &
         pres(begin_x:end_x, begin_y:end_y, begin_z:end_z),                     &
@@ -457,9 +483,9 @@ do begin_z = 1, model_levels, chunk_z
         co2_1d_chunk,                                                          &
         cloud_frac(begin_x:end_x, begin_y:end_y, begin_z:end_z),               &
         qcl(begin_x:end_x, begin_y:end_y, begin_z:end_z),                      &
-        ix,                                                                    &
-        jy,                                                                    &
-        k,                                                                     &
+        chunk_id_x,                                                            &
+        chunk_id_y,                                                            &
+        chunk_id_z,                                                            &
         zdryrt2_chunk,                                                         &
         zwetrt(begin_x:end_x, begin_y:end_y, begin_z:end_z, :),                &
         rc_het_chunk,                                                          &
@@ -688,6 +714,12 @@ DO l = 1, dim_ntp
 END DO
 !$OMP END DO
 !$OMP END PARALLEL
+
+! Write out number of chemistry steps for current timestep
+if (.not. ncsteps_found) then
+  call nc_store_int_3d("ncsteps", timestep, ncsteps_full)
+end if
+timestep = timestep + 1
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

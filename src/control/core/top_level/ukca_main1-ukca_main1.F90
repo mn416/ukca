@@ -833,7 +833,7 @@ IF (l_first_call) THEN
 
   IF (ukca_config%l_ukca_chem) THEN
 
-    CALL ukca_iniasad(n_pnts)
+    CALL ukca_iniasad(n_pnts, chunk_x, chunk_y, chunk_z)
 
     ! Check that some CLASSIC aerosol types/processes are modelled if
     ! heterogeneous reactions on CLASSIC aerosols are used in UKCA.

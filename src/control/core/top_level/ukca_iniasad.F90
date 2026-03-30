@@ -36,7 +36,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_INIASAD_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_iniasad(npoints)
+SUBROUTINE ukca_iniasad(npoints, chunk_x, chunk_y, chunk_z)
 
 USE ukca_chem_defs_mod,   ONLY: chch_defs
 USE asad_mod,             ONLY: ldepd, ldepw, ih_o3, ih_h2o2,                  &
@@ -53,6 +53,7 @@ USE asad_cinit_mod, ONLY: asad_cinit
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: npoints   ! no of spatial points
+integer, intent(in) :: chunk_x, chunk_y, chunk_z
 
 !       Local variables
 
@@ -88,7 +89,7 @@ IF (printstatus >= prstatus_oper) THEN
 END IF
 
 !$OMP PARALLEL
-CALL asad_mod_init(npoints)
+CALL asad_mod_init(npoints, chunk_x, chunk_y, chunk_z)
 !$OMP END PARALLEL
 
 ! Set up dry and wet deposition logicals using module switches

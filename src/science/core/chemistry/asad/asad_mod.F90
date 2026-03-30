@@ -409,13 +409,14 @@ END SUBROUTINE asad_mod_pre_setup_init
 
 
 ! ######################################################################
-SUBROUTINE asad_mod_init(n_points)
+SUBROUTINE asad_mod_init(n_points, chunk_x, chunk_y, chunk_z)
 
 ! To allocate and initialise ASAD arrays and variables
 
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: n_points
+integer, intent(in) :: chunk_x, chunk_y, chunk_z
 
 LOGICAL, SAVE :: firstcall=.TRUE.
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -552,9 +553,18 @@ IF (method == int_method_NR) THEN
   IF (.NOT. ALLOCATED(nonzero_map))  ALLOCATE(nonzero_map(jpcspf, jpcspf))
   IF (.NOT. ALLOCATED(reorder))  ALLOCATE(reorder(jpcspf))
   IF (.NOT. ALLOCATED(ncsteps_full)) THEN
-    ALLOCATE(ncsteps_full(ukca_config%row_length, ukca_config%rows,            &
-                          ukca_config%model_levels /                           &
-                            ukca_config%ukca_chem_seg_size))
+    if (ukca_config%l_ukca_asad_full) then
+      ! Full-domain mode
+      ALLOCATE(ncsteps_full(                                                   &
+        (ukca_config%row_length+chunk_x-1)/chunk_x,                            &
+        (ukca_config%rows+chunk_y-1)/chunk_y,                                  &
+        (ukca_config%model_levels+chunk_z-1)/chunk_z))
+    else
+      ! Column mode
+      ALLOCATE(ncsteps_full(ukca_config%row_length, ukca_config%rows,          &
+                            ukca_config%model_levels /                         &
+                              ukca_config%ukca_chem_seg_size))
+    end if
   END IF
 
   ! allocate arrays required by solver. These should only be done once, and not
