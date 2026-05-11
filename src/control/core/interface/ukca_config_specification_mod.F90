@@ -164,6 +164,7 @@ TYPE :: ukca_config_spec_type
                                        ! rather than horizontal slices
   LOGICAL :: l_ukca_asad_full          ! True to pass the entire domain to ASAD
                                        ! solver rather than slices or columns
+  INTEGER :: i_ukca_asad_full_chunk_size(3) ! For full-domain 3D chunking
   LOGICAL :: l_ukca_debug_asad         ! Include additional print output
                                        ! specific to ASAD
   LOGICAL :: l_ukca_intdd              ! True for interactive dry deposition
@@ -858,6 +859,7 @@ ukca_config%i_chem_timestep_halvings = imdi
 ukca_config%dts0 = imdi
 ukca_config%l_ukca_asad_columns = .FALSE.
 ukca_config%l_ukca_asad_full = .FALSE.
+ukca_config%i_ukca_asad_full_chunk_size(:) = [-1, -1, -1]
 ukca_config%l_ukca_debug_asad = .FALSE.
 ukca_config%l_ukca_intdd = .FALSE.
 ukca_config%l_ukca_ddepo3_ocean = .FALSE.
@@ -1137,6 +1139,7 @@ SUBROUTINE ukca_get_config(                                                    &
    l_ukca_scale_ppe,                                                           &
    l_ukca_asad_columns,                                                        &
    l_ukca_asad_full,                                                           &
+   i_ukca_asad_full_chunk_size,                                                &
    l_ukca_debug_asad,                                                          &
    l_ukca_intdd, l_ukca_ddepo3_ocean, l_ukca_ddep_lev1, l_ukca_dry_dep_so2wet, &
    l_deposition_jules,                                                         &
@@ -1340,6 +1343,7 @@ LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_wetdep_off
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_scale_ppe
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_asad_columns
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_asad_full
+INTEGER, OPTIONAL, INTENT(OUT) :: i_ukca_asad_full_chunk_size(3)
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_debug_asad
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_intdd
 LOGICAL, OPTIONAL, INTENT(OUT) :: l_ukca_ddepo3_ocean
@@ -1542,6 +1546,8 @@ IF (PRESENT(l_ukca_asad_columns))                                              &
   l_ukca_asad_columns = ukca_config%l_ukca_asad_columns
 IF (PRESENT(l_ukca_asad_full))                                                 &
   l_ukca_asad_full = ukca_config%l_ukca_asad_full
+IF (PRESENT(i_ukca_asad_full_chunk_size))                                      &
+  i_ukca_asad_full_chunk_size(:) = ukca_config%i_ukca_asad_full_chunk_size(:)
 IF (PRESENT(l_ukca_debug_asad))                                                &
   l_ukca_debug_asad = ukca_config%l_ukca_debug_asad
 IF (PRESENT(l_ukca_intdd)) l_ukca_intdd = ukca_config%l_ukca_intdd
