@@ -604,18 +604,18 @@ row_length = ukca_config%row_length
 rows = ukca_config%rows
 model_levels = ukca_config%model_levels
 
-! Determine chunk size for full-domain 3D chunking
-full_chunk_x = ukca_config%ukca_chem_full_chunk_size(1)
-full_chunk_y = ukca_config%ukca_chem_full_chunk_size(2)
-full_chunk_z = ukca_config%ukca_chem_full_chunk_size(3)
-IF (full_chunk_x <= 0 .OR. full_chunk_x > row_length) full_chunk_x = row_length
-IF (full_chunk_y <= 0 .OR. full_chunk_y > rows) full_chunk_y = rows
-IF (full_chunk_z <= 0 .OR. full_chunk_z > model_levels)                        &
-  full_chunk_z = model_levels
-
 theta_field_size = row_length * rows
 tot_n_pnts = theta_field_size * model_levels
 IF (ukca_config%l_ukca_asad_full) THEN
+  ! Determine chunk size for full-domain 3D chunking
+  full_chunk_x = ukca_config%ukca_chem_full_chunk_size(1)
+  full_chunk_y = ukca_config%ukca_chem_full_chunk_size(2)
+  full_chunk_z = ukca_config%ukca_chem_full_chunk_size(3)
+  IF (full_chunk_x <= 0 .OR. full_chunk_x > row_length)                        &
+    full_chunk_x = row_length
+  IF (full_chunk_y <= 0 .OR. full_chunk_y > rows) full_chunk_y = rows
+  IF (full_chunk_z <= 0 .OR. full_chunk_z > model_levels)                      &
+    full_chunk_z = model_levels
   n_pnts = full_chunk_x * full_chunk_y * full_chunk_z
 ELSE IF (ukca_config%l_ukca_asad_columns) THEN
   n_pnts = ukca_config%ukca_chem_seg_size

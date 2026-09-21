@@ -277,7 +277,7 @@ END DO
 !$OMP END DO
 !$OMP END PARALLEL
 
-! Store tracer mmr into for use in ASAD chemical solver
+! Store tracer mmr for use in ASAD chemical solver
 zq(:,:,:) = q(:,:,:)/c_h2o
 
 ! Store photolysis rates
