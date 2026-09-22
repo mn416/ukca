@@ -611,11 +611,24 @@ IF (ukca_config%l_ukca_asad_full) THEN
   full_chunk_x = ukca_config%ukca_chem_full_chunk_size(1)
   full_chunk_y = ukca_config%ukca_chem_full_chunk_size(2)
   full_chunk_z = ukca_config%ukca_chem_full_chunk_size(3)
-  IF (full_chunk_x <= 0 .OR. full_chunk_x > row_length)                        &
+  IF (full_chunk_x <= 0 .OR. full_chunk_x > row_length) THEN
+    WRITE(umMessage,'(A,I0)')                                                  &
+      'Setting chemistry chunk row length to ', row_length
+    CALL umPrint(umMessage,src=RoutineName)
     full_chunk_x = row_length
-  IF (full_chunk_y <= 0 .OR. full_chunk_y > rows) full_chunk_y = rows
-  IF (full_chunk_z <= 0 .OR. full_chunk_z > model_levels)                      &
+  END IF
+  IF (full_chunk_y <= 0 .OR. full_chunk_y > rows) THEN
+    WRITE(umMessage,'(A,I0)')                                                  &
+      'Setting chemistry rows-per-chunk to ', rows
+    CALL umPrint(umMessage,src=RoutineName)
+    full_chunk_y = rows
+  END IF
+  IF (full_chunk_z <= 0 .OR. full_chunk_z > model_levels) THEN
+    WRITE(umMessage,'(A,I0)')                                                  &
+      'Setting chemistry levels-per-chunk to ', model_levels
+    CALL umPrint(umMessage,src=RoutineName)
     full_chunk_z = model_levels
+  END IF
   n_pnts = full_chunk_x * full_chunk_y * full_chunk_z
 ELSE IF (ukca_config%l_ukca_asad_columns) THEN
   n_pnts = ukca_config%ukca_chem_seg_size
