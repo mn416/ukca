@@ -843,8 +843,9 @@ IF (ukca_config%i_ukca_chem /= i_ukca_chem_off) THEN
   ! Full-domain-based run configuration
   IF (ukca_config%l_ukca_asad_full) THEN
     ukca_config%ukca_chem_full_chunk_size(:) = [-1, -1, -1]
-    IF (PRESENT(ukca_chem_full_chunk_size))                                    &
+    IF (PRESENT(ukca_chem_full_chunk_size)) THEN
       ukca_config%ukca_chem_full_chunk_size(:) = ukca_chem_full_chunk_size(:)
+    END IF
   END IF
 
   ! Configuration specific to explicit B-E Offline Oxidants scheme
