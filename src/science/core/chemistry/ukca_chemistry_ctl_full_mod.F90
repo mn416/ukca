@@ -608,56 +608,70 @@ DO jspf = 1, jpcspf
 
   IF (n_ch4 > 0) THEN
     IF (specf(jspf) == advt(n_ch4)) THEN
+      !$stomp exclusive
       atm_ch4_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *                &
                              volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! CO
   IF (n_co > 0) THEN
     IF (specf(jspf) == advt(n_co)) THEN
+      !$stomp exclusive
       atm_co_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *                 &
                             volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! N2O
   IF (n_n2o > 0) THEN
     IF (specf(jspf) == advt(n_n2o)) THEN
+      !$stomp exclusive
       atm_n2o_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *                &
                              volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! CFC-12
   IF (n_cf2cl2 > 0) THEN
     IF (specf(jspf) == advt(n_cf2cl2)) THEN
+      !$stomp exclusive
       atm_cf2cl2_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *             &
                                 volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! CFC-11
   IF (n_cfcl3 > 0) THEN
     IF (specf(jspf) == advt(n_cfcl3)) THEN
+      !$stomp exclusive
       atm_cfcl3_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *              &
                                volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! CH3Br
   IF (n_mebr > 0) THEN
     IF (specf(jspf) == advt(n_mebr)) THEN
+      !$stomp exclusive
       atm_mebr_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *               &
                               volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
   ! H2
   IF (n_h2 > 0) THEN
     IF (specf(jspf) == advt(n_h2)) THEN
+      !$stomp exclusive
       atm_h2_mol(:,:,:) = zftr(:,:,:,jspf) * full_tnd(:,:,:) *                 &
                             volume(:,:,:) * 1.0e6/avogadro
+      !$stomp end exclusive
     END IF
   END IF
 
