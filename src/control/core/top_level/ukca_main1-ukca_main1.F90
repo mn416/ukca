@@ -169,8 +169,8 @@ USE ukca_um_legacy_mod, ONLY:                                                  &
 
 USE ukca_humidity_mod,      ONLY: ukca_vmrsat_liq, ukca_vmr_clear_sky
 
-USE asad_mod,               ONLY: nnaf, interval, advt, jpctr, jpspec, jpdd,   &
-                                  jpdw, jppj
+USE asad_mod,               ONLY: nnaf, advt, jpctr, jpspec, jpdd,             &
+                                  jpdw, jppj, s=>asad_state
 
 USE ukca_tracer_vars,       ONLY: trmol_post_chem
 USE ukca_cspecies,          ONLY: c_species, c_na_species, n_bro, n_h2o,       &
@@ -941,21 +941,21 @@ IF (l_first_call) THEN
                      * 0.01 ! revert from m^-2 to cm^2/cm^3
     END IF
 
-    ! Check that solver interval has been set correctly in ukca_init
+    ! Check that solver s%interval has been set correctly in ukca_init
     ! This is not relevant if running without chem i.e. Age-of-air mode
 
     icode = 0
     IF (ukca_config%ukca_int_method == int_method_nr .OR.                      &
         ukca_config%ukca_int_method == int_method_be_explicit) THEN
-      ! interval can be greater than 1 for BE explicit and N-R solvers
-      IF (interval == imdi) icode = 101
+      ! s%interval can be greater than 1 for BE explicit and N-R solvers
+      IF (s%interval == imdi) icode = 101
     ELSE
-      ! only allowed to use interval = 1 for other solvers
-      IF (interval == imdi .OR. interval /= 1) icode = 102
+      ! only allowed to use s%interval = 1 for other solvers
+      IF (s%interval == imdi .OR. s%interval /= 1) icode = 102
     END IF
     IF (icode > 0) THEN
-      cmessage = 'Error for solver interval'
-      WRITE(umMessage,'(A40,A12,I6)') cmessage,' Interval: ',interval
+      cmessage = 'Error for solver s%interval'
+      WRITE(umMessage,'(A40,A12,I6)') cmessage,' Interval: ',s%interval
       CALL umPrint(umMessage,src=RoutineName)
       CALL ereport(RoutineName, icode, cmessage)
     END IF
@@ -970,11 +970,11 @@ END IF
 
 ! decide whether to do chemistry and/or aerosol
 IF ( ukca_config%l_ukca_chem ) THEN
-  do_chemistry = (MOD(timestep_number, interval) == 0)
+  do_chemistry = (MOD(timestep_number, s%interval) == 0)
   do_aerosol = (do_chemistry .AND. ukca_config%l_ukca_mode)
 ELSE
   do_chemistry = .FALSE.
-  do_aerosol = ((MOD(timestep_number, interval) == 0) .AND.                    &
+  do_aerosol = ((MOD(timestep_number, s%interval) == 0) .AND.                  &
                  ukca_config%l_ukca_mode)
 END IF
 

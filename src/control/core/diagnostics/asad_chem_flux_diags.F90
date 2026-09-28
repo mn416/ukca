@@ -33,12 +33,11 @@ USE ukca_um_legacy_mod, ONLY: modl_b, isec_b, item_b, iopl_d,                  &
                               st_levels_model_theta, st_levels_single,         &
                               submodel_for_sm, atmos_im, mype
 USE asad_flux_dat,    ONLY: asad_chemical_fluxes, stashcode_ukca_chem_diag
-USE asad_mod,         ONLY: advt, dpd, dpw, fpsc1, fpsc2,                      &
-                            jpspb, jpsph, jpspj, jpspt,                        &
-                            ldepd, ldepw,                                      &
-                            nbrkx, nhrkx, nprkx, ntrkx, prk,                   &
-                            spb, speci, sph, spj, spt, y,                      &
-                            jpspec, jpbk, jptk, jppj, jphk, jpnr, jpctr
+USE asad_mod,         ONLY: advt, jpspb, jpsph, jpspj, jpspt,                  &
+                            ldepd, ldepw, nbrkx, nhrkx, nprkx,                 &
+                            ntrkx, spb, speci, sph, spj,                       &
+                            spt, jpspec, jpbk, jptk, jppj,                     &
+                            jphk, jpnr, jpctr, s=>asad_state
 USE ukca_tropopause,  ONLY: L_stratosphere
 USE ukca_cspecies,    ONLY: c_species
 USE parkind1,         ONLY: jprb, jpim
@@ -107,7 +106,7 @@ PUBLIC :: asad_lightning_diagnostics
 
 TYPE :: chemdiag
   INTEGER :: location          ! location of reaction in
-                               ! y/rk/prk/em_field/dpd/dpw array
+                               ! s%y/rk/s%prk/em_field/s%dpd/dpw array
   INTEGER :: stash_number      ! Stash number
   INTEGER :: find_rxn_loc      ! Reaction location
   INTEGER :: num_reactants     ! No of reactants

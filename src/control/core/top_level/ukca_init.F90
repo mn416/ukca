@@ -34,8 +34,7 @@ CONTAINS
 SUBROUTINE ukca_init
 
 USE ukca_constants,        ONLY: isec_per_day, isec_per_hour
-USE asad_mod,              ONLY: cdt, cdt_diag, interval,                      &
-                                 ncsteps, ncsteps_factor, tslimit
+USE asad_mod,              ONLY: tslimit, s=>asad_state
 
 USE ukca_config_specification_mod, ONLY:                                       &
                                  ukca_config, glomap_config,                   &
@@ -141,50 +140,50 @@ IF ( ukca_config%i_ukca_chem == i_ukca_chem_off ) THEN
 
   IF (ukca_config%l_ukca_mode) THEN
     ! No UKCA chemistry - dust only
-    interval = ukca_config%chem_timestep/timestep
-    cdt = REAL(ukca_config%chem_timestep)
+    s%interval = ukca_config%chem_timestep/timestep
+    s%cdt = REAL(ukca_config%chem_timestep)
   ELSE
     ! No UKCA chemistry
-    interval = 1
-    cdt = REAL(timestep)
+    s%interval = 1
+    s%cdt = REAL(timestep)
   END IF
-  cdt_diag = cdt
-  ncsteps = 1
-  ncsteps_factor = 1
+  s%cdt_diag = s%cdt
+  s%ncsteps = 1
+  s%ncsteps_factor = 1
 
 ELSE IF (ukca_config%ukca_int_method == int_method_nr) THEN
 
   ! Newton-Raphson solver
-  interval = ukca_config%chem_timestep/timestep
+  s%interval = ukca_config%chem_timestep/timestep
   ! Half the ASAD chemistry timestep as many times as are requested by the
   ! i_chem_timestep_halvings parameter
-  ncsteps_factor = 2 ** ukca_config%i_chem_timestep_halvings
-  ncsteps = ncsteps_factor
-  cdt_diag = REAL(ukca_config%chem_timestep)
-  cdt = cdt_diag / REAL(ncsteps_factor)
+  s%ncsteps_factor = 2 ** ukca_config%i_chem_timestep_halvings
+  s%ncsteps = s%ncsteps_factor
+  s%cdt_diag = REAL(ukca_config%chem_timestep)
+  s%cdt = s%cdt_diag / REAL(s%ncsteps_factor)
 
 ELSE IF (ukca_config%ukca_int_method == int_method_impact) THEN
 
   ! IMPACT solver use about 15 or 10 minutes, depending on dynamical timestep
   IF (timestep < tslimit) THEN
-    ncsteps_factor = 1
+    s%ncsteps_factor = 1
   ELSE
-    ncsteps_factor = 2
+    s%ncsteps_factor = 2
   END IF
-  interval = 1
-  ncsteps = ncsteps_factor
-  cdt = REAL(timestep) / REAL(ncsteps_factor)
-  cdt_diag = cdt
+  s%interval = 1
+  s%ncsteps = s%ncsteps_factor
+  s%cdt = REAL(timestep) / REAL(s%ncsteps_factor)
+  s%cdt_diag = s%cdt
 
 ELSE IF (ukca_config%ukca_int_method == int_method_be_explicit) THEN
 
   ! Explicit Backward-Euler solver
-  ! solver interval derived from namelist value of chemical timestep
-  interval = ukca_config%chem_timestep/timestep
-  cdt = REAL(ukca_config%chem_timestep)
-  cdt_diag = cdt
-  ncsteps = 1
-  ncsteps_factor = 1
+  ! solver s%interval derived from namelist value of chemical timestep
+  s%interval = ukca_config%chem_timestep/timestep
+  s%cdt = REAL(ukca_config%chem_timestep)
+  s%cdt_diag = s%cdt
+  s%ncsteps = 1
+  s%ncsteps_factor = 1
 
 ELSE
 
@@ -197,20 +196,23 @@ ELSE
 END IF
 
 IF (printstatus >= prstatus_oper) THEN
-  WRITE(umMessage,'(A40,I6)') 'Interval for chemical solver set to: ', interval
+  WRITE(umMessage,'(A40,I6)') 'Interval for chemical solver set to: ',         &
+                              s%interval
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A40,E12.4)') 'Timestep for chemical solver set to: ', cdt
+  WRITE(umMessage,'(A40,E12.4)') 'Timestep for chemical solver set to: ', s%cdt
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A40,I6)') 'No. steps for chemical solver set to: ', ncsteps
+  WRITE(umMessage,'(A40,I6)') 'No. steps for chemical solver set to: ',        &
+                              s%ncsteps
   CALL umPrint(umMessage,src='ukca_init')
 END IF
 
-! Verify that the interval and timestep values have been set correctly
-IF (ABS(cdt*ncsteps - REAL(timestep*interval)) > 1e-4) THEN
+! Verify that the s%interval and timestep values have been set correctly
+IF (ABS(s%cdt*ncsteps - REAL(timestep*s%interval)) > 1e-4) THEN
   cmessage=' chemical timestep does not fit dynamical timestep'
   WRITE(umMessage,'(A)') cmessage
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A,I6,A,I6)') ' timestep: ',timestep,' interval: ',interval
+  WRITE(umMessage,'(A,I6,A,I6)') ' timestep: ',timestep,' s%interval: ',       &
+                                 s%interval
   CALL umPrint(umMessage,src='ukca_init')
   errcode = ukca_config%chem_timestep
   CALL ereport('UKCA_INIT',errcode,cmessage)

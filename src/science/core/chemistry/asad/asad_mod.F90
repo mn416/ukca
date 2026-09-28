@@ -67,7 +67,7 @@ TYPE :: asad_state
   REAL, ALLOCATABLE :: ftilde(:,:)
 
   ! interval in timesteps between calls to chemistry
-  !INTEGER :: interval = imdi
+  INTEGER :: interval = imdi
 
   ! Pivot information for solving jacobian
   INTEGER, ALLOCATABLE :: ipa(:,:)
@@ -390,7 +390,6 @@ INTEGER :: nsst           ! No of steady-state species
 INTEGER :: nit0=20        ! ftoy iterations with method=0
 INTEGER :: nfphot
 INTEGER :: method          ! chemistry integration method
-!INTEGER :: interval = imdi ! interval in timesteps between calls to chemistry
 INTEGER :: nnfrp           ! Total number of fractional products
 INTEGER :: nstst           ! No of steady state species
 INTEGER :: nf
