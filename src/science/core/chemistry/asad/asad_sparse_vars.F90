@@ -75,7 +75,7 @@ CONTAINS
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SUBROUTINE setup_spfuljac()
+SUBROUTINE setup_spfuljac(s)
 !
 ! This routine is divided into 4 parts.
 !
@@ -111,7 +111,7 @@ USE asad_mod, ONLY: specf, frpx, jpcspf, jpfrpx, jpmsp,                        &
                     ntrf, ntro3, nzjac1, reorder, spfjsize_max,                &
                     maxterms, maxfterms, nposterms, nnegterms, nfracterms,     &
                     posterms, negterms, fracterms, base_tracer, ffrac,         &
-                    ztabpd, total, s=>asad_state
+                    ztabpd, total, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
@@ -121,6 +121,8 @@ USE errormessagelength_mod, ONLY: errormessagelength
 USE ukca_um_legacy_mod, ONLY: mype
 
 IMPLICIT NONE
+
+TYPE(asad_state_type), INTENT(INOUT) :: s
 
 ! Local variables
 
@@ -450,7 +452,7 @@ END SUBROUTINE setup_spfuljac
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SUBROUTINE spfuljac(n_points, cdt, min_pivot, nonzero_map, spfj)
+SUBROUTINE spfuljac(s, n_points, cdt, min_pivot, nonzero_map, spfj)
 !
 !  Routine to calculate the Jacobian in sparse format
 !
@@ -459,13 +461,14 @@ USE asad_mod, ONLY: ctype, jpcspf, jpfm, jpif, jpmsp,                          &
                     njcoth, nmsjac, nodd, nsjac1, nstst,                       &
                     ntro3, spfjsize_max, nposterms, nnegterms, nfracterms,     &
                     posterms, negterms, fracterms, base_tracer, ffrac,         &
-                    total, s=>asad_state
+                    total, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 REAL, INTENT(IN)    :: cdt
 REAL, INTENT(IN)    :: min_pivot

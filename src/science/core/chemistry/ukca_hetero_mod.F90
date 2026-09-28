@@ -52,7 +52,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='UKCA_HETERO_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_hetero(n_points, have_nat, stratflag)
+SUBROUTINE ukca_hetero(s, n_points, have_nat, stratflag)
 ! Description:
 !
 ! Changed from version by Peter Breasicke to allow for dynamical limitation of
@@ -88,7 +88,7 @@ SUBROUTINE ukca_hetero(n_points, have_nat, stratflag)
 ! These are of the form:-
 
 USE asad_mod,        ONLY: specf, nhrkx, peps, sph, jpcspf,                    &
-                           jphk, s=>asad_state
+                           jphk, asad_state_type
 USE ukca_config_constants_mod,  ONLY: avogadro, boltzmann
 USE ukca_constants,  ONLY: pi, m_clono2, m_hocl, m_brono2, m_hobr, m_n2o5,     &
                            m_h2o, m_hno3
@@ -96,6 +96,7 @@ USE ukca_config_specification_mod, ONLY: ukca_config
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 ! logical to indicate whether natpsc formation is
 ! allowed at this point (based on height above surface)
@@ -428,7 +429,7 @@ WHERE (.NOT. (stratflag)) s%sph2o = 0.0
 ! calculate the amount of hno3 and h2o in the solid phase and return
 ! the residual gas phase concentration
 !
-CALL ukca_pscpres(zt(1:n_points),zp(1:n_points),s%tnd(1:n_points),             &
+CALL ukca_pscpres(s,zt(1:n_points),zp(1:n_points),s%tnd(1:n_points),           &
               zh2o(1:n_points), zhno3(1:n_points), 1, n_points,                &
               n_points, have_nat(1:n_points), s%sph2o(1:n_points))
 
@@ -438,7 +439,7 @@ IF (ih2o  > 0) s%f(:,ih2o)  = zh2o
 ! =====================================================================
 ! =====================================================================
 IF (ukca_config%i_ukca_hetconfig == 0) THEN
-  CALL ukca_calckpsc( s%za(1:n_points), zt(1:n_points),                        &
+  CALL ukca_calckpsc( s, s%za(1:n_points), zt(1:n_points),                     &
                  zh2o(1:n_points), zhcl(1:n_points),                           &
                  zclono2(1:n_points), zn2o5(1:n_points),                       &
                  zhocl(1:n_points),                                            &
@@ -1110,7 +1111,7 @@ END SUBROUTINE ukca_shi_liquid_aerosol
 
 
 ! ######################################################################
-SUBROUTINE ukca_solidphase(n_points)
+SUBROUTINE ukca_solidphase(s, n_points)
 
 ! Description:
 !
@@ -1149,7 +1150,7 @@ SUBROUTINE ukca_solidphase(n_points)
 !---------------------------------------------------------------------
 !
 
-USE asad_mod,    ONLY: specf, jpcspf, s=>asad_state
+USE asad_mod,    ONLY: specf, jpcspf, asad_state_type
 USE ereport_mod, ONLY: ereport
 
 
@@ -1157,6 +1158,7 @@ USE errormessagelength_mod, ONLY: errormessagelength
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 ! local variables
@@ -1206,7 +1208,7 @@ RETURN
 END SUBROUTINE ukca_solidphase
 
 ! ######################################################################
-SUBROUTINE ukca_calckpsc(sasa,t,th2o,thcl,tcnit,tn2o5,thocl,                   &
+SUBROUTINE ukca_calckpsc(s, sasa,t,th2o,thcl,tcnit,tn2o5,thocl,                &
                     akpsc1,akpsc2,akpsc3,akpsc4,akpsc5,                        &
                     lpsa,lphocl,lppsc,lpsimp,                                  &
                     kchmlev,kstart,kend,dt)
@@ -1284,13 +1286,14 @@ SUBROUTINE ukca_calckpsc(sasa,t,th2o,thcl,tcnit,tn2o5,thocl,                   &
 !
 !-----------------------------------------------------------------------
 !
-USE asad_mod,                  ONLY: s=>asad_state
+USE asad_mod,                  ONLY: asad_state_type
 USE ukca_config_constants_mod, ONLY: avogadro, boltzmann
 USE ukca_constants, ONLY: pi
 
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 LOGICAL, INTENT(IN) :: lpsa
 LOGICAL, INTENT(IN) :: lphocl
 LOGICAL, INTENT(IN) :: lppsc
@@ -1907,15 +1910,16 @@ RETURN
 END SUBROUTINE ukca_position
 
 ! ######################################################################
-SUBROUTINE ukca_pscpres(t,p,tnd,th2o,thno3,                                    &
+SUBROUTINE ukca_pscpres(s,t,p,tnd,th2o,thno3,                                  &
                    kstart,kend,kchmlev, have_nat, sph2o)
 
-USE asad_mod,           ONLY: s=>asad_state
+USE asad_mod,           ONLY: asad_state_type
 
 IMPLICIT NONE
 
 ! Subroutine interface
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: kstart
 INTEGER, INTENT(IN) :: kend
 INTEGER, INTENT(IN) :: kchmlev

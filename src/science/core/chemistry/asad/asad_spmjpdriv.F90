@@ -103,9 +103,9 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_SPMJPDRIV_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_spmjpdriv(ix,jy,nlev,n_points)
+SUBROUTINE asad_spmjpdriv(s, ix,jy,nlev,n_points)
 
-USE asad_mod, ONLY: jpcspf, jpspec, nitfg, speci, s=>asad_state
+USE asad_mod, ONLY: jpcspf, jpspec, nitfg, speci, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -123,6 +123,7 @@ USE asad_ftoy_mod, ONLY: asad_ftoy
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points     ! Number of points in chunk
 INTEGER, INTENT(IN) :: ix           ! i counter
 INTEGER, INTENT(IN) :: jy           ! j counter
@@ -178,7 +179,8 @@ END IF
 num_iter = 0
 iter = 1
 DO WHILE (iter <= iredo)
-  CALL asad_spimpmjp(exit_code, ix, jy, nlev, n_points, location, solver_iter)
+  CALL asad_spimpmjp(s, exit_code, ix, jy, nlev, n_points,                     &
+                     location, solver_iter)
   num_iter = num_iter + solver_iter
 
   IF (exit_code == 0) THEN
@@ -241,8 +243,8 @@ DO WHILE (iter <= iredo)
 
     ! Call asad_ftoy with jit = 0 to reinitialise s%y array
     jit = 0
-    CALL asad_ftoy( not_first_call, nitfg, jit, n_points, ix, jy, nlev )
-    CALL asad_diffun( n_points )
+    CALL asad_ftoy( s, not_first_call, nitfg, jit, n_points, ix, jy, nlev )
+    CALL asad_diffun( s, n_points )
     iter = 1
 
   END IF

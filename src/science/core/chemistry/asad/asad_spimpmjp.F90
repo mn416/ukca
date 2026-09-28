@@ -123,14 +123,15 @@ CONTAINS
 
 ! *********************************************************************
 
-SUBROUTINE forward_euler(n_points, f, f_initial, f_min, nonzero_map, spfj)
+SUBROUTINE forward_euler(s, n_points, f, f_initial, f_min, nonzero_map, spfj)
 
-USE asad_mod,            ONLY: jpcspf, spfjsize_max, s=>asad_state
+USE asad_mod,            ONLY: jpcspf, spfjsize_max, asad_state_type
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
 
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN)  :: n_points
 REAL, INTENT(OUT)    :: f(1:n_points,1:jpcspf)
 REAL, INTENT(IN)     :: f_initial(1:n_points,1:jpcspf)
@@ -167,14 +168,15 @@ END SUBROUTINE forward_euler
 
 ! *********************************************************************
 
-SUBROUTINE calc_residual_error(n_points,residual_error,G_f,f_min)
+SUBROUTINE calc_residual_error(s, n_points,residual_error,G_f,f_min)
 
-USE asad_mod,            ONLY: jpcspf, nlf, s=>asad_state
+USE asad_mod,            ONLY: jpcspf, nlf, asad_state_type
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
 
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 REAL, INTENT(OUT) :: residual_error
 REAL, INTENT(IN) :: G_f(1:n_points,1:jpcspf)
@@ -252,11 +254,11 @@ END SUBROUTINE calc_error_norm
 
 ! *********************************************************************
 
-SUBROUTINE asad_spimpmjp(exit_code, ix, jy, nlev, n_points, location,          &
+SUBROUTINE asad_spimpmjp(s, exit_code, ix, jy, nlev, n_points, location,       &
                          solver_iter)
 
 USE asad_mod,           ONLY: ptol, peps, nitnr, nstst, nonzero_map,           &
-                              jpcspf, nonzero_map_unordered, s=>asad_state
+                              jpcspf, nonzero_map_unordered, asad_state_type
 USE asad_sparse_vars,   ONLY: setup_spfuljac, spfuljac, spresolv2, splinslv2
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE yomhook,            ONLY: lhook, dr_hook
@@ -273,6 +275,7 @@ USE asad_ftoy_mod,      ONLY: asad_ftoy
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 INTEGER, INTENT(IN) :: ix
 INTEGER, INTENT(IN) :: jy
@@ -359,7 +362,7 @@ f_initial = s%f
 WHERE (s%f<f_min) s%f = f_min
 
 ! Call ASAD_STEADY at start of step to initialise deriv properly
-IF (nstst /= 0)  CALL asad_steady( n_points )
+IF (nstst /= 0)  CALL asad_steady( s, n_points )
 
 ! OMP CRITICAL will only allow one thread through this code at a time,
 ! while the other threads are held until completion.
@@ -368,17 +371,17 @@ IF (first_pass) THEN
   IF (first) THEN
     ! Determine number and positions of nonzero elements in sparse
     ! full Jacobian
-    CALL setup_spfuljac()
+    CALL setup_spfuljac(s)
     first = .FALSE.
   END IF
   first_pass = .FALSE.
 END IF
 !$OMP END CRITICAL (setup_jacobian_init)
 
-CALL spfuljac(n_points,s%cdt,f_min,nonzero_map,s%spfj)
+CALL spfuljac(s, n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
 ! Call forward Euler to make first guess, f_0 for s%f(t=n+1) (next timestep)
-CALL forward_euler(n_points, s%f, f_initial, f_min, nonzero_map, s%spfj)
+CALL forward_euler(s, n_points, s%f, f_initial, f_min, nonzero_map, s%spfj)
 
 ! Start Newton-Raphson loop to generate estimates f_1, f_2, f_3,... for s%f(t=n+1)
 DO iter=1,ukca_config%nrsteps
@@ -387,9 +390,9 @@ DO iter=1,ukca_config%nrsteps
   IF (iter == 1) ifi=nitnr
   ! Asad_ftoy needs iteration count to calculate concentration of total RO2
   ! if l_ro2_perm_chem = TRUE
-  CALL asad_ftoy(not_first_call, ifi, iter, n_points, ix, jy, nlev)
+  CALL asad_ftoy(s, not_first_call, ifi, iter, n_points, ix, jy, nlev)
 
-  IF (nstst /= 0 .AND. ifi ==0) CALL asad_steady( n_points )
+  IF (nstst /= 0 .AND. ifi ==0) CALL asad_steady( s, n_points )
 
   IF (s%ltrig .AND. printstatus >= prstatus_oper) THEN
     DO jl=1,n_points
@@ -408,7 +411,7 @@ DO iter=1,ukca_config%nrsteps
     END DO
   END IF
 
-  CALL asad_diffun( n_points ) ! calculates s%fdot
+  CALL asad_diffun( s, n_points ) ! calculates s%fdot
 
   IF (error_norm < RelTol_error) THEN
     exit_code = 0           ! Successful exit
@@ -426,7 +429,7 @@ DO iter=1,ukca_config%nrsteps
   G_f = (s%f - f_initial)*deltt - s%fdot
 
   ! Calculate residual error (the relative magnitude of G_f)
-  CALL calc_residual_error(n_points,residual_error,G_f,f_min)
+  CALL calc_residual_error(s, n_points,residual_error,G_f,f_min)
   IF (residual_error < RelTol_residual_error) THEN
     exit_code = 0 ! Successful exit
     solver_iter = iter
@@ -447,7 +450,7 @@ DO iter=1,ukca_config%nrsteps
     GO TO 9999
   END IF
 
-  CALL spfuljac(n_points,s%cdt,f_min,nonzero_map,s%spfj)
+  CALL spfuljac(s,n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     WRITE(umMessage,"('Iteration ',i4)") iter
@@ -488,7 +491,7 @@ DO iter=1,ukca_config%nrsteps
       WRITE(umMessage,cmessage2) 'f_incr',(f_incr(jl,jtr),jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
     END DO
-    CALL asad_fuljac(n_points)
+    CALL asad_fuljac(s, n_points)
     WRITE(umMessage,"('Iteration ',i4)") iter
     CALL umPrint(umMessage,src='asad_spimpmjp')
     DO jl=1,n_points
@@ -550,9 +553,9 @@ DO iter=1,ukca_config%nrsteps
     IF ((iter >= ukca_config%i_ukca_quasinewton_start) .AND.                   &
         (iter <= ukca_config%i_ukca_quasinewton_end)) THEN
 
-      CALL asad_ftoy(not_first_call,ifi, iter, n_points, ix, jy, nlev)
-      CALL asad_steady(n_points)
-      CALL asad_diffun(n_points) ! updates s%fdot
+      CALL asad_ftoy(s, not_first_call,ifi, iter, n_points, ix, jy, nlev)
+      CALL asad_steady(s, n_points)
+      CALL asad_diffun(s, n_points) ! updates s%fdot
 
       G_f_old = G_f
       G_f     = (s%f - f_initial)*deltt - s%fdot

@@ -88,17 +88,18 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_JAC_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_jac(n_points)
+SUBROUTINE asad_jac(s, n_points)
 
 USE asad_mod, ONLY: ctype, jpcspf, jpif, jpfm, jpmsp,                          &
                     jpnr, jpspec, madvtr, moffam, ndepd,                       &
                     ndepw, njacx1, njacx2, njacx3, njcgrp,                     &
                     nltr3, nltrf, nmpjac, nodd, npjac1,                        &
-                    nspi, ntr3, ntrf, peps, s=>asad_state
+                    nspi, ntr3, ntrf, peps, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 !       Local variables

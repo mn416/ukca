@@ -53,14 +53,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_BEDRIV_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_bedriv(nslon,nslat, n_points, nlev)
+SUBROUTINE asad_bedriv(s, nslon,nslat, n_points, nlev)
 
 USE asad_mod,        ONLY: ctype, frpx, jpif, jpmsp, jpna,                     &
                            jpnr, jpsp, jpoo, ldepd, ldepw,                     &
                            nfrpx, nnfrp, nprkx, nspi, nstst,                   &
                            ntabfp, ntrkx, nuni, speci, spj,                    &
                            spt, jpspec, jpcspf, jptk, jppj,                    &
-                           s=>asad_state
+                           asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
@@ -76,6 +76,7 @@ IMPLICIT NONE
 
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 INTEGER, INTENT(IN) :: nlev        ! Model level
 INTEGER, INTENT(IN) :: nslon
@@ -368,9 +369,9 @@ END IF  ! End of initialization
 ! Assign sensible values to species array s%y
 iter  = 1
 jit   = 0 ! Current iteration No. 0: initialising s%y
-CALL asad_ftoy(not_first_call, iter, jit, n_points, nslon, nslat, nlev)
+CALL asad_ftoy(s, not_first_call, iter, jit, n_points, nslon, nslat, nlev)
 IF (nstst  /=  0) THEN
-  CALL asad_steady( n_points )
+  CALL asad_steady( s, n_points )
 END IF
 
 ! Save previous state of species array

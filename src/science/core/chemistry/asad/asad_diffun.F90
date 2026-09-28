@@ -72,15 +72,16 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_DIFFUN_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_diffun( kl )
+SUBROUTINE asad_diffun( s, kl )
 
 USE asad_mod,               ONLY: nodd, moffam, madvtr, nf, nlf,               &
-                                  jpcspf, s=>asad_state
+                                  jpcspf, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE asad_prls_mod, ONLY: asad_prls
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: kl      ! No of spatial points
 
 !       Local variables
@@ -116,7 +117,7 @@ END DO
 !       2. Calculate production & loss terms of individual species
 !          --------- ---------- - ---- ----- -- ---------- -------
 
-CALL asad_prls( kl, nf, nlf, gdepem )
+CALL asad_prls( s, kl, nf, nlf, gdepem )
 
 !       3. Calculate tendencies
 !          --------- ----------

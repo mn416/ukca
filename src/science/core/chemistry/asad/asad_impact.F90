@@ -89,11 +89,11 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_IMPACT_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_impact(n_points, ix, jy, nlev)
+SUBROUTINE asad_impact(s, n_points, ix, jy, nlev)
 
 USE asad_mod,        ONLY: ctype, jpif, ljacx, madvtr, majors,                 &
                            moffam, nlpdv, nltrim, nitnr, nprkx,                &
-                           nspi, peps, ptol, jpcspf, s=>asad_state
+                           nspi, peps, ptol, jpcspf, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -106,6 +106,7 @@ USE asad_ftoy_mod, ONLY: asad_ftoy
 IMPLICIT NONE
 
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points   ! No of spatial points
 INTEGER, INTENT(IN) :: ix         ! i counter
 INTEGER, INTENT(IN) :: jy         ! j counter
@@ -221,9 +222,9 @@ DO jit = 1, ukca_config%nrsteps
   !         2.2  Work out rates of change and main diagonal of J.
 
   ! Call to asad_ftoy includes iteration count
-  CALL asad_ftoy(not_first_call, ifi, jit, n_points, ix, jy, nlev)
-  CALL asad_diffun( nl )
-  CALL asad_jac(n_points)
+  CALL asad_ftoy(s, not_first_call, ifi, jit, n_points, ix, jy, nlev)
+  CALL asad_diffun( s, nl )
+  CALL asad_jac(s, n_points)
 
   !         2.3  Do the normal Newton-Raphson iteration with
   !              Jacobian approximated to main diagonal.

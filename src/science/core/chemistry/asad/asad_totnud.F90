@@ -40,15 +40,16 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_TOTNUD_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_totnud(n_points)
+SUBROUTINE asad_totnud(s, n_points)
 
-USE asad_mod, ONLY: pmin, s=>asad_state
+USE asad_mod, ONLY: pmin, asad_state_type
 USE ukca_config_constants_mod, ONLY: boltzmann
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 !       Local variables

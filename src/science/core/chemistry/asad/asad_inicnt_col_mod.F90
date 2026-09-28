@@ -47,9 +47,9 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_INICNT_COL_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_inicnt_col( species, y_out, klen, ix, jy )
+SUBROUTINE asad_inicnt_col( s, species, y_out, klen, ix, jy )
 
-USE asad_mod,              ONLY: nlfro2, jpro2, s=>asad_state
+USE asad_mod,              ONLY: nlfro2, jpro2, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_constants,        ONLY: c_oh, c_o3, c_no3, c_ho2
 USE ukca_environment_fields_mod,     ONLY: o3_offline, oh_offline,             &
@@ -61,6 +61,7 @@ USE errormessagelength_mod, ONLY: errormessagelength
 
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: klen      ! No of spatial points
 INTEGER, INTENT(IN) :: ix        ! i counter
 INTEGER, INTENT(IN) :: jy        ! j counter

@@ -89,14 +89,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_CDRIVE_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_cdrive(ftr, pp, pt, pq, co2_1d, cld_f, cld_l,                  &
+SUBROUTINE asad_cdrive(s, ftr, pp, pt, pq, co2_1d, cld_f, cld_l,               &
                        ix, jy, nlev, dryrt, wetrt, rc_het, prt,                &
                        n_points, have_nat, stratflag, H_plus_1d_arr)
 
 USE asad_mod,        ONLY: ctype, jpspec, jpcspf, jppj, jpdd,                  &
                            jpdw, jpif, lvmr, madvtr, method,                   &
                            moffam, ndepd, ndepw, nfphot, nit0,                 &
-                           nitfg, nodd, s=>asad_state
+                           nitfg, nodd, asad_state_type
 USE ukca_hetero_mod, ONLY: ukca_hetero, ukca_solidphase
 USE ukca_config_specification_mod, ONLY: ukca_config
 
@@ -125,6 +125,7 @@ IMPLICIT NONE
 
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s    ! ASAD mutable state
 INTEGER, INTENT(IN) :: n_points              ! No of points
 INTEGER, INTENT(IN) :: ix                    ! i counter
 INTEGER, INTENT(IN) :: jy                    ! j counter
@@ -198,22 +199,22 @@ END DO
 
 !       2.  Calculate total number densities
 
-CALL asad_totnud(n_points)
+CALL asad_totnud(s, n_points)
 
 !       3.  Read model tracer concentrations into working array,
 !           and if necessary, convert vmr to number densities
 
 IF ( lvmr ) THEN
   DO jtr = 1, jpcspf
-    DO jl  = 1, n_points
+    DO jl = 1, n_points
       ftr(jl,jtr) = ftr(jl,jtr) * s%tnd(jl)
-      s%f(jl,jtr)   = ftr(jl,jtr)
+      s%f(jl,jtr) = ftr(jl,jtr)
     END DO
   END DO
 ELSE
   DO jtr = 1, jpcspf
-    DO jl  = 1, n_points
-      s%f(jl,jtr)   = ftr(jl,jtr)
+    DO jl = 1, n_points
+      s%f(jl,jtr) = ftr(jl,jtr)
     END DO
   END DO
 END IF
@@ -221,18 +222,18 @@ END IF
 !       4.  Calculate reaction rate coefficients
 !           --------- -------- ---- ------------
 
-CALL asad_bimol (n_points, stratflag)
-CALL asad_trimol(n_points)
+CALL asad_bimol (s, n_points, stratflag)
+CALL asad_trimol(s, n_points)
 
 ! Calculate aqueous-phase SO2 oxdn. and tropospheric heterogeneous rates
 IF (ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_trophet)              &
-  CALL asad_hetero(n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
+  CALL asad_hetero(s, n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
 
 !       5.  Calculate deposition and emission rates
 !           --------- ---------- --- -------- -----
 
-IF ( ndepw /= 0 ) CALL ukca_wetdep(wetrt, n_points)
-IF ( ndepd /= 0 ) CALL ukca_drydep(nlev, dryrt, n_points)
+IF ( ndepw /= 0 ) CALL ukca_wetdep(s, wetrt, n_points)
+IF ( ndepd /= 0 ) CALL ukca_drydep(s, nlev, dryrt, n_points)
 
 !       6.  Integrate chemistry by chosen method. Otherwise,
 !           simply calculate tendencies due to chemistry
@@ -248,13 +249,12 @@ SELECT CASE (method)
 CASE (0)
 
   !     6.0  Not integrating: just compute tendencies.
-
-  CALL ukca_photol(prt, nl)
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(nl, have_nat, stratflag)
-  CALL asad_ftoy(first_call, nit0, num_iter, nl, ix, jy, nlev)
-  CALL asad_diffun(nl)
+  CALL ukca_photol(s, prt, nl)
+  IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
+  CALL asad_ftoy(s, first_call, nit0, num_iter, nl, ix, jy, nlev)
+  CALL asad_diffun(s, nl)
   IF (ukca_config%l_ukca_het_psc) THEN
-    CALL ukca_solidphase(nl)
+    CALL ukca_solidphase(s, nl)
     CALL asad_posthet()
   END IF
 
@@ -272,14 +272,14 @@ CASE (1)
     ! pass num_iter to asad_ftoy
     num_iter=0
 
-    IF (gphot) CALL ukca_photol(prt, nl)
-    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(nl, have_nat, stratflag)
-    CALL asad_ftoy(gfirst, nitfg, num_iter, nl, ix, jy, nlev)
-    CALL asad_diffun(nl)
-    CALL asad_jac(nl)
-    CALL asad_impact(nl, ix, jy, nlev)
+    IF (gphot) CALL ukca_photol(s, prt, nl)
+    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
+    CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
+    CALL asad_diffun(s, nl)
+    CALL asad_jac(s, nl)
+    CALL asad_impact(s, nl, ix, jy, nlev)
   END DO
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(nl)
+  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
 CASE (3)
 
@@ -294,12 +294,12 @@ CASE (3)
   ! pass num_iter to asad_ftoy
   num_iter=0
 
-  CALL ukca_photol(prt, nl)
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(nl, have_nat, stratflag)
-  CALL asad_ftoy(gfirst, nitfg, num_iter, nl, ix, jy, nlev)
-  CALL asad_diffun(nl)
-  CALL asad_spmjpdriv(ix, jy, nlev, nl)
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(nl)
+  CALL ukca_photol(s, prt, nl)
+  IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
+  CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
+  CALL asad_diffun(s, nl)
+  CALL asad_spmjpdriv(s, ix, jy, nlev, nl)
+  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
 CASE (5)
 
@@ -314,12 +314,12 @@ CASE (5)
     ! pass num_iter to asad_ftoy
     num_iter=0
 
-    IF (gphot) CALL ukca_photol(prt, nl)
-    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(nl, have_nat, stratflag)
-    CALL asad_ftoy(gfirst, nitfg, num_iter, nl, ix, jy, nlev)
-    CALL asad_bedriv(ix, jy, nl, nlev)
+    IF (gphot) CALL ukca_photol(s, prt, nl)
+    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
+    CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
+    CALL asad_bedriv(s, ix, jy, nl, nlev)
   END DO
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(nl)
+  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
 CASE DEFAULT
 

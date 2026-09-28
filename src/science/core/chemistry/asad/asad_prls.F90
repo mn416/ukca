@@ -113,15 +113,16 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_PRLS_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_prls( kl, knspec, kspec, ldepem )
+SUBROUTINE asad_prls( s, kl, knspec, kspec, ldepem )
 
 USE asad_mod,            ONLY: nuni, nspi, ngrp, nprdx1, nprdx2,               &
                                nprdx3, ntabfp, frpx, nldepx, nnfrp,            &
-                               jpspec, jpnr, s=>asad_state
+                               jpspec, jpnr, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: kl
 INTEGER, INTENT(IN) :: knspec
 INTEGER, INTENT(IN) :: kspec(knspec)

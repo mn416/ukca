@@ -67,14 +67,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_STEADY_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_steady( kl )
+SUBROUTINE asad_steady( s, kl )
 
 USE asad_mod,               ONLY: peps, nspi, nssi, nssrt, nssrx,              &
                                   nssri, nsspt, nsspi, nsst, nspo1d,           &
                                   nspo3, nspoh, nspo3p, nsph, nuni,            &
                                   nspho2, nspno, nspn, nss_o3p, nss_o1d,       &
                                   nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss,   &
-                                  s=>asad_state
+                                  asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -83,6 +83,7 @@ IMPLICIT NONE
 
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: kl            ! No. of points
 
 ! Local variables

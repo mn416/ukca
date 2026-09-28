@@ -43,13 +43,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYSELF_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_fyself(n_points)
+SUBROUTINE asad_fyself(s, n_points)
 
-USE asad_mod,        ONLY: nstst, nlstst, nspi, jpnr, s=>asad_state
+USE asad_mod,        ONLY: nstst, nlstst, nspi, jpnr, asad_state_type
 USE parkind1,        ONLY: jprb, jpim
 USE yomhook,         ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points    ! No of spatial points
 
 !       Local variables

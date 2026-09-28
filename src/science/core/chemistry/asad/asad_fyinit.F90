@@ -59,12 +59,12 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYINIT_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_fyinit(ofirst, n_points, ix, jy, nlev)
+SUBROUTINE asad_fyinit(s, ofirst, n_points, ix, jy, nlev)
 
 USE asad_mod,             ONLY: ctype, ilcf, ilct, ilftr, ilss,                &
                                 jpoo, jpcf, jpco, jpif, jpna,                  &
                                 jpsp, madvtr, moffam, nlmajmin, peps,          &
-                                speci, jsro2, jpspec, s=>asad_state
+                                speci, jsro2, jpspec, asad_state_type
 USE ukca_diurnal_oxidant, ONLY: ukca_set_diurnal_ox, ukca_set_diurnal_ox_col
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_environment_fields_mod, ONLY: atmospheric_co2,                        &
@@ -82,6 +82,7 @@ USE asad_inicnt_mod, ONLY: asad_inicnt
 USE asad_inicnt_col_mod, ONLY: asad_inicnt_col
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points   ! No of spatial points
 INTEGER, INTENT(IN) :: ix         ! i counter
 INTEGER, INTENT(IN) :: jy         ! j counter
@@ -293,9 +294,9 @@ IF (ofirst) THEN
   DO j = 1, icf
     js = ilcf(j)
     IF (ukca_config%l_ukca_asad_columns) THEN
-      CALL asad_inicnt_col(speci(js), s%y(1,js), n_points, ix, jy)
+      CALL asad_inicnt_col(s, speci(js), s%y(1,js), n_points, ix, jy)
     ELSE
-      CALL asad_inicnt(speci(js), s%y(1,js), n_points, nlev)
+      CALL asad_inicnt(s, speci(js), s%y(1,js), n_points, nlev)
     END IF
   END DO
 END IF

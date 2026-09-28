@@ -55,14 +55,15 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYFIXR_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_fyfixr(n_points)
+SUBROUTINE asad_fyfixr(s, n_points)
 
 USE asad_mod,       ONLY: nlmajmin, jpif, moffam, madvtr, majors,              &
-                          ctype, s=>asad_state
+                          ctype, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 !       Local variables

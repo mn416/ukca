@@ -50,16 +50,17 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_TRIMOL_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_trimol(n_points)
+SUBROUTINE asad_trimol(s, n_points)
 
 USE asad_mod,        ONLY: at, ntrkx, spt, peps, specf,                        &
-                           jpcspf, jptk, s=>asad_state
+                           jpcspf, jptk, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ukca_um_legacy_mod, ONLY: exp_v, powr_v, oneover_v
 
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 !       Local variables

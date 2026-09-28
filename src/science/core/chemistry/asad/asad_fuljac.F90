@@ -79,19 +79,20 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FULJAC_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_fuljac(n_points)
+SUBROUTINE asad_fuljac(s, n_points)
 
 USE asad_mod,        ONLY: ctype, frpx, jpfm, jpif, jpmsp,                     &
                            madvtr, moffam, ndepd, ndepw, nfrpx,                &
                            njcoth, nltrf, nmzjac, nmsjac, nodd,                &
                            npdfr, nsjac1, nstst, ntabpd, ntrf,                 &
                            ntrho2, ntro3, ntroh, ntrno, nzjac1,                &
-                           ztabpd, jpspec, jpcspf, s=>asad_state
+                           ztabpd, jpspec, jpcspf, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
 ! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 ! Local variables

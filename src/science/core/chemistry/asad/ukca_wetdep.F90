@@ -38,9 +38,9 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_WETDEP_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_wetdep(wetrt,n_points)
+SUBROUTINE ukca_wetdep(s,wetrt,n_points)
 
-USE asad_mod,         ONLY: ndepw, nldepw, jpdw, s=>asad_state
+USE asad_mod,         ONLY: ndepw, nldepw, jpdw, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -48,6 +48,7 @@ USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points                  ! No of spatial
 
 REAL, INTENT(IN) :: wetrt(n_points,jpdw) ! Wet dep rates

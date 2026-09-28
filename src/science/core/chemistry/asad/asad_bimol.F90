@@ -75,10 +75,10 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_BIMOL_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_bimol( n_points, stratflag_opt )
+SUBROUTINE asad_bimol( s, n_points, stratflag_opt )
 
 USE asad_mod,        ONLY: specf, spb, ab, peps, nbrkx,                        &
-                           jpspb, jpcspf, jpbk, s=>asad_state
+                           jpspb, jpcspf, jpbk, asad_state_type
 USE asad_findreaction_mod, ONLY: asad_findreaction
 USE ukca_config_specification_mod, ONLY: ukca_config
 
@@ -90,6 +90,7 @@ USE ereport_mod, ONLY: ereport
 
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 ! optional argument used for masking off the stratosphere
 LOGICAL, INTENT(IN), OPTIONAL :: stratflag_opt(n_points)

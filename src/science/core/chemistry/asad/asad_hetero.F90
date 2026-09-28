@@ -44,14 +44,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_HETERO_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_hetero(n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
+SUBROUTINE asad_hetero(s, n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
 
 USE asad_findreaction_mod, ONLY: asad_findreaction
 USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
                            iho2_h, in2o5_h, iso3_o3, ihso3_o3, ih2o2_oh,       &
                            ihno3_oh, spb, sph, nbrkx, nhrkx,                   &
                            jpspb, jpsph, jpeq, ih_o3_const, jpbk,              &
-                           jphk, jpdw, s=>asad_state
+                           jphk, jpdw, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_chem_offline, ONLY: nwet_constant
 USE ukca_fdiss_constant_mod, ONLY: ukca_fdiss_constant
@@ -70,6 +70,7 @@ USE ukca_fdiss_mod, ONLY: ukca_fdiss
 IMPLICIT NONE
 
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points         ! No of spatial points
 
 REAL, INTENT(IN) :: cld_f(n_points)     ! Cloud fraction

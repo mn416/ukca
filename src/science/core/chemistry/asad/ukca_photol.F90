@@ -37,13 +37,14 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_PHOTOL_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_photol(prt,n_points)
+SUBROUTINE ukca_photol(s,prt,n_points)
 
-USE asad_mod,        ONLY: nprkx, jppj, s=>asad_state
+USE asad_mod,        ONLY: nprkx, jppj, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points         ! No of spatial points
 
 REAL, INTENT(IN) :: prt(n_points,jppj)  ! Photolysis rates

@@ -37,14 +37,15 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_DRYDEP_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_drydep(nlev, dryrt, n_points)
+SUBROUTINE ukca_drydep(s, nlev, dryrt, n_points)
 
-USE asad_mod,       ONLY: ndepd, nldepd, jpdd, s=>asad_state
+USE asad_mod,       ONLY: ndepd, nldepd, jpdd, asad_state_type
 USE ukca_config_specification_mod,ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: nlev                 ! Level number
 INTEGER, INTENT(IN) :: n_points             ! No of spatial poin
 

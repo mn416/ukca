@@ -133,12 +133,12 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FTOY_MOD'
 
 CONTAINS
 
-SUBROUTINE asad_ftoy(ofirst,iter, num_iter, n_points, ix, jy, nlev)
+SUBROUTINE asad_ftoy(s, ofirst,iter, num_iter, n_points, ix, jy, nlev)
 
 USE asad_mod,            ONLY: peps, nstst, jpfm, jpif, jpna,                  &
                                moffam, majors, ilstmin, ilft, nodd,            &
                                nlmajmin, madvtr, nlstst, ctype, ftol,          &
-                               jsro2, nlfro2, jpspec, jpro2, s=>asad_state
+                               jsro2, nlfro2, jpspec, jpro2, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -157,6 +157,7 @@ IMPLICIT NONE
 
 
 
+TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN)    :: n_points  ! No of spatial points
 INTEGER, INTENT(IN)    :: ix        ! i counter
 INTEGER, INTENT(IN)    :: jy        ! j counter
@@ -284,7 +285,7 @@ END IF
 
 !       1.1 Set concentrations/initialise species
 
-CALL asad_fyinit(ofirst,n_points, ix, jy, nlev)
+CALL asad_fyinit(s, ofirst,n_points, ix, jy, nlev)
 
 ! If computing RO2-permutation reactions, update total RO2 concentration
 IF ( ukca_config%l_ukca_ro2_perm ) THEN
@@ -343,13 +344,13 @@ END IF
 !       2.  Calculate self-reacting terms
 !           --------- ------------- -----
 
-IF ( ofirst ) CALL asad_fyself(n_points)
+IF ( ofirst ) CALL asad_fyself(s, n_points)
 
 !       3.  Calculate family members using previous ratios
 !           --------- ------ ------- ----- -------- ------
 
 IF (iter == 0) THEN
-  CALL asad_fyfixr(n_points)
+  CALL asad_fyfixr(s, n_points)
   IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
   RETURN
 END IF
@@ -380,7 +381,7 @@ DO jit = 1, iter
   !             Regardless of whether the user has them turned on or not.
   !             See method above.
 
-  CALL asad_prls( n_points, istmin, ilstmin, gdepem )
+  CALL asad_prls( s, n_points, istmin, ilstmin, gdepem )
 
   !         4.2 Initialise ratios
 
