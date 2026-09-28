@@ -74,9 +74,10 @@ SUBROUTINE ukca_chemistry_ctl_be(                                              &
   )
 
 USE ukca_um_legacy_mod,   ONLY: deposition_from_ukca_chemistry
-USE asad_mod,             ONLY: speci, y, tnd, ndepd, ndepw, advt, prk,        &
-                                nitfg, lvmr, f, jpctr, jpspec,                 &
-                                jpbk, jptk, jphk, jpnr, jpdd, jpdw, nldepd
+USE asad_mod,             ONLY: speci, ndepd, ndepw, advt, nitfg,              &
+                                lvmr, jpctr, jpspec, jpbk, jptk,               &
+                                jphk, jpnr, jpdd, jpdw, nldepd,                &
+                                s=>asad_state
 USE asad_chem_flux_diags, ONLY: asad_chemical_diagnostics,                     &
                                 l_asad_use_chem_diags, l_asad_use_flux_rxns,   &
                                 l_asad_use_wetdep, l_asad_use_drydep
@@ -293,7 +294,7 @@ DO k=1,k_be_top
     zfcloud(:) = 0.0
   END IF
 
-  ! Convert mmr into vmr for tracers and set f array
+  ! Convert mmr into vmr for tracers and set s%f array
   DO js=1,jpctr
     zftr(:,js) = tracer(kcs:kce,js)/c_species(js)
   END DO
@@ -322,10 +323,10 @@ DO k=1,k_be_top
 
   ! Convert tracers to concentration
   DO js=1,jpctr
-    f(:,js) = zftr(:,js) * tnd(:)
+    s%f(:,js) = zftr(:,js) * s%tnd(:)
   END DO
 
-  ! Initialise y array, including the offline oxidants
+  ! Initialise s%y array, including the offline oxidants
   jit = 0
   CALL asad_ftoy(ofirst, nitfg, jit, theta_field_size, ix, jy, k)
 
@@ -337,20 +338,20 @@ DO k=1,k_be_top
            l_asad_use_wetdep .OR. l_asad_use_drydep))
 
   ! Store H2SO4 tracer if it will be updated in MODE using delh2so4_chem
-  IF (uph2so4inaer == 1) ystore(:) = y(:,nn_h2so4)
+  IF (uph2so4inaer == 1) ystore(:) = s%y(:,nn_h2so4)
 
-  CALL ukca_deriv_offline(nr, n_be_calls, theta_field_size, dts, y, zdryrt,    &
+  CALL ukca_deriv_offline(nr, n_be_calls, theta_field_size, dts, s%y, zdryrt,  &
                           zwetrt, so2_wetox_h2o2, so2_wetox_o3, so2_dryox_oh,  &
                           lflux, dflux)
 
   ! Restore H2SO4 tracer as it will be updated in MODE using delh2so4_chem
-  IF (uph2so4inaer == 1) y(:,nn_h2so4) = ystore(:)
+  IF (uph2so4inaer == 1) s%y(:,nn_h2so4) = ystore(:)
 
   ! Retrieve tracer concentrations
   DO j = 1,jpctr
     DO i = 1,jpspec
       IF (advt(j) == speci(i)) THEN
-        tracer(kcs:kce,j) = y(:,i)/tnd(:)*c_species(j)
+        tracer(kcs:kce,j) = s%y(:,i)/s%tnd(:)*c_species(j)
         EXIT
       END IF
     END DO
@@ -360,23 +361,23 @@ DO k=1,k_be_top
   delso2_wet_h2o2(kcs:kce) = so2_wetox_h2o2(:)
   delso2_wet_o3(kcs:kce)   = so2_wetox_o3(:)
   delh2so4_chem(kcs:kce)   = so2_dryox_oh(:)
-  delso2_drydep(kcs:kce)   = zdryrt(:,nn_so2)*y(:,nn_so2)*dts
-  delso2_wetdep(kcs:kce)   = zwetrt(:,nn_so2)*y(:,nn_so2)*dts
+  delso2_drydep(kcs:kce)   = zdryrt(:,nn_so2)*s%y(:,nn_so2)*dts
+  delso2_wetdep(kcs:kce)   = zwetrt(:,nn_so2)*s%y(:,nn_so2)*dts
 
-  ! Fill the prk array from the flux array
+  ! Fill the s%prk array from the flux array
   IF (lflux) THEN
     DO i = 1,jpbk
-      prk(:,ibimol(i)) = dflux(:,i)
+      s%prk(:,ibimol(i)) = dflux(:,i)
     END DO
 
     j = jpbk
     DO i = 1,jptk
-      prk(:,itrimol(i)) = dflux(:,i+j)
+      s%prk(:,itrimol(i)) = dflux(:,i+j)
     END DO
 
     j = jpbk + jptk
     DO i = 1,jphk
-      prk(:,ihetero(i)) = dflux(:,i+j)
+      s%prk(:,ihetero(i)) = dflux(:,i+j)
     END DO
 
     ! 3D flux diagnostics
@@ -411,8 +412,9 @@ USE asad_hetero_mod,     ONLY: asad_hetero
 USE asad_totnud_mod,     ONLY: asad_totnud
 USE asad_trimol_mod,     ONLY: asad_trimol
 USE ukca_chem_defs_mod,  ONLY: ratb_defs, ratt_defs, rath_defs
-USE asad_mod,            ONLY: p, t, wp, spb, spt, sph, nbrkx, ntrkx, nhrkx,   &
-                               rk, jpspb, jpspt, jpsph, jpbk, jptk, jphk
+USE asad_mod,            ONLY: spb, spt, sph, nbrkx, ntrkx,                    &
+                               nhrkx, jpspb, jpspt, jpsph, jpbk,               &
+                               jptk, jphk, s=>asad_state
 USE ukca_missing_data_mod, ONLY: rmdi, imdi
 USE umPrintMgr,          ONLY: umPrint, umMessage
 USE ereport_mod,         ONLY: ereport
@@ -460,9 +462,9 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 ! Copy pressure, temperature and water vapour into module variables
 npnts = theta_field_size
 
-p(1:npnts) = zp(1:npnts)
-t(1:npnts) = zt(1:npnts)
-wp(1:npnts) = zq(1:npnts)
+s%p(1:npnts) = zp(1:npnts)
+s%t(1:npnts) = zt(1:npnts)
+s%wp(1:npnts) = zq(1:npnts)
 
 ! Calculate total number density (tnd)
 
@@ -576,21 +578,21 @@ IF (first) THEN
 
 END IF     ! first
 
-! Fill the backward-Euler rate coefficient array from rk, using the
+! Fill the backward-Euler rate coefficient array from s%rk, using the
 !  addressing arrays
 
 DO i = 1,jpbk
-  rc(:,i) = rk(:,ibimol(i))
+  rc(:,i) = s%rk(:,ibimol(i))
 END DO
 
 j = jpbk
 DO i = 1,jptk
-  rc(:,i+j) = rk(:,itrimol(i))
+  rc(:,i+j) = s%rk(:,itrimol(i))
 END DO
 
 j = jpbk + jptk
 DO i = 1,jphk
-  rc(:,i+j) = rk(:,ihetero(i))
+  rc(:,i+j) = s%rk(:,ihetero(i))
 END DO
 
 IF (first .AND. ANY(ABS(rc - rmdi) < EPSILON(0.0))) THEN

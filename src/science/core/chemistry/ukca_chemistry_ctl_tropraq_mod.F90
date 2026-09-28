@@ -70,10 +70,12 @@ SUBROUTINE ukca_chemistry_ctl_tropraq(                                         &
                 )
 
 USE ukca_um_legacy_mod,   ONLY: rgas => r
-USE asad_mod,             ONLY: advt, jpctr, jpcspf, jpro2, jpdd, jpdw,        &
-                                jpeq, jphk, jppj, jpspec, jpnr, jpspj, jpspt,  &
-                                jptk, ldepd, ldepw, nadvt, nnaf, nprkx, ntrkx, &
-                                speci, sph2o, spj, spt, spro2, ctype, y, nlnaro2
+USE asad_mod,             ONLY: advt, jpctr, jpcspf, jpro2, jpdd,              &
+                                jpdw, jpeq, jphk, jppj, jpspec,                &
+                                jpnr, jpspj, jpspt, jptk, ldepd,               &
+                                ldepw, nadvt, nnaf, nprkx, ntrkx,              &
+                                speci, spj, spt, spro2, ctype,                 &
+                                nlnaro2, s=>asad_state
 USE ukca_config_defs_mod, ONLY: nr_therm, nr_phot
 USE ukca_cspecies,        ONLY: c_species, n_ch4, n_hono2, n_o3,               &
                                 nn_ch4, nn_cl, nn_h2o2, nn_h2so4,              &
@@ -349,9 +351,9 @@ DO k=1,model_levels
   ! Copy water vapour and ice field into 1-D arrays
   IF (ukca_config%l_ukca_het_psc) THEN
     IF (k <= model_levels) THEN
-      sph2o(:) = qcf(kcs:kce)/c_h2o
+      s%sph2o(:) = qcf(kcs:kce)/c_h2o
     ELSE
-      sph2o(:) = 0.0
+      s%sph2o(:) = 0.0
     END IF
   END IF
 

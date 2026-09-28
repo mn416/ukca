@@ -67,9 +67,9 @@ while rest:
   if len(result) == 1: break
   rest = "SUBROUTINE" + result[1]
   result = rest.split("END SUBROUTINE", 1)
-  routines.append(result[0] + "END SUBROUTINE")
+  routines.append(result[0])
   if len(result) == 1: break
-  rest = result[1]
+  rest = "END SUBROUTINE" + result[1]
 
 new_routines = []
 for r in routines:

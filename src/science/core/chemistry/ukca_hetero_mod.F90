@@ -87,9 +87,8 @@ SUBROUTINE ukca_hetero(n_points, have_nat, stratflag)
 ! Declarations:
 ! These are of the form:-
 
-USE asad_mod,        ONLY: specf, cdt_diag, f, nhrkx, p, peps, rk,             &
-                           shno3, sph, sph2o, sphno3, t, tnd, wp, za,          &
-                           fpsc1, sh2o, jpcspf, jphk
+USE asad_mod,        ONLY: specf, nhrkx, peps, sph, jpcspf,                    &
+                           jphk, s=>asad_state
 USE ukca_config_constants_mod,  ONLY: avogadro, boltzmann
 USE ukca_constants,  ONLY: pi, m_clono2, m_hocl, m_brono2, m_hobr, m_n2o5,     &
                            m_h2o, m_hno3
@@ -371,82 +370,82 @@ END IF
 !$OMP END CRITICAL (ukca_hetero_init)
 
 ! pressure in hPa here.
-zp(1:n_points)       = p(1:n_points) / 100.0
-zt(1:n_points)       = t(1:n_points)
+zp(1:n_points)       = s%p(1:n_points) / 100.0
+zt(1:n_points)       = s%t(1:n_points)
 
 ! copy tracers. Make sure they have been found correctly.
 IF (ihno3 > 0) THEN
-  zhno3 = f(:,ihno3)
+  zhno3 = s%f(:,ihno3)
 ELSE
   zhno3 = 0.0
 END IF
 ! if water vapour tracer is not present, use special water
 ! vapour field.
 IF (ih2o > 0) THEN
-  zh2o = f(:,ih2o)
+  zh2o = s%f(:,ih2o)
 ELSE
-  zh2o = wp
+  zh2o = s%wp
 END IF
 IF (ihcl > 0) THEN
-  zhcl = f(:,ihcl)
+  zhcl = s%f(:,ihcl)
 ELSE
   zhcl = 0.0
 END IF
 IF (iclono2 > 0) THEN
-  zclono2 = f(:,iclono2)
+  zclono2 = s%f(:,iclono2)
 ELSE
   zclono2 = 0.0
 END IF
 IF (in2o5 > 0) THEN
-  zn2o5 = f(:,in2o5)
+  zn2o5 = s%f(:,in2o5)
 ELSE
   zn2o5 = 0.0
 END IF
 IF (ihocl > 0) THEN
-  zhocl = f(:,ihocl)
+  zhocl = s%f(:,ihocl)
 ELSE
   zhocl = 0.0
 END IF
 IF (ihobr > 0) THEN
-  zhobr = f(:,ihobr)
+  zhobr = s%f(:,ihobr)
 ELSE
   zhobr = 0.0
 END IF
 IF (ihbr > 0) THEN
-  zhbr = f(:,ihbr)
+  zhbr = s%f(:,ihbr)
 ELSE
   zhbr = 0.0
 END IF
 IF (ibrono2 > 0) THEN
-  zbrono2 = f(:,ibrono2)
+  zbrono2 = s%f(:,ibrono2)
 ELSE
   zbrono2 = 0.0
 END IF
 
 ! Remove tropospheric ice clouds. They would cause model instability!
-WHERE (.NOT. (stratflag)) sph2o = 0.0
+WHERE (.NOT. (stratflag)) s%sph2o = 0.0
 !
 ! calculate the amount of hno3 and h2o in the solid phase and return
 ! the residual gas phase concentration
 !
-CALL ukca_pscpres(zt(1:n_points),zp(1:n_points),tnd(1:n_points),               &
+CALL ukca_pscpres(zt(1:n_points),zp(1:n_points),s%tnd(1:n_points),             &
               zh2o(1:n_points), zhno3(1:n_points), 1, n_points,                &
-              n_points, have_nat(1:n_points), sph2o(1:n_points))
+              n_points, have_nat(1:n_points), s%sph2o(1:n_points))
 
-IF (ihno3 > 0) f(:,ihno3) = zhno3
-IF (ih2o  > 0) f(:,ih2o)  = zh2o
+IF (ihno3 > 0) s%f(:,ihno3) = zhno3
+IF (ih2o  > 0) s%f(:,ih2o)  = zh2o
 
 ! =====================================================================
 ! =====================================================================
 IF (ukca_config%i_ukca_hetconfig == 0) THEN
-  CALL ukca_calckpsc( za(1:n_points), zt(1:n_points),                          &
+  CALL ukca_calckpsc( s%za(1:n_points), zt(1:n_points),                        &
                  zh2o(1:n_points), zhcl(1:n_points),                           &
                  zclono2(1:n_points), zn2o5(1:n_points),                       &
                  zhocl(1:n_points),                                            &
                  psc1(1:n_points), psc2(1:n_points),                           &
                  psc3(1:n_points), psc4(1:n_points),                           &
                  psc5(1:n_points), gpsa, gphocl,                               &
-                 gppsc, gpsimp, n_points, 1, n_points, cdt_diag )
+                 gppsc, gpsimp, n_points, 1, n_points, s%cdt_diag )
   !
   ! divide rates by h2o or hcl as asad treats psc reactions as bimolecular
   !
@@ -467,9 +466,9 @@ IF (ukca_config%i_ukca_hetconfig == 0) THEN
     hk(:,4) = 0.0
   END WHERE
   !
-  ! copy the relevant hk's to rk's
+  ! copy the relevant hk's to s%rk's
   ! Introduce dynamical upper limit. Consider A + B -> C. Throughput through
-  ! reaction rk*[A]*[B]*dt should be less than 0.5*min([A],[B])
+  ! reaction s%rk*[A]*[B]*dt should be less than 0.5*min([A],[B])
   ! Also introduce flexible numbering (allow for reordering of reactions
   ! in rath.d
   ! Olaf Morgenstern  18/10/2004
@@ -477,17 +476,17 @@ IF (ukca_config%i_ukca_hetconfig == 0) THEN
   !
   ! 1. ClONO2 + H2O --> HOCl + HNO3
   IF (n_clono2_h2o > 0) THEN
-    rk(:,n_clono2_h2o) = hk(:,1)
+    s%rk(:,n_clono2_h2o) = hk(:,1)
   END IF
 
   IF (n_clono2_hcl > 0) THEN
     ! 2. ClONO2 + HCl --> Cl2 + HNO3
-    rk(:,n_clono2_hcl) = hk(:,2)
+    s%rk(:,n_clono2_hcl) = hk(:,2)
   END IF
 
   IF (n_hocl_hcl > 0) THEN
     ! 3. HOCl + HCl --> Cl2 + H2O
-    rk(:,n_hocl_hcl) = hk(:,3)
+    s%rk(:,n_hocl_hcl) = hk(:,3)
   END IF
 
   ! Optionally filter N2O5+H2O by stratflag to prevent double-counting.
@@ -495,18 +494,18 @@ IF (ukca_config%i_ukca_hetconfig == 0) THEN
     ! 4. N2O5 + H2O -> 2 HNO3
     IF (ukca_config%l_fix_ukca_n2o5_h2o) THEN
       WHERE (stratflag)
-        rk(:,n_n2o5_h2o) = hk(:,4)
+        s%rk(:,n_n2o5_h2o) = hk(:,4)
       ELSE WHERE
-        rk(:,n_n2o5_h2o) = 0.0
+        s%rk(:,n_n2o5_h2o) = 0.0
       END WHERE
     ELSE
-      rk(:,n_n2o5_h2o) = hk(:,4)
+      s%rk(:,n_n2o5_h2o) = hk(:,4)
     END IF
   END IF
 
   IF (n_n2o5_hcl > 0) THEN
     ! 5. N2O5 + HCl -> ClNO2 + HNO3
-    rk(:,n_n2o5_hcl) = hk(:,5)
+    s%rk(:,n_n2o5_hcl) = hk(:,5)
   END IF
   ! =====================================================================
   ! =====================================================================
@@ -556,7 +555,7 @@ ELSE ! New config
         !              3.1  SIMPLE PSC SCHEME
         IF (gpsimp) THEN
           !         Zero order PSC rates.
-          kpsc(1:n_points, jh) = 4.6e-5 * fpsc1(1:n_points)
+          kpsc(1:n_points, jh) = 4.6e-5 * s%fpsc1(1:n_points)
           !
         ELSE
           !          3.2  CALCULATE SURFACE AREA OF PSC'S
@@ -564,9 +563,9 @@ ELSE ! New config
           !             (rho[g/cm3]*rad[cm]/100[cm/m])
           !           TYPE 1
           psc1sa(1:n_points) = (m_hno3+3.0*m_h2o)*amu*3.0e5 *                  &
-                               shno3(1:n_points)/(rho1*rad1)
+                               s%shno3(1:n_points)/(rho1*rad1)
           !           TYPE 2
-          psc2sa(1:n_points) = m_h2o*amu*3.0e5 * sh2o(1:n_points)/(rho2*rad2)
+          psc2sa(1:n_points) = m_h2o*amu*3.0e5 * s%sh2o(1:n_points)/(rho2*rad2)
           !
           !           Rate on type 1 and 2
           IF (gam1(jh) >= 1.0) THEN  ! reaction uses calculated gamma
@@ -593,10 +592,10 @@ ELSE ! New config
       IF (ukca_config%i_ukca_hetconfig > 0) THEN
         IF ( jh <= 3 .OR. jh == 8) THEN  ! reaction uses calculated gamma
           kpsc(1:n_points ,jh) = kpsc(1:n_points, jh) + c_cf(1:n_points)*      &
-                                 100.0*za(1:n_points) * gam3calc(1:n_points, jh)
+                                 100.0*s%za(1:n_points) * gam3calc(1:n_points, jh)
         ELSE                ! reaction uses constant gamma
           kpsc(1:n_points, jh) = kpsc(1:n_points, jh) + c_cf(1:n_points)*      &
-                                 100.0*za(1:n_points) * gam3(jh)
+                                 100.0*s%za(1:n_points) * gam3(jh)
         END IF
       END IF
 
@@ -614,7 +613,7 @@ ELSE ! New config
     !            ----- --- --- ---
     DO jl = 1, n_points
       zrate=MAX(1.0,                                                           &
-                cdt_diag*(kpsc(jl,1) * zclono2(jl)+                            &
+                s%cdt_diag*(kpsc(jl,1) * zclono2(jl)+                          &
                           kpsc(jl,5) * zn2o5(jl)+                              &
                           kpsc(jl,3) * zhocl(jl)+                              &
                           kpsc(jl,6) * zhobr(jl)+                              &
@@ -634,7 +633,7 @@ ELSE ! New config
     IF ( ukca_config%i_ukca_hetconfig == 2 ) THEN
       DO jl = 1, n_points
         zrate=MAX(1.0,                                                         &
-                  cdt_diag*(kpsc(jl,9)  * zhobr(jl)+                           &
+                  s%cdt_diag*(kpsc(jl,9)  * zhobr(jl)+                         &
                             kpsc(jl,10) * zhocl(jl)+                           &
                             kpsc(jl,11) * zclono2(jl)+                         &
                             kpsc(jl,12) * zbrono2(jl)+                         &
@@ -653,60 +652,60 @@ ELSE ! New config
 
   ! divide rates by h2o/hcl/hbr as asad treats psc reactions as bimolecular
   WHERE ( zhcl > peps )
-    rk(:,n_clono2_hcl) = kpsc(:,1) / zhcl
-    rk(:,n_hocl_hcl) = kpsc(:,3) / zhcl
-    rk(:,n_n2o5_hcl) = kpsc(:,5) / zhcl
-    rk(:,n_hobr_hcl) = kpsc(:,6) / zhcl
-    rk(:,n_brono2_hcl) = kpsc(:,7) / zhcl
+    s%rk(:,n_clono2_hcl) = kpsc(:,1) / zhcl
+    s%rk(:,n_hocl_hcl) = kpsc(:,3) / zhcl
+    s%rk(:,n_n2o5_hcl) = kpsc(:,5) / zhcl
+    s%rk(:,n_hobr_hcl) = kpsc(:,6) / zhcl
+    s%rk(:,n_brono2_hcl) = kpsc(:,7) / zhcl
   ELSE WHERE
-    rk(:,n_clono2_hcl) = 0.0
-    rk(:,n_hocl_hcl) = 0.0
-    rk(:,n_n2o5_hcl) = 0.0
-    rk(:,n_hobr_hcl) = 0.0
-    rk(:,n_brono2_hcl) = 0.0
+    s%rk(:,n_clono2_hcl) = 0.0
+    s%rk(:,n_hocl_hcl) = 0.0
+    s%rk(:,n_n2o5_hcl) = 0.0
+    s%rk(:,n_hobr_hcl) = 0.0
+    s%rk(:,n_brono2_hcl) = 0.0
   END WHERE
 
   WHERE ( zh2o > peps )
-    rk(:,n_clono2_h2o) = kpsc(:,2) / zh2o
-    rk(:,n_brono2_h2o) = kpsc(:,8) / zh2o
+    s%rk(:,n_clono2_h2o) = kpsc(:,2) / zh2o
+    s%rk(:,n_brono2_h2o) = kpsc(:,8) / zh2o
   ELSE WHERE
-    rk(:,n_clono2_h2o) = 0.0
-    rk(:,n_brono2_h2o) = 0.0
+    s%rk(:,n_clono2_h2o) = 0.0
+    s%rk(:,n_brono2_h2o) = 0.0
   END WHERE
 
   ! Optionally filter N2O5+H2O by stratflag to prevent double-counting.
   IF (ukca_config%l_fix_ukca_n2o5_h2o) THEN
     WHERE ( zh2o > peps .AND. stratflag )
-      rk(:,n_n2o5_h2o) = kpsc(:,4) / zh2o
+      s%rk(:,n_n2o5_h2o) = kpsc(:,4) / zh2o
     ELSE WHERE
-      rk(:,n_n2o5_h2o) = 0.0
+      s%rk(:,n_n2o5_h2o) = 0.0
     END WHERE
   ELSE
     WHERE ( zh2o > peps )
-      rk(:,n_n2o5_h2o) = kpsc(:,4) / zh2o
+      s%rk(:,n_n2o5_h2o) = kpsc(:,4) / zh2o
     ELSE WHERE
-      rk(:,n_n2o5_h2o) = 0.0
+      s%rk(:,n_n2o5_h2o) = 0.0
     END WHERE
   END IF
 
   WHERE ( zhbr > peps )
-    rk(:,n_hobr_hbr) = kpsc(:,9) / zhbr
-    rk(:,n_hocl_hbr) = kpsc(:,10) / zhbr
-    rk(:,n_clono2_hbr) = kpsc(:,11) / zhbr
-    rk(:,n_brono2_hbr) = kpsc(:,12) / zhbr
-    rk(:,n_n2o5_hbr) = kpsc(:,13) / zhbr
+    s%rk(:,n_hobr_hbr) = kpsc(:,9) / zhbr
+    s%rk(:,n_hocl_hbr) = kpsc(:,10) / zhbr
+    s%rk(:,n_clono2_hbr) = kpsc(:,11) / zhbr
+    s%rk(:,n_brono2_hbr) = kpsc(:,12) / zhbr
+    s%rk(:,n_n2o5_hbr) = kpsc(:,13) / zhbr
   ELSE WHERE
-    rk(:,n_hobr_hbr) = 0.0
-    rk(:,n_hocl_hbr) = 0.0
-    rk(:,n_clono2_hbr) = 0.0
-    rk(:,n_brono2_hbr) = 0.0
-    rk(:,n_n2o5_hbr) = 0.0
+    s%rk(:,n_hobr_hbr) = 0.0
+    s%rk(:,n_hocl_hbr) = 0.0
+    s%rk(:,n_clono2_hbr) = 0.0
+    s%rk(:,n_brono2_hbr) = 0.0
+    s%rk(:,n_n2o5_hbr) = 0.0
   END WHERE
 END IF
 
 
 ! save the solid phase hno3 to add back after end of the chemistry timestep
-sphno3 = shno3
+s%sphno3 = s%shno3
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -1150,7 +1149,7 @@ SUBROUTINE ukca_solidphase(n_points)
 !---------------------------------------------------------------------
 !
 
-USE asad_mod,    ONLY: f, sphno3, specf, jpcspf
+USE asad_mod,    ONLY: specf, jpcspf, s=>asad_state
 USE ereport_mod, ONLY: ereport
 
 
@@ -1199,8 +1198,8 @@ IF (first_pass) THEN
 END IF
 !$OMP END CRITICAL (ukca_solidphase_init)
 
-f(1:n_points,ihno3) = f(1:n_points,ihno3) +                                    &
-                 sphno3(1:n_points)
+s%f(1:n_points,ihno3) = s%f(1:n_points,ihno3) +                                &
+                 s%sphno3(1:n_points)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -1285,7 +1284,7 @@ SUBROUTINE ukca_calckpsc(sasa,t,th2o,thcl,tcnit,tn2o5,thocl,                   &
 !
 !-----------------------------------------------------------------------
 !
-USE asad_mod,                  ONLY: fpsc1, shno3, sh2o
+USE asad_mod,                  ONLY: s=>asad_state
 USE ukca_config_constants_mod, ONLY: avogadro, boltzmann
 USE ukca_constants, ONLY: pi
 
@@ -1400,9 +1399,9 @@ IF ( lppsc .OR. lpsa ) THEN
     IF (lpsimp) THEN
       !
       !         Zero order PSC rates.
-      akpsc1(kstart:kend)=4.6e-5*fpsc1(kstart:kend)
-      akpsc2(kstart:kend)=4.6e-5*fpsc1(kstart:kend)
-      akpsc3(kstart:kend)=4.6e-5*fpsc1(kstart:kend)
+      akpsc1(kstart:kend)=4.6e-5*s%fpsc1(kstart:kend)
+      akpsc2(kstart:kend)=4.6e-5*s%fpsc1(kstart:kend)
+      akpsc3(kstart:kend)=4.6e-5*s%fpsc1(kstart:kend)
       !
     ELSE
       !
@@ -1410,10 +1409,10 @@ IF ( lppsc .OR. lpsa ) THEN
       !
       !           TYPE 1
       psc1sa(kstart:kend)=                                                     &
-         1.85*63.0*u*3.0e5*shno3(kstart:kend)/(rho1*rad1)
+         1.85*63.0*u*3.0e5*s%shno3(kstart:kend)/(rho1*rad1)
       !           TYPE 2
       psc2sa(kstart:kend)=                                                     &
-              18.0*u*3.0e5*sh2o (kstart:kend)/(rho2*rad2)
+              18.0*u*3.0e5*s%sh2o (kstart:kend)/(rho2*rad2)
       !
       akpsc1(kstart:kend) =                                                    &
         ccnit(kstart:kend)*(psc1sa(kstart:kend)*gam1a +                        &
@@ -1911,7 +1910,7 @@ END SUBROUTINE ukca_position
 SUBROUTINE ukca_pscpres(t,p,tnd,th2o,thno3,                                    &
                    kstart,kend,kchmlev, have_nat, sph2o)
 
-USE asad_mod,           ONLY: shno3, sh2o, fpsc1, fpsc2
+USE asad_mod,           ONLY: s=>asad_state
 
 IMPLICIT NONE
 
@@ -1945,10 +1944,10 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_PSCPRES'
 
 !
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-shno3(kstart:kend) = 0.0
-sh2o (kstart:kend) = 0.0
-fpsc1(kstart:kend) = 0.0
-fpsc2(kstart:kend) = 0.0
+s%shno3(kstart:kend) = 0.0
+s%sh2o (kstart:kend) = 0.0
+s%fpsc1(kstart:kend) = 0.0
+s%fpsc2(kstart:kend) = 0.0
 !
 DO jl=kstart,kend
   !
@@ -1967,24 +1966,24 @@ DO jl=kstart,kend
   !
   ! only perform calculation if considering NAT in this region
   IF (thno3(jl) > zhno3eq .AND. have_nat(jl)) THEN
-    fpsc1(jl) = 1.0
-    shno3(jl) = thno3(jl)-zhno3eq
+    s%fpsc1(jl) = 1.0
+    s%shno3(jl) = thno3(jl)-zhno3eq
     thno3(jl) = zhno3eq
   ELSE
-    fpsc1(jl) = 0.0
+    s%fpsc1(jl) = 0.0
   END IF
   !
   !     Type 2 PSCs
   !
   IF (.TRUE.) THEN
-    ! just sh2o from volume mixing ratio to number density and set
+    ! just s%sh2o from volume mixing ratio to number density and set
     ! FPSC2 flag
     IF (sph2o(jl) > 0.0) THEN
-      sh2o(jl) = sph2o(jl) * tnd(jl)
-      fpsc2(jl) = 1.0
+      s%sh2o(jl) = sph2o(jl) * tnd(jl)
+      s%fpsc2(jl) = 1.0
     ELSE
-      fpsc2(jl) = 0.0
-      sh2o(jl) = 0.0
+      s%fpsc2(jl) = 0.0
+      s%sh2o(jl) = 0.0
     END IF
   ELSE
     ! calculate water ice number density locally
@@ -1995,11 +1994,11 @@ DO jl=kstart,kend
     zh2oeq = zh2oeq*tnd(jl)/(100.0*p(jl))
     !
     IF (th2o(jl) > zh2oeq) THEN
-      fpsc2(jl) = 1.0
-      sh2o(jl) = th2o(jl)-zh2oeq
+      s%fpsc2(jl) = 1.0
+      s%sh2o(jl) = th2o(jl)-zh2oeq
       th2o(jl)  = zh2oeq
     ELSE
-      fpsc2(jl) = 0.0
+      s%fpsc2(jl) = 0.0
     END IF
   END IF
 END DO

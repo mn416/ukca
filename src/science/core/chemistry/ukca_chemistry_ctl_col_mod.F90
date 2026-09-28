@@ -64,13 +64,11 @@ SUBROUTINE ukca_chemistry_ctl_col(                                             &
                 zdryrt, zwetrt, nlev_with_ddep, co2_interactive                &
                 )
 
-USE asad_mod,             ONLY: advt, cdt_diag, ctype,                         &
-                                dpd, dpw, fpsc1, fpsc2,                        &
-                                ihso3_h2o2, ihso3_o3, ih2so4_hv, iso2_oh,      &
-                                iso3_o3, jpctr, jpcspf, jpdd, jpdw, jpnr,      &
-                                jppj, jpro2, jpspec, nadvt, nlnaro2, nprkx,    &
-                                o1d_in_ss, o3p_in_ss, prk, rk,                 &
-                                specf, speci, sph2o, sphno3, spro2, tnd, y, za
+USE asad_mod,             ONLY: advt, ctype, ihso3_h2o2, ihso3_o3, ih2so4_hv,  &
+                                iso2_oh, iso3_o3, jpctr, jpcspf, jpdd,         &
+                                jpdw, jpnr, jppj, jpro2, jpspec,               &
+                                nadvt, nlnaro2, nprkx, o1d_in_ss, o3p_in_ss,   &
+                                specf, speci, spro2, s=>asad_state
 USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_drydep,                             &
                                 l_asad_use_flux_rxns,                          &
@@ -487,21 +485,21 @@ DO i=1,rows
         IF (uph2so4inaer == 1) THEN
           ! H2SO4 will be updated in MODE, so store old value here
           IF (ukca_config%l_fix_ukca_h2so4_ystore) THEN
-            ! primary array passed is zftr, so save this, NOT y
+            ! primary array passed is zftr, so save this, NOT s%y
             ystore(kcs:kce) = zftr(kcs:kce,istore_h2so4)
           ELSE
-            ystore(kcs:kce) = y(1:chunk_size,nn_h2so4)
+            ystore(kcs:kce) = s%y(1:chunk_size,nn_h2so4)
           END IF
         END IF
 
-        ! Initialise za for current chunk, following reallocation
-        za(:)=0.0
-        za(1:chunk_size) = so4_sa(j,i,kcs:kce)
+        ! Initialise s%za for current chunk, following reallocation
+        s%za(:)=0.0
+        s%za(1:chunk_size) = so4_sa(j,i,kcs:kce)
 
-        ! Initialise sph2o for current chunk
-        sph2o(:) = 0.0
+        ! Initialise s%sph2o for current chunk
+        s%sph2o(:) = 0.0
         IF (ukca_config%l_ukca_het_psc) THEN
-          sph2o(1:chunk_size) = qcf(j,i,kcs:kce)/c_h2o
+          s%sph2o(1:chunk_size) = qcf(j,i,kcs:kce)/c_h2o
         END IF
 
         ! Call asad_cdrive with segmented arrays
@@ -522,22 +520,22 @@ DO i=1,rows
                          stratflag(kcs:kce),                                   &
                          H_plus_1d_arr(kcs:kce))
 
-        ! Store the full column values of dpd, dpw, fpsc1,
-        ! fpsc2, prk and y - these are needed later on
+        ! Store the full column values of s%dpd, s%dpw, s%fpsc1,
+        ! s%fpsc2, s%prk and s%y - these are needed later on
         ! for the calculation of 3D flux diagnostics
         ! outside the chunking loop
-        dpd_full(kcs:kce,:)=dpd(1:chunk_size,:)
-        dpw_full(kcs:kce,:)=dpw(1:chunk_size,:)
-        fpsc1_full(kcs:kce)=fpsc1(1:chunk_size)
-        fpsc2_full(kcs:kce)=fpsc2(1:chunk_size)
-        prk_full(kcs:kce,:)=prk(1:chunk_size,:)
-        y_full(kcs:kce,:)=y(1:chunk_size,:)
+        dpd_full(kcs:kce,:)=s%dpd(1:chunk_size,:)
+        dpw_full(kcs:kce,:)=s%dpw(1:chunk_size,:)
+        fpsc1_full(kcs:kce)=s%fpsc1(1:chunk_size)
+        fpsc2_full(kcs:kce)=s%fpsc2(1:chunk_size)
+        prk_full(kcs:kce,:)=s%prk(1:chunk_size,:)
+        y_full(kcs:kce,:)=s%y(1:chunk_size,:)
 
         IF (ukca_config%l_ukca_het_psc) THEN
           ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
-          ! Note that sphno3 is NAT in number density of HNO3.
-          IF (ANY(sphno3(:) > 0.0)) THEN
-            shno3_3d(j,i,kcs:kce) = (sphno3(:)/tnd(:))*c_hono2
+          ! Note that s%sphno3 is NAT in number density of HNO3.
+          IF (ANY(s%sphno3(:) > 0.0)) THEN
+            shno3_3d(j,i,kcs:kce) = (s%sphno3(:)/s%tnd(:))*c_hono2
           ELSE
             shno3_3d(j,i,kcs:kce) = 0.0
           END IF
@@ -546,24 +544,24 @@ DO i=1,rows
         IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
           ! Calculate chemical fluxes for MODE
           IF (ihso3_h2o2 > 0) delSO2_wet_H2O2(j,i,kcs:kce) =                   &
-            delSO2_wet_H2O2(j,i,kcs:kce) + (rk(:,ihso3_h2o2)*                  &
-            y(:,nn_so2)*y(:,nn_h2o2))*cdt_diag
+            delSO2_wet_H2O2(j,i,kcs:kce) + (s%rk(:,ihso3_h2o2)*                &
+            s%y(:,nn_so2)*s%y(:,nn_h2o2))*s%cdt_diag
           IF (ihso3_o3 > 0) delSO2_wet_O3(j,i,kcs:kce) =                       &
-            delSO2_wet_O3(j,i,kcs:kce) + (rk(:,ihso3_o3)*                      &
-            y(:,nn_so2)*y(:,nn_o3))*cdt_diag
+            delSO2_wet_O3(j,i,kcs:kce) + (s%rk(:,ihso3_o3)*                    &
+            s%y(:,nn_so2)*s%y(:,nn_o3))*s%cdt_diag
           IF (iso3_o3 > 0) delSO2_wet_O3(j,i,kcs:kce) =                        &
-            delSO2_wet_O3(j,i,kcs:kce) + (rk(:,iso3_o3)*                       &
-            y(:,nn_so2)*y(:,nn_o3))*cdt_diag
+            delSO2_wet_O3(j,i,kcs:kce) + (s%rk(:,iso3_o3)*                     &
+            s%y(:,nn_so2)*s%y(:,nn_o3))*s%cdt_diag
           ! net H2SO4 production - note that this is affected by
           ! l_fix_ukca_h2so4_ystore above. Y value is concentration
           ! from chemistry prior to zftr being over-written below
           IF (iso2_oh > 0 .AND. ih2so4_hv > 0) THEN
             delh2so4_chem(j,i,kcs:kce) = delh2so4_chem(j,i,kcs:kce) +          &
-             ((rk(:,iso2_oh)*y(:,nn_so2)*y(:,nn_oh)) -                         &
-              (rk(:,ih2so4_hv)*y(:,nn_h2so4)))*cdt_diag
+             ((s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh)) -                   &
+              (s%rk(:,ih2so4_hv)*s%y(:,nn_h2so4)))*s%cdt_diag
           ELSE IF (iso2_oh > 0) THEN
             delh2so4_chem(j,i,kcs:kce) = delh2so4_chem(j,i,kcs:kce) +          &
-              (rk(:,iso2_oh)*y(:,nn_so2)*y(:,nn_oh))*cdt_diag
+              (s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh))*s%cdt_diag
           END IF
 
           IF (uph2so4inaer == 1) THEN
@@ -575,11 +573,11 @@ DO i=1,rows
               ! zftr is already in VMR, so divide by diagnostic chemistry
               ! timestep to give as vmr/s
               delh2so4_chem(j,i,kcs:kce) = (zftr(kcs:kce,istore_h2so4)         &
-                                             - ystore(kcs:kce)) / cdt_diag
-              ! primary array passed is zftr, so copy back to this, NOT y
+                                             - ystore(kcs:kce)) / s%cdt_diag
+              ! primary array passed is zftr, so copy back to this, NOT s%y
               zftr(kcs:kce,istore_h2so4) = ystore(kcs:kce)
             ELSE
-              y(:,nn_h2so4) = ystore(kcs:kce)
+              s%y(:,nn_h2so4) = ystore(kcs:kce)
             END IF
           END IF
         END IF
@@ -623,13 +621,13 @@ DO i=1,rows
         ! O1D mmr
         IF (o1d_in_ss) THEN
           l = name2ntpindex('O(1D)     ')
-          all_ntp(l)%data_3d(j,i,kcs:kce) = ( y(:,nn_o1d)/tnd(:) ) * c_o1d
+          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s%y(:,nn_o1d)/s%tnd(:) ) * c_o1d
         END IF
 
         ! O3P mmr
         IF (o3p_in_ss) THEN
           l = name2ntpindex('O(3P)     ')
-          all_ntp(l)%data_3d(j,i,kcs:kce) = ( y(:,nn_o3p)/tnd(:) ) * c_o3p
+          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s%y(:,nn_o3p)/s%tnd(:) ) * c_o3p
         END IF
 
         ! First copy the concentrations from the zftr array to the
@@ -640,7 +638,7 @@ DO i=1,rows
         DO jspf = 1, jpcspf
           IF (n_ch4 > 0) THEN
             IF (specf(jspf) == advt(n_ch4)) THEN
-              atm_ch4_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*            &
+              atm_ch4_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*          &
                                   volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -648,7 +646,7 @@ DO i=1,rows
           ! CO
           IF (n_co > 0) THEN
             IF (specf(jspf) == advt(n_co)) THEN
-              atm_co_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*             &
+              atm_co_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*           &
                                   volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -656,7 +654,7 @@ DO i=1,rows
           ! N2O
           IF (n_n2o > 0) THEN
             IF (specf(jspf) == advt(n_n2o)) THEN
-              atm_n2o_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*            &
+              atm_n2o_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*          &
                                    volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -664,7 +662,7 @@ DO i=1,rows
           ! CFC-12
           IF (n_cf2cl2 > 0) THEN
             IF (specf(jspf) == advt(n_cf2cl2)) THEN
-              atm_cf2cl2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*         &
+              atm_cf2cl2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*       &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -672,7 +670,7 @@ DO i=1,rows
           ! CFC-11
           IF (n_cfcl3 > 0) THEN
             IF (specf(jspf) == advt(n_cfcl3)) THEN
-              atm_cfcl3_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*          &
+              atm_cfcl3_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*        &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -680,7 +678,7 @@ DO i=1,rows
           ! CH3Br
           IF (n_mebr > 0) THEN
             IF (specf(jspf) == advt(n_mebr)) THEN
-              atm_mebr_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*           &
+              atm_mebr_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*         &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -688,7 +686,7 @@ DO i=1,rows
           ! H2
           IF (n_h2 > 0) THEN
             IF (specf(jspf) == advt(n_h2)) THEN
-              atm_h2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*tnd(:)*             &
+              atm_h2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*           &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -749,13 +747,8 @@ END SUBROUTINE ukca_chemistry_ctl_col
 
 SUBROUTINE ukca_reallocate_asad_arrays(n_pnts)
 
-USE asad_mod, ONLY: prod, slos, pd, co3, deriv, dpd, dpw,                      &
-                     ej, emr, f, fdot, fj, fpsc1, fpsc2,                       &
-                     ftilde, ipa, lati, linfam, method, p,                     &
-                     pmintnd, prk, qa, ratio, rk, sh2o, shno3,                 &
-                     sph2o, sphno3, t, t300, tnd, wp, co2, y,                  &
-                     ydot, za, spfj, spfjsize_max,                             &
-                     jpspec, jpcspf, jpnr
+USE asad_mod, ONLY: method, spfjsize_max, jpspec, jpcspf, jpnr,                &
+                    s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config, int_method_nr
 
 IMPLICIT NONE
@@ -769,110 +762,110 @@ method = ukca_config%ukca_int_method
 ! to which they are initially allocated in ukca_mod.F90)...
 
 IF (method == int_method_NR) THEN ! sparse_vars
-  IF (ALLOCATED(spfj)) DEALLOCATE(spfj)
+  IF (ALLOCATED(s%spfj)) DEALLOCATE(s%spfj)
 END IF
 
-IF (ALLOCATED(za)) DEALLOCATE(za)
-IF (ALLOCATED(ydot)) DEALLOCATE(ydot)
-IF (ALLOCATED(y)) DEALLOCATE(y)
-IF (ALLOCATED(co2)) DEALLOCATE(co2)
-IF (ALLOCATED(wp)) DEALLOCATE(wp)
-IF (ALLOCATED(tnd)) DEALLOCATE(tnd)
-IF (ALLOCATED(t300)) DEALLOCATE(t300)
-IF (ALLOCATED(t)) DEALLOCATE(t)
-IF (ALLOCATED(sphno3)) DEALLOCATE(sphno3)
-IF (ALLOCATED(sph2o)) DEALLOCATE(sph2o)
-IF (ALLOCATED(shno3)) DEALLOCATE(shno3)
-IF (ALLOCATED(sh2o)) DEALLOCATE(sh2o)
-IF (ALLOCATED(rk)) DEALLOCATE(rk)
-IF (ALLOCATED(ratio)) DEALLOCATE(ratio)
-IF (ALLOCATED(qa)) DEALLOCATE(qa)
-IF (ALLOCATED(prk)) DEALLOCATE(prk)
-IF (ALLOCATED(pmintnd)) DEALLOCATE(pmintnd)
-IF (ALLOCATED(p)) DEALLOCATE(p)
-IF (ALLOCATED(linfam)) DEALLOCATE(linfam)
-IF (ALLOCATED(lati)) DEALLOCATE(lati)
-IF (ALLOCATED(ipa)) DEALLOCATE(ipa)
-IF (ALLOCATED(ftilde)) DEALLOCATE(ftilde)
-IF (ALLOCATED(fpsc2)) DEALLOCATE(fpsc2)
-IF (ALLOCATED(fpsc1))  DEALLOCATE(fpsc1)
-IF (ALLOCATED(fj)) DEALLOCATE(fj)
-IF (ALLOCATED(fdot)) DEALLOCATE(fdot)
-IF (ALLOCATED(f)) DEALLOCATE(f)
-IF (ALLOCATED(emr)) DEALLOCATE(emr)
-IF (ALLOCATED(ej)) DEALLOCATE(ej)
-IF (ALLOCATED(dpw)) DEALLOCATE(dpw)
-IF (ALLOCATED(dpd)) DEALLOCATE(dpd)
-IF (ALLOCATED(deriv)) DEALLOCATE(deriv)
-IF (ALLOCATED(co3)) DEALLOCATE(co3)
-IF (ALLOCATED(pd)) DEALLOCATE(pd)
+IF (ALLOCATED(s%za)) DEALLOCATE(s%za)
+IF (ALLOCATED(s%ydot)) DEALLOCATE(s%ydot)
+IF (ALLOCATED(s%y)) DEALLOCATE(s%y)
+IF (ALLOCATED(s%co2)) DEALLOCATE(s%co2)
+IF (ALLOCATED(s%wp)) DEALLOCATE(s%wp)
+IF (ALLOCATED(s%tnd)) DEALLOCATE(s%tnd)
+IF (ALLOCATED(s%t300)) DEALLOCATE(s%t300)
+IF (ALLOCATED(s%t)) DEALLOCATE(s%t)
+IF (ALLOCATED(s%sphno3)) DEALLOCATE(s%sphno3)
+IF (ALLOCATED(s%sph2o)) DEALLOCATE(s%sph2o)
+IF (ALLOCATED(s%shno3)) DEALLOCATE(s%shno3)
+IF (ALLOCATED(s%sh2o)) DEALLOCATE(s%sh2o)
+IF (ALLOCATED(s%rk)) DEALLOCATE(s%rk)
+IF (ALLOCATED(s%ratio)) DEALLOCATE(s%ratio)
+IF (ALLOCATED(s%qa)) DEALLOCATE(s%qa)
+IF (ALLOCATED(s%prk)) DEALLOCATE(s%prk)
+IF (ALLOCATED(s%pmintnd)) DEALLOCATE(s%pmintnd)
+IF (ALLOCATED(s%p)) DEALLOCATE(s%p)
+IF (ALLOCATED(s%linfam)) DEALLOCATE(s%linfam)
+IF (ALLOCATED(s%lati)) DEALLOCATE(s%lati)
+IF (ALLOCATED(s%ipa)) DEALLOCATE(s%ipa)
+IF (ALLOCATED(s%ftilde)) DEALLOCATE(s%ftilde)
+IF (ALLOCATED(s%fpsc2)) DEALLOCATE(s%fpsc2)
+IF (ALLOCATED(s%fpsc1))  DEALLOCATE(s%fpsc1)
+IF (ALLOCATED(s%fj)) DEALLOCATE(s%fj)
+IF (ALLOCATED(s%fdot)) DEALLOCATE(s%fdot)
+IF (ALLOCATED(s%f)) DEALLOCATE(s%f)
+IF (ALLOCATED(s%emr)) DEALLOCATE(s%emr)
+IF (ALLOCATED(s%ej)) DEALLOCATE(s%ej)
+IF (ALLOCATED(s%dpw)) DEALLOCATE(s%dpw)
+IF (ALLOCATED(s%dpd)) DEALLOCATE(s%dpd)
+IF (ALLOCATED(s%deriv)) DEALLOCATE(s%deriv)
+IF (ALLOCATED(s%co3)) DEALLOCATE(s%co3)
+IF (ALLOCATED(s%pd)) DEALLOCATE(s%pd)
 
 !...and re-allocate based on value of n_pnts
-IF (.NOT. ALLOCATED(pd)) ALLOCATE(pd(n_pnts,2*jpspec))
-IF (.NOT. ALLOCATED(co3)) ALLOCATE(co3(n_pnts))
-IF (.NOT. ALLOCATED(deriv)) ALLOCATE(deriv(n_pnts,4,4))
-IF (.NOT. ALLOCATED(dpd)) ALLOCATE(dpd(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(dpw)) ALLOCATE(dpw(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(ej)) ALLOCATE(ej(n_pnts,jpcspf))
-IF (.NOT. ALLOCATED(emr)) ALLOCATE(emr(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(f)) ALLOCATE(f(n_pnts,jpcspf))
-IF (.NOT. ALLOCATED(fdot)) ALLOCATE(fdot(n_pnts,jpcspf))
-IF (.NOT. ALLOCATED(fj)) ALLOCATE(fj(n_pnts,jpcspf,jpcspf))
-IF (.NOT. ALLOCATED(fpsc1)) ALLOCATE(fpsc1(n_pnts))
-IF (.NOT. ALLOCATED(fpsc2)) ALLOCATE(fpsc2(n_pnts))
-IF (.NOT. ALLOCATED(ftilde)) ALLOCATE(ftilde(n_pnts, jpcspf))
-IF (.NOT. ALLOCATED(ipa)) ALLOCATE(ipa(n_pnts,jpcspf))
-IF (.NOT. ALLOCATED(lati)) ALLOCATE(lati(n_pnts))
-IF (.NOT. ALLOCATED(linfam)) ALLOCATE(linfam(n_pnts,0:jpcspf))
-IF (.NOT. ALLOCATED(p)) ALLOCATE(p(n_pnts))
-IF (.NOT. ALLOCATED(pmintnd)) ALLOCATE(pmintnd(n_pnts))
-IF (.NOT. ALLOCATED(prk)) ALLOCATE(prk(n_pnts,jpnr))
-IF (.NOT. ALLOCATED(qa)) ALLOCATE(qa(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(ratio)) ALLOCATE(ratio(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(rk)) ALLOCATE(rk(n_pnts,jpnr))
-IF (.NOT. ALLOCATED(sh2o)) ALLOCATE(sh2o(n_pnts))
-IF (.NOT. ALLOCATED(shno3)) ALLOCATE(shno3(n_pnts))
-IF (.NOT. ALLOCATED(sph2o)) ALLOCATE(sph2o(n_pnts))
-IF (.NOT. ALLOCATED(sphno3)) ALLOCATE(sphno3(n_pnts))
-IF (.NOT. ALLOCATED(t)) ALLOCATE(t(n_pnts))
-IF (.NOT. ALLOCATED(t300)) ALLOCATE(t300(n_pnts))
-IF (.NOT. ALLOCATED(tnd)) ALLOCATE(tnd(n_pnts))
-IF (.NOT. ALLOCATED(wp)) ALLOCATE(wp(n_pnts))
-IF (.NOT. ALLOCATED(co2)) ALLOCATE(co2(n_pnts))
-IF (.NOT. ALLOCATED(y)) ALLOCATE(y(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(ydot)) ALLOCATE(ydot(n_pnts,jpspec))
-IF (.NOT. ALLOCATED(za)) ALLOCATE(za(n_pnts))
+IF (.NOT. ALLOCATED(s%pd)) ALLOCATE(s%pd(n_pnts,2*jpspec))
+IF (.NOT. ALLOCATED(s%co3)) ALLOCATE(s%co3(n_pnts))
+IF (.NOT. ALLOCATED(s%deriv)) ALLOCATE(s%deriv(n_pnts,4,4))
+IF (.NOT. ALLOCATED(s%dpd)) ALLOCATE(s%dpd(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%dpw)) ALLOCATE(s%dpw(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%ej)) ALLOCATE(s%ej(n_pnts,jpcspf))
+IF (.NOT. ALLOCATED(s%emr)) ALLOCATE(s%emr(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%f)) ALLOCATE(s%f(n_pnts,jpcspf))
+IF (.NOT. ALLOCATED(s%fdot)) ALLOCATE(s%fdot(n_pnts,jpcspf))
+IF (.NOT. ALLOCATED(s%fj)) ALLOCATE(s%fj(n_pnts,jpcspf,jpcspf))
+IF (.NOT. ALLOCATED(s%fpsc1)) ALLOCATE(s%fpsc1(n_pnts))
+IF (.NOT. ALLOCATED(s%fpsc2)) ALLOCATE(s%fpsc2(n_pnts))
+IF (.NOT. ALLOCATED(s%ftilde)) ALLOCATE(s%ftilde(n_pnts, jpcspf))
+IF (.NOT. ALLOCATED(s%ipa)) ALLOCATE(s%ipa(n_pnts,jpcspf))
+IF (.NOT. ALLOCATED(s%lati)) ALLOCATE(s%lati(n_pnts))
+IF (.NOT. ALLOCATED(s%linfam)) ALLOCATE(s%linfam(n_pnts,0:jpcspf))
+IF (.NOT. ALLOCATED(s%p)) ALLOCATE(s%p(n_pnts))
+IF (.NOT. ALLOCATED(s%pmintnd)) ALLOCATE(s%pmintnd(n_pnts))
+IF (.NOT. ALLOCATED(s%prk)) ALLOCATE(s%prk(n_pnts,jpnr))
+IF (.NOT. ALLOCATED(s%qa)) ALLOCATE(s%qa(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%ratio)) ALLOCATE(s%ratio(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%rk)) ALLOCATE(s%rk(n_pnts,jpnr))
+IF (.NOT. ALLOCATED(s%sh2o)) ALLOCATE(s%sh2o(n_pnts))
+IF (.NOT. ALLOCATED(s%shno3)) ALLOCATE(s%shno3(n_pnts))
+IF (.NOT. ALLOCATED(s%sph2o)) ALLOCATE(s%sph2o(n_pnts))
+IF (.NOT. ALLOCATED(s%sphno3)) ALLOCATE(s%sphno3(n_pnts))
+IF (.NOT. ALLOCATED(s%t)) ALLOCATE(s%t(n_pnts))
+IF (.NOT. ALLOCATED(s%t300)) ALLOCATE(s%t300(n_pnts))
+IF (.NOT. ALLOCATED(s%tnd)) ALLOCATE(s%tnd(n_pnts))
+IF (.NOT. ALLOCATED(s%wp)) ALLOCATE(s%wp(n_pnts))
+IF (.NOT. ALLOCATED(s%co2)) ALLOCATE(s%co2(n_pnts))
+IF (.NOT. ALLOCATED(s%y)) ALLOCATE(s%y(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%ydot)) ALLOCATE(s%ydot(n_pnts,jpspec))
+IF (.NOT. ALLOCATED(s%za)) ALLOCATE(s%za(n_pnts))
 
 IF (method == int_method_NR) THEN ! sparse vars
-  IF (.NOT. ALLOCATED(spfj)) ALLOCATE(spfj(n_pnts,spfjsize_max))
+  IF (.NOT. ALLOCATED(s%spfj)) ALLOCATE(s%spfj(n_pnts,spfjsize_max))
 END IF
 
-NULLIFY(prod)
-NULLIFY(slos)
-prod => pd(:,1:jpspec)
-slos => pd(:,jpspec+1:2*jpspec)
+NULLIFY(s%prod)
+NULLIFY(s%slos)
+s%prod => s%pd(:,1:jpspec)
+s%slos => s%pd(:,jpspec+1:2*jpspec)
 
 ! (re-)initialise DERIV array to 1.0 before each call to ASAD_CDRIVE
 ! to ensure bit-comparability when changing domain decomposition
-deriv(:,:,:) = 1.0
+s%deriv(:,:,:) = 1.0
 
 !     Clear the species arrays
-f(:,:)      = 0.0
-fdot(:,:)   = 0.0
-ej(:,:)     = 0.0
-linfam(:,:) = .FALSE.
+s%f(:,:)      = 0.0
+s%fdot(:,:)   = 0.0
+s%ej(:,:)     = 0.0
+s%linfam(:,:) = .FALSE.
 
-y(:,:)    = 0.0
-ydot(:,:) = 0.0
-prod(:,:) = 0.0
-slos(:,:) = 0.0
-dpd(:,:)  = 0.0
-dpw(:,:)  = 0.0
-emr(:,:)  = 0.0
+s%y(:,:)    = 0.0
+s%ydot(:,:) = 0.0
+s%prod(:,:) = 0.0
+s%slos(:,:) = 0.0
+s%dpd(:,:)  = 0.0
+s%dpw(:,:)  = 0.0
+s%emr(:,:)  = 0.0
 
 !     Clear the rates and index arrays
-rk(:,:)   = 0.0
-prk(:,:)  = 0.0
+s%rk(:,:)   = 0.0
+s%prk(:,:)  = 0.0
 
 RETURN
 END SUBROUTINE ukca_reallocate_asad_arrays
