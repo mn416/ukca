@@ -207,7 +207,7 @@ IF (printstatus >= prstatus_oper) THEN
 END IF
 
 ! Verify that the s%interval and timestep values have been set correctly
-IF (ABS(s%cdt*ncsteps - REAL(timestep*s%interval)) > 1e-4) THEN
+IF (ABS(s%cdt*s%ncsteps - REAL(timestep*s%interval)) > 1e-4) THEN
   cmessage=' chemical timestep does not fit dynamical timestep'
   WRITE(umMessage,'(A)') cmessage
   CALL umPrint(umMessage,src='ukca_init')

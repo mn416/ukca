@@ -88,6 +88,7 @@ for r in routines:
         else:
             non_state_vars.append(item)
     if state_vars:
+      state_vars.sort(key=len, reverse=True)
       non_state_vars.append("s=>asad_state")
       # Remove state vars from use statement
       def chunk(xs, n):
@@ -108,8 +109,8 @@ for r in routines:
       non_fortran_id_char = r"(^|$|\n|[^a-zA-Z0-9_])"
       asad_var_pattern = non_fortran_id_char + \
                          r"(" + "|".join(state_vars) + r")" + \
-                         non_fortran_id_char
-      r = re.sub(asad_var_pattern, r"\1s%\2\3", r)
+                         "(?=" + non_fortran_id_char + ")"
+      r = re.sub(asad_var_pattern, r"\1s%\2", r)
   new_routines.append(r)
 
 lines = "".join(new_routines).splitlines()

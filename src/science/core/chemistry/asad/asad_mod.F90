@@ -34,7 +34,7 @@ USE ukca_missing_data_mod, ONLY: imdi
 IMPLICIT NONE
 PUBLIC
 
-TYPE :: asad_state
+TYPE :: asad_state_type
   ! chemistry timestep
   REAL :: cdt
 
@@ -95,7 +95,7 @@ TYPE :: asad_state
   REAL, ALLOCATABLE :: p(:)
 
   ! pd[:] = [prod[:], slos[:]]
-  REAL, TARGET, ALLOCATABLE :: pd(:,:)
+  REAL, ALLOCATABLE :: pd(:,:)
 
   REAL, ALLOCATABLE :: pmintnd(:)
   REAL, ALLOCATABLE :: prk(:,:)
@@ -149,7 +149,7 @@ TYPE :: asad_state
   LOGICAL :: firstcall = .TRUE.
 END TYPE
 
-TYPE(asad_state) :: asad_state
+TYPE(asad_state_type), TARGET :: asad_state
 
 INTEGER :: jpctr = 0                 ! No. of transported chemical tracers
 INTEGER :: jpspec = 0                ! No. of chemical species
@@ -669,7 +669,7 @@ IF (.NOT. ALLOCATED(asad_state%ratio))                                         &
 IF (.NOT. ALLOCATED(asad_state%rk)) ALLOCATE(asad_state%rk(n_points,jpnr))
 IF (.NOT. ALLOCATED(asad_state%sh2o)) ALLOCATE(asad_state%sh2o(n_points))
 IF (.NOT. ALLOCATED(asad_state%shno3)) ALLOCATE(asad_state%shno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%sph20)) ALLOCATE(asad_state%sph20(n_points))
+IF (.NOT. ALLOCATED(asad_state%sph2o)) ALLOCATE(asad_state%sph2o(n_points))
 IF (.NOT. ALLOCATED(asad_state%sphno3)) ALLOCATE(asad_state%sphno3(n_points))
 IF (.NOT. ALLOCATED(asad_state%t)) ALLOCATE(asad_state%t(n_points))
 IF (.NOT. ALLOCATED(asad_state%t300)) ALLOCATE(asad_state%t300(n_points))
@@ -758,7 +758,7 @@ IF (.NOT. ALLOCATED(asad_state%ratio))                                         &
 IF (.NOT. ALLOCATED(asad_state%rk)) ALLOCATE(asad_state%rk(n_points,jpnr))
 IF (.NOT. ALLOCATED(asad_state%sh2o)) ALLOCATE(asad_state%sh2o(n_points))
 IF (.NOT. ALLOCATED(asad_state%shno3)) ALLOCATE(asad_state%shno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%sph20)) ALLOCATE(asad_state%sph20(n_points))
+IF (.NOT. ALLOCATED(asad_state%sph2o)) ALLOCATE(asad_state%sph2o(n_points))
 IF (.NOT. ALLOCATED(asad_state%sphno3)) ALLOCATE(asad_state%sphno3(n_points))
 IF (.NOT. ALLOCATED(asad_state%t)) ALLOCATE(asad_state%t(n_points))
 IF (.NOT. ALLOCATED(asad_state%t300)) ALLOCATE(asad_state%t300(n_points))
@@ -808,7 +808,7 @@ asad_state%ratio(:,:)  = 0.0
 asad_state%sh2o(:)     = 0.0
 asad_state%shno3(:)    = 0.0
 asad_state%slos(:,:)   = 0.0
-asad_state%sph20(:)    = 0.0
+asad_state%sph2o(:)    = 0.0
 asad_state%sphno3(:)   = 0.0
 asad_state%t(:)        = 0.0
 asad_state%t300(:)     = 0.0
@@ -856,14 +856,14 @@ END IF
 
 IF (ALLOCATED(asad_state%za)) DEALLOCATE(asad_state%za)
 IF (ALLOCATED(asad_state%ydot)) DEALLOCATE(asad_state%ydot)
-IF (ALLOCATED(asad_state%y)) DEALLOCATE(asad_sate%y)
+IF (ALLOCATED(asad_state%y)) DEALLOCATE(asad_state%y)
 IF (ALLOCATED(asad_state%co2)) DEALLOCATE(asad_state%co2)
 IF (ALLOCATED(asad_state%wp)) DEALLOCATE(asad_state%wp)
 IF (ALLOCATED(asad_state%tnd)) DEALLOCATE(asad_state%tnd)
 IF (ALLOCATED(asad_state%t300)) DEALLOCATE(asad_state%t300)
 IF (ALLOCATED(asad_state%t)) DEALLOCATE(asad_state%t)
 IF (ALLOCATED(asad_state%sphno3)) DEALLOCATE(asad_state%sphno3)
-IF (ALLOCATED(asad_state%sph20)) DEALLOCATE(asad_state%sph20)
+IF (ALLOCATED(asad_state%sph2o)) DEALLOCATE(asad_state%sph2o)
 IF (ALLOCATED(asad_state%shno3)) DEALLOCATE(asad_state%shno3)
 IF (ALLOCATED(asad_state%sh2o)) DEALLOCATE(asad_state%sh2o)
 IF (ALLOCATED(asad_state%rk)) DEALLOCATE(asad_state%rk)

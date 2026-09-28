@@ -1643,7 +1643,7 @@ ELSE
     SELECT CASE (asad_chemdiags(l)%diag_type)
     CASE (cdrxn)
       asad_chemdiags(l)%throughput(:,:,klevel) =                               &
-           RESHAPE(prk(:,asad_chemdiags(l)%location),                          &
+           RESHAPE(s%prk(:,asad_chemdiags(l)%location),                        &
            [row_length,rows])*volume(:,:,klevel)*convfac
       IF (asad_chemdiags(l)%tropospheric_mask) THEN
         WHERE (L_stratosphere(:,:,klevel))
@@ -1657,9 +1657,9 @@ ELSE
              SIZE(asad_chemdiags(l)%throughput(:,:,:),DIM=3)) THEN
            ! if 2D then only take lowest level, otherwise will be 3D
           asad_chemdiags(l)%throughput(:,:,klevel)=                            &
-               RESHAPE(dpd(:,asad_chemdiags(l)%location),                      &
+               RESHAPE(s%dpd(:,asad_chemdiags(l)%location),                    &
                        [row_length,rows])*                                     &
-               RESHAPE(y(:,asad_chemdiags(l)%location),                        &
+               RESHAPE(s%y(:,asad_chemdiags(l)%location),                      &
                        [row_length,rows])*                                     &
                volume(:,:,klevel)*convfac
           IF (asad_chemdiags(l)%tropospheric_mask) THEN
@@ -1671,9 +1671,9 @@ ELSE
         ! Not needed (?)
       CASE (cdwet) ! WET DEP
         asad_chemdiags(l)%throughput(:,:,klevel)=                              &
-             RESHAPE(dpw(:,asad_chemdiags(l)%location),                        &
+             RESHAPE(s%dpw(:,asad_chemdiags(l)%location),                      &
                      [row_length,rows])*                                       &
-             RESHAPE(y(:,asad_chemdiags(l)%location),                          &
+             RESHAPE(s%y(:,asad_chemdiags(l)%location),                        &
                      [row_length,rows])*                                       &
              volume(:,:,klevel)*convfac
         ! Not needed (?)
@@ -2242,7 +2242,7 @@ ELSE
       SELECT CASE (asad_chemdiags(l)%rxn_type)
       CASE (cdpsc_typ1)
         asad_chemdiags(l)%throughput(:,:,klevel) =                             &
-             RESHAPE(fpsc1(:),[row_length,rows])
+             RESHAPE(s%fpsc1(:),[row_length,rows])
         IF (asad_chemdiags(l)%tropospheric_mask) THEN
           WHERE (L_stratosphere(:,:,klevel))
             asad_chemdiags(l)%throughput(:,:,klevel) = 0.0
@@ -2250,7 +2250,7 @@ ELSE
         END IF
       CASE (cdpsc_typ2)
         asad_chemdiags(l)%throughput(:,:,klevel) =                             &
-             RESHAPE(fpsc2(:),[row_length,rows])
+             RESHAPE(s%fpsc2(:),[row_length,rows])
         IF (asad_chemdiags(l)%tropospheric_mask) THEN
           WHERE (L_stratosphere(:,:,klevel))
             asad_chemdiags(l)%throughput(:,:,klevel) = 0.0

@@ -586,12 +586,12 @@ DO jit=1,besteps
         l3 = 1.0 + s%cdt * l1
 
         ! New value for NO3
-        s%y(:,ino3) = (l3 * (s%ydot(:,js) + s%p*cdt) +                         &
+        s%y(:,ino3) = (l3 * (s%ydot(:,js) + s%p*s%cdt) +                       &
                      r1 * s%cdt * s%ydot(:,in2o5)) /                           &
                     (l3 * l2 - r1 * r2 * s%cdt * s%cdt)
 
         ! New value for N2O5
-        s%y(:,in2o5) = (s%ydot(:,in2o5) + r2*s%cdt*y(:,js))/l3
+        s%y(:,in2o5) = (s%ydot(:,in2o5) + r2*s%cdt*s%y(:,js))/l3
 
       END IF    ! distinction between SS and TR species
     END IF      ! exclude N2O5 tracer

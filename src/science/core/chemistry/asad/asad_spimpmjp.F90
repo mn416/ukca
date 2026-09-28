@@ -152,9 +152,9 @@ DO jtr=1,jpcspf
   ip = nonzero_map(jtr,jtr)
   DO jl=1,n_points
     IF (spfj(jl,ip) > 0.0) THEN
-      f(jl,jtr) = f_initial(jl,jtr) + s%cdt*fdot(jl,jtr)
+      f(jl,jtr) = f_initial(jl,jtr) + s%cdt*s%fdot(jl,jtr)
     ELSE
-      f(jl,jtr) = f_initial(jl,jtr) + (s%cdt*fdot(jl,jtr))/                    &
+      f(jl,jtr) = f_initial(jl,jtr) + (s%cdt*s%fdot(jl,jtr))/                  &
                     (1.0-s%cdt*spfj(jl,ip))
     END IF
     IF (f(jl,jtr) < f_min) f(jl,jtr) = f_min
@@ -169,8 +169,7 @@ END SUBROUTINE forward_euler
 
 SUBROUTINE calc_residual_error(n_points,residual_error,G_f,f_min)
 
-USE asad_mod,            ONLY: jpcspf, nlf
-USE asad_mod,            ONLY: prod, slos
+USE asad_mod,            ONLY: jpcspf, nlf, s=>asad_state
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
 
@@ -197,7 +196,7 @@ residual_error = 0.0
 !  by calculating residual_error further down
 DO jtr=1,jpcspf
   j=nlf(jtr)
-  tmprc(1:n_points,jtr) = prod(1:n_points,j) + slos(1:n_points,j)
+  tmprc(1:n_points,jtr) = s%prod(1:n_points,j) + s%slos(1:n_points,j)
 END DO
 
 DO jtr=1,jpcspf
@@ -400,7 +399,7 @@ DO iter=1,ukca_config%nrsteps
         WRITE(umMessage,cmessage1) iter-1,(f_initial(jl,jtr),jtr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
         WRITE(umMessage,cmessage1) iter-1,                                     &
-                      ((f_initial(jl,jtr)+s%cdt*fdot(jl,jtr)),jtr=1,jpcspf)
+                      ((f_initial(jl,jtr)+s%cdt*s%fdot(jl,jtr)),jtr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
       END IF
       WRITE(umMessage,cmessage1) iter-1, (s%f(jl,jtr),jtr=1,jpcspf),           &
@@ -471,7 +470,7 @@ DO iter=1,ukca_config%nrsteps
   END IF
 
   CALL splinslv2(n_points,G_f,f_incr,f_min,f_max,nonzero_map_unordered,        &
-                    s%modified_map,spfj)
+                    s%modified_map,s%spfj)
 
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     DO jl=1,n_points
@@ -565,7 +564,7 @@ DO iter=1,ukca_config%nrsteps
         G_ftmp(jl,:) = G_f(jl,:)*(1.0 - coeff)
       END DO
 
-      CALL spresolv2(n_points,G_ftmp,f_incr,f_min,s%modified_map,spfj,max_val)
+      CALL spresolv2(n_points,G_ftmp,f_incr,f_min,s%modified_map,s%spfj,max_val)
 
       s%f = s%f + f_incr
       ! remove negative values. Does not need to be done in

@@ -195,10 +195,10 @@ DO jtr = 1, jpcspf
     !                an explicit step.
 
     IF ( s%ej(jl,jtr) > 0.0 ) THEN
-      s%f(jl,jtr) = zf(jl,jtr) + s%cdt*fdot(jl,jtr)
+      s%f(jl,jtr) = zf(jl,jtr) + s%cdt*s%fdot(jl,jtr)
     ELSE
-      s%f(jl,jtr) = zf(jl,jtr) + ( s%cdt*fdot(jl,jtr) )                        &
-                       / ( 1.0 - s%cdt*ej(jl,jtr) )
+      s%f(jl,jtr) = zf(jl,jtr) + ( s%cdt*s%fdot(jl,jtr) )                      &
+                       / ( 1.0 - s%cdt*s%ej(jl,jtr) )
     END IF
     IF ( s%linfam(jl,jtr) ) s%f(jl,jtr) = s%y(jl,isp)
 
@@ -232,9 +232,9 @@ DO jit = 1, ukca_config%nrsteps
     isp = majors(jtr)
     DO jl = 1, n_points
       zprf(jl,jtr) = s%f(jl,jtr)
-      binv(jl,jtr) = 1.0 / ( 1.0 - s%cdt*ej(jl,jtr) )
+      binv(jl,jtr) = 1.0 / ( 1.0 - s%cdt*s%ej(jl,jtr) )
       dely(jl,jtr) = binv(jl,jtr) *                                            &
-             ( (zf(jl,jtr) - s%f(jl,jtr)) + s%cdt*fdot(jl,jtr) )
+             ( (zf(jl,jtr) - s%f(jl,jtr)) + s%cdt*s%fdot(jl,jtr) )
       s%f(jl,jtr) = s%f(jl,jtr) + dely(jl,jtr)
 
       IF ( s%linfam(jl,jtr) ) s%f(jl,jtr) = s%y(jl,isp)
