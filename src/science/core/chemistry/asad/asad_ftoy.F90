@@ -135,13 +135,10 @@ CONTAINS
 
 SUBROUTINE asad_ftoy(ofirst,iter, num_iter, n_points, ix, jy, nlev)
 
-USE asad_mod,            ONLY: f, y, prod, slos, ratio, qa,                    &
-                               peps, cdt, pmintnd, nstst,                      &
-                               jpfm, jpif, jpna, moffam,                       &
-                               majors, ilstmin, ilft, nodd,                    &
-                               nlmajmin, madvtr, linfam,                       &
-                               nlstst, ctype, ftol,                            &
-                               jsro2, nlfro2, jpspec, jpro2
+USE asad_mod,            ONLY: peps, nstst, jpfm, jpif, jpna,                  &
+                               moffam, majors, ilstmin, ilft, nodd,            &
+                               nlmajmin, madvtr, nlstst, ctype, ftol,          &
+                               jsro2, nlfro2, jpspec, jpro2, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -227,7 +224,7 @@ imaj = 0
 
 ! initalise reals
 sl = 0.0
-zthresh = 2.0 / cdt
+zthresh = 2.0 / s%cdt
 
 ! initialise arrays
 zy = 0.0
@@ -294,7 +291,7 @@ IF ( ukca_config%l_ukca_ro2_perm ) THEN
 
 
   ! Save previous calculation of total RO2
-  fro2_old(1:n_points) = y(1:n_points, jsro2)
+  fro2_old(1:n_points) = s%y(1:n_points, jsro2)
 
   ! Calculate sum of all RO2 species on current iteration
   fro2(1:n_points)     = 0.0
@@ -303,7 +300,7 @@ IF ( ukca_config%l_ukca_ro2_perm ) THEN
 
     ! Get index location of each RO2 species and sum
     iro2       = nlfro2(j)
-    fro2(1:n_points) = fro2(1:n_points) + f(1:n_points, iro2)
+    fro2(1:n_points) = fro2(1:n_points) + s%f(1:n_points, iro2)
 
   END DO   ! End iteration over RO2 species
 
@@ -322,7 +319,8 @@ IF ( ukca_config%l_ukca_ro2_perm ) THEN
   END IF
 
   ! Calculate the new concentration of RO2
-  y(1:n_points, jsro2) = fro2_old(1:n_points) + damp_ro2*(fro2(1:n_points) - fro2_old(1:n_points))
+  s%y(1:n_points, jsro2) = fro2_old(1:n_points) + damp_ro2*(fro2(1:n_points) - &
+                           fro2_old(1:n_points))
 
 END IF
 
@@ -370,7 +368,8 @@ DO jit = 1, iter
     DO j = 1, nstst
       js = nlstst(j)
       DO jl = 1, n_points
-        IF (ABS(y(jl,js)) < peps .AND. prod(jl,js) > peps ) y(jl,js) = peps
+        IF (ABS(s%y(jl,js)) < peps .AND. s%prod(jl,js) > peps )                &
+          s%y(jl,js) = peps
       END DO
     END DO
   END IF
@@ -388,46 +387,46 @@ DO jit = 1, iter
   DO j = 1, nstst
     js = nlstst(j)
     DO jl = 1, n_points
-      ratio(jl,js) = 0.0
+      s%ratio(jl,js) = 0.0
     END DO
   END DO
 
   !         4.3  Compute species values for species in steady state
   !              (minor members of family, 'SS' and 'FT' species)
-  !              N.B. because of the way asad computes slos, the y
+  !              N.B. because of the way asad computes s%slos, the s%y
   !              value can go slightly negative during the quadratic
   !              due to loss of precision. We forcibly fix it here.
-  !              Also note that we cannot permit y=0.0 during the ftoy
+  !              Also note that we cannot permit s%y=0.0 during the ftoy
   !              iteration because of the need to get 'sl'.
 
   DO j = 1, istmin
     js = ilstmin(j)
     DO jl = 1, n_points
-      IF ( y(jl,js) < peps ) THEN
+      IF ( s%y(jl,js) < peps ) THEN
         sl = 0.0
       ELSE
-        sl = slos(jl,js) / y(jl,js)
+        sl = s%slos(jl,js) / s%y(jl,js)
       END IF
-      IF ( qa(jl,js) > peps ) THEN
-        zb(jl) = sl - qa(jl,js) * y(jl,js)
-        zc(jl) = prod(jl,js)
-        zd(jl) = zb(jl)*zb(jl) + 4.0*qa(jl,js)*zc(jl)
+      IF ( s%qa(jl,js) > peps ) THEN
+        zb(jl) = sl - s%qa(jl,js) * s%y(jl,js)
+        zc(jl) = s%prod(jl,js)
+        zd(jl) = zb(jl)*zb(jl) + 4.0*s%qa(jl,js)*zc(jl)
         IF ( zd(jl) > 0.0 ) THEN
-          y(jl,js) = (zb(jl) - SQRT(zd(jl)))/(-2.0*qa(jl,js))
-          IF ( y(jl,js)  <   0.0 ) y(jl,js) = 10.0*peps
+          s%y(jl,js) = (zb(jl) - SQRT(zd(jl)))/(-2.0*s%qa(jl,js))
+          IF ( s%y(jl,js)  <   0.0 ) s%y(jl,js) = 10.0*peps
         ELSE
-          y(jl,js) = zb(jl) / ( -2.0 * qa(jl,js) )
+          s%y(jl,js) = zb(jl) / ( -2.0 * s%qa(jl,js) )
         END IF
-      ELSE IF (qa(jl,js) <= peps .AND. sl > peps ) THEN
-        y(jl,js) = prod(jl,js) / sl
+      ELSE IF (s%qa(jl,js) <= peps .AND. sl > peps ) THEN
+        s%y(jl,js) = s%prod(jl,js) / sl
       ELSE
-        y(jl,js) = 0.0
+        s%y(jl,js) = 0.0
       END IF
     END DO
   END DO
 
   !         4.4  Now compute ratios for minor species members.
-  !              ** could possibly take out 1/y(imaj) and convert to '*'
+  !              ** could possibly take out 1/s%y(imaj) and convert to '*'
 
   istart = nlmajmin(3)
   iend   = nlmajmin(4)
@@ -438,11 +437,11 @@ DO jit = 1, iter
     imaj = 0
     IF ( ifam /= 0 ) imaj = majors(ifam)
     DO jl = 1, n_points
-      IF ( y(jl,imaj) > peps ) THEN
-        ratio(jl,js)   = y(jl,js) / y(jl,imaj)
-        ratio(jl,imaj) = ratio(jl,imaj) + iodd * ratio(jl,js)
+      IF ( s%y(jl,imaj) > peps ) THEN
+        s%ratio(jl,js)   = s%y(jl,js) / s%y(jl,imaj)
+        s%ratio(jl,imaj) = s%ratio(jl,imaj) + iodd * s%ratio(jl,js)
       ELSE
-        ratio(jl,js) = 0.0
+        s%ratio(jl,js) = 0.0
       END IF
     END DO
   END DO
@@ -459,31 +458,31 @@ DO jit = 1, iter
     imaj = majors(ifam)
     IF ( ofirst .AND. jit == 1 ) THEN
       DO jl = 1, n_points
-        IF ( y(jl,js) > peps ) THEN
-          sl = slos(jl,js) / y(jl,js)
+        IF ( s%y(jl,js) > peps ) THEN
+          sl = s%slos(jl,js) / s%y(jl,js)
         ELSE
           sl = 0.0
         END IF
-        linfam(jl,itr) = sl > zthresh
-        IF ( linfam(jl,itr) ) f(jl,ifam) = f(jl,ifam) + iodd*f(jl,itr)
+        s%linfam(jl,itr) = sl > zthresh
+        IF ( s%linfam(jl,itr) ) s%f(jl,ifam) = s%f(jl,ifam) + iodd*s%f(jl,itr)
       END DO
     END IF
 
     DO jl = 1, n_points
-      IF ( linfam(jl,itr) ) THEN
-        IF ( y(jl,imaj)  >   peps ) THEN
-          ratio(jl,js)   = y(jl,js) / y(jl,imaj)
-          ratio(jl,imaj) = ratio(jl,imaj) + iodd * ratio(jl,js)
+      IF ( s%linfam(jl,itr) ) THEN
+        IF ( s%y(jl,imaj)  >   peps ) THEN
+          s%ratio(jl,js)   = s%y(jl,js) / s%y(jl,imaj)
+          s%ratio(jl,imaj) = s%ratio(jl,imaj) + iodd * s%ratio(jl,js)
         ELSE
-          ratio(jl,js) = 0.0
+          s%ratio(jl,js) = 0.0
         END IF
       ELSE
-        y(jl,js) = f(jl,itr)
+        s%y(jl,js) = s%f(jl,itr)
       END IF
     END DO
   END DO
 
-  !         4.6  Finally compute ratio of major species to family and
+  !         4.6  Finally compute s%ratio of major species to family and
   !              hence set the minor family members.
 
   istart = nlmajmin(1)
@@ -493,8 +492,8 @@ DO jit = 1, iter
     iodd = nodd(js)
     ifam = moffam(js)
     DO jl = 1, n_points
-      ratio(jl,js) = 1.0 / (iodd + ratio(jl,js))
-      y(jl,js)     = f(jl,ifam) * ratio(jl,js)
+      s%ratio(jl,js) = 1.0 / (iodd + s%ratio(jl,js))
+      s%y(jl,js)     = s%f(jl,ifam) * s%ratio(jl,js)
     END DO
   END DO
 
@@ -506,12 +505,12 @@ DO jit = 1, iter
     imaj = majors(ifam)
     IF ( ctype(js) /= jpif ) THEN
       DO jl = 1, n_points
-        y(jl,js) = y(jl,imaj) * ratio(jl,js)
+        s%y(jl,js) = s%y(jl,imaj) * s%ratio(jl,js)
       END DO
     ELSE
       itr = madvtr(js)
       DO jl = 1, n_points
-        IF ( linfam(jl,itr) ) y(jl,js) = y(jl,imaj) * ratio(jl,js)
+        IF ( s%linfam(jl,itr) ) s%y(jl,js) = s%y(jl,imaj) * s%ratio(jl,js)
       END DO
     END IF
   END DO
@@ -522,8 +521,8 @@ DO jit = 1, iter
   DO j = 1,nstst
     js = nlstst(j)
     DO jl = 1, n_points
-      IF ( ABS(y(jl,js)-zy(jl,js)) >  ftol*y(jl,js)                            &
-      .AND. y(jl,js) >  pmintnd(jl) ) gconv=.FALSE.
+      IF ( ABS(s%y(jl,js)-zy(jl,js)) >  ftol*s%y(jl,js)                        &
+      .AND. s%y(jl,js) >  s%pmintnd(jl) ) gconv=.FALSE.
     END DO
     IF ( .NOT. gconv ) EXIT
   END DO
@@ -535,7 +534,7 @@ DO jit = 1, iter
   DO j = 1, nstst
     js = nlstst(j)
     DO jl = 1, n_points
-      zy(jl,js) = y(jl,js)
+      zy(jl,js) = s%y(jl,js)
     END DO
   END DO
 

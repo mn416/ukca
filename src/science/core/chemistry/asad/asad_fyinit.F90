@@ -61,11 +61,10 @@ CONTAINS
 
 SUBROUTINE asad_fyinit(ofirst, n_points, ix, jy, nlev)
 
-USE asad_mod,             ONLY: ctype, f,                                      &
-                                ilcf, ilct, ilftr, ilss, jpoo,                 &
-                                jpcf, jpco, jpif, jpna, jpsp,                  &
-                                madvtr, moffam, nlmajmin, peps,                &
-                                speci, tnd, y, jsro2, jpspec
+USE asad_mod,             ONLY: ctype, ilcf, ilct, ilftr, ilss,                &
+                                jpoo, jpcf, jpco, jpif, jpna,                  &
+                                jpsp, madvtr, moffam, nlmajmin, peps,          &
+                                speci, jsro2, jpspec, s=>asad_state
 USE ukca_diurnal_oxidant, ONLY: ukca_set_diurnal_ox, ukca_set_diurnal_ox_col
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_environment_fields_mod, ONLY: atmospheric_co2,                        &
@@ -165,7 +164,7 @@ IF ( first_pass ) THEN
         IF ( speci(js) == 'RO2       ') jsro2 = js
       END IF
       ! Family members, normal tracers and RO2-type species mapped
-      ! between f and y arrays
+      ! between s%f and s%y arrays
       IF (ctype(js) == jpif .OR.                                               &
           ctype(js) == jpsp .OR.                                               &
           ctype(js) == jpoo ) THEN
@@ -190,7 +189,7 @@ IF ( ofirst ) THEN
     js = nlmajmin(j)
     ifam = moffam(js)
     DO jl = 1, n_points
-      y(jl,js) = f(jl,ifam)
+      s%y(jl,js) = s%f(jl,ifam)
     END DO
   END DO
 
@@ -199,7 +198,7 @@ IF ( ofirst ) THEN
   DO j = istart, iend
     js = nlmajmin(j)
     DO jl = 1, n_points
-      y(jl,js) = peps10
+      s%y(jl,js) = peps10
     END DO
   END DO
 
@@ -208,7 +207,7 @@ IF ( ofirst ) THEN
   DO j = 1, iss
     js = ilss(j)
     DO jl = 1, n_points
-      y(jl,js) = peps10
+      s%y(jl,js) = peps10
     END DO
   END DO
 
@@ -264,7 +263,7 @@ IF ( ofirst ) THEN
     END IF
 
     DO jl = 1, n_points
-      y(jl,js) = zcnst * tnd(jl)
+      s%y(jl,js) = zcnst * s%tnd(jl)
     END DO
   END DO
 
@@ -281,7 +280,7 @@ DO j = 1, iftr
   js = ilftr(j)
   itr = madvtr(js)
   DO jl = 1, n_points
-    y(jl,js) = f(jl,itr)
+    s%y(jl,js) = s%f(jl,itr)
   END DO
 END DO
 
@@ -294,9 +293,9 @@ IF (ofirst) THEN
   DO j = 1, icf
     js = ilcf(j)
     IF (ukca_config%l_ukca_asad_columns) THEN
-      CALL asad_inicnt_col(speci(js), y(1,js), n_points, ix, jy)
+      CALL asad_inicnt_col(speci(js), s%y(1,js), n_points, ix, jy)
     ELSE
-      CALL asad_inicnt(speci(js), y(1,js), n_points, nlev)
+      CALL asad_inicnt(speci(js), s%y(1,js), n_points, nlev)
     END IF
   END DO
 END IF
@@ -307,9 +306,9 @@ IF (ofirst .AND.                                                               &
   DO j = 1, icf
     js = ilcf(j)
     IF (ukca_config%l_ukca_asad_columns) THEN
-      CALL ukca_set_diurnal_ox_col(speci(js),  y(:,js), n_points, ix, jy)
+      CALL ukca_set_diurnal_ox_col(speci(js),  s%y(:,js), n_points, ix, jy)
     ELSE
-      CALL ukca_set_diurnal_ox(speci(js),  y(:,js), n_points, nlev)
+      CALL ukca_set_diurnal_ox(speci(js),  s%y(:,js), n_points, nlev)
     END IF
   END DO
 END IF

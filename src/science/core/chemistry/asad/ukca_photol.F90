@@ -39,7 +39,7 @@ CONTAINS
 
 SUBROUTINE ukca_photol(prt,n_points)
 
-USE asad_mod,        ONLY:  rk, nprkx, jppj
+USE asad_mod,        ONLY: nprkx, jppj, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -63,7 +63,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 DO jl = 1, n_points
   DO jr = 1, jppj
-    rk(jl,nprkx(jr)) = prt(jl,jr)
+    s%rk(jl,nprkx(jr)) = prt(jl,jr)
   END DO
 END DO
 

@@ -57,8 +57,8 @@ CONTAINS
 
 SUBROUTINE asad_fyfixr(n_points)
 
-USE asad_mod,       ONLY: y, f, ratio, linfam, nlmajmin, jpif,                 &
-                          moffam, madvtr, majors, ctype
+USE asad_mod,       ONLY: nlmajmin, jpif, moffam, madvtr, majors,              &
+                          ctype, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -93,7 +93,7 @@ DO j = istart, iend
   js   = nlmajmin(j)
   ifam = moffam(js)
   DO jl = 1, n_points
-    y(jl,js) = f(jl,ifam) * ratio(jl,js)
+    s%y(jl,js) = s%f(jl,ifam) * s%ratio(jl,js)
   END DO
 END DO
 
@@ -108,13 +108,13 @@ DO j = istart, iend
   imaj = majors(ifam)
   IF ( ctype(js) /= jpif ) THEN
     DO jl = 1, n_points
-      y(jl,js) = y(jl,imaj) * ratio(jl,js)
+      s%y(jl,js) = s%y(jl,imaj) * s%ratio(jl,js)
     END DO
   ELSE
     itr = madvtr(js)
     DO jl = 1, n_points
-      IF ( linfam(jl,itr) ) y(jl,js) =                                         &
-                            y(jl,imaj) * ratio(jl,js)
+      IF ( s%linfam(jl,itr) ) s%y(jl,js) =                                     &
+                            s%y(jl,imaj) * s%ratio(jl,js)
     END DO
   END IF
 END DO

@@ -42,7 +42,7 @@ CONTAINS
 
 SUBROUTINE asad_totnud(n_points)
 
-USE asad_mod, ONLY: tnd, p, t, pmintnd, pmin
+USE asad_mod, ONLY: pmin, s=>asad_state
 USE ukca_config_constants_mod, ONLY: boltzmann
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -71,8 +71,8 @@ zb = boltzmann*1.0e6
 !          ----- ------ ------- ---- -------- ------- -- --------
 
 DO jl = 1, n_points
-  tnd(jl)     = p(jl) / ( zb * t(jl) )
-  pmintnd(jl) = pmin * tnd(jl)
+  s%tnd(jl)     = s%p(jl) / ( zb * s%t(jl) )
+  s%pmintnd(jl) = pmin * s%tnd(jl)
 END DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

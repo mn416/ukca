@@ -125,7 +125,7 @@ CONTAINS
 
 SUBROUTINE forward_euler(n_points, f, f_initial, f_min, nonzero_map, spfj)
 
-USE asad_mod,            ONLY: cdt, jpcspf, fdot, spfjsize_max
+USE asad_mod,            ONLY: jpcspf, spfjsize_max, s=>asad_state
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
 
@@ -152,9 +152,10 @@ DO jtr=1,jpcspf
   ip = nonzero_map(jtr,jtr)
   DO jl=1,n_points
     IF (spfj(jl,ip) > 0.0) THEN
-      f(jl,jtr) = f_initial(jl,jtr) + cdt*fdot(jl,jtr)
+      f(jl,jtr) = f_initial(jl,jtr) + s%cdt*fdot(jl,jtr)
     ELSE
-      f(jl,jtr) = f_initial(jl,jtr) + (cdt*fdot(jl,jtr))/(1.0-cdt*spfj(jl,ip))
+      f(jl,jtr) = f_initial(jl,jtr) + (s%cdt*fdot(jl,jtr))/                    &
+                    (1.0-s%cdt*spfj(jl,ip))
     END IF
     IF (f(jl,jtr) < f_min) f(jl,jtr) = f_min
   END DO
@@ -255,9 +256,8 @@ END SUBROUTINE calc_error_norm
 SUBROUTINE asad_spimpmjp(exit_code, ix, jy, nlev, n_points, location,          &
                          solver_iter)
 
-USE asad_mod,           ONLY: ptol, peps, cdt, f, fdot, nitnr, nstst, y,       &
-                              fj, nonzero_map, ltrig, jpcspf, spfj,            &
-                              modified_map, nonzero_map_unordered
+USE asad_mod,           ONLY: ptol, peps, nitnr, nstst, nonzero_map,           &
+                              jpcspf, nonzero_map_unordered, s=>asad_state
 USE asad_sparse_vars,   ONLY: setup_spfuljac, spfuljac, spresolv2, splinslv2
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE yomhook,            ONLY: lhook, dr_hook
@@ -308,12 +308,12 @@ REAL :: residual_error
 
 LOGICAL :: not_first_call = .FALSE.
 
-REAL :: f_initial(n_points,jpcspf) ! Concentration from previous timestep,f(t=n)
+REAL :: f_initial(n_points,jpcspf) ! Concentration from previous timestep,s%f(t=n)
 REAL :: f_incr(n_points,jpcspf)  ! Increment at end of NR step that is added to
                                  ! the previous estimate of the chemical species
-                                 ! f(t=n+1) at the next timestep.
-REAL :: G_f(n_points,jpcspf)   ! Function G_f = (f(t=n+1) - f(t=n))/dt - fdot
-                               ! Newton-Raphson finds f such that G_f(f) = 0
+                                 ! s%f(t=n+1) at the next timestep.
+REAL :: G_f(n_points,jpcspf)   ! Function G_f = (s%f(t=n+1) - s%f(t=n))/dt - s%fdot
+                               ! Newton-Raphson finds s%f such that G_f(s%f) = 0
 
 INTEGER, PARAMETER :: ltrig_iter=51   ! Set to nrsteps if want LTRIG
 INTEGER, PARAMETER :: incr_limiter=7  ! The maximum number of iterations for
@@ -343,7 +343,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 f_min = SQRT(peps) ! Minimum species concentration
 
-RelTol_residual_error = 1.0e-10 ! Relative tolerance for |G(f)|
+RelTol_residual_error = 1.0e-10 ! Relative tolerance for |G(s%f)|
 RelTol_error = 10*ptol          ! Relative tolerance for |f_incr|
 
 ! Size of increment limiter
@@ -352,12 +352,12 @@ rafmax = 1.0e+04
 
 exit_code = 0
 error_norm = 1.0
-deltt = 1.0/cdt
+deltt = 1.0/s%cdt
 damp1 = 0.5
 
-!  Save values of f at start of step
-f_initial = f
-WHERE (f<f_min) f = f_min
+!  Save values of s%f at start of step
+f_initial = s%f
+WHERE (s%f<f_min) s%f = f_min
 
 ! Call ASAD_STEADY at start of step to initialise deriv properly
 IF (nstst /= 0)  CALL asad_steady( n_points )
@@ -376,12 +376,12 @@ IF (first_pass) THEN
 END IF
 !$OMP END CRITICAL (setup_jacobian_init)
 
-CALL spfuljac(n_points,cdt,f_min,nonzero_map,spfj)
+CALL spfuljac(n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
-! Call forward Euler to make first guess, f_0 for f(t=n+1) (next timestep)
-CALL forward_euler(n_points, f, f_initial, f_min, nonzero_map, spfj)
+! Call forward Euler to make first guess, f_0 for s%f(t=n+1) (next timestep)
+CALL forward_euler(n_points, s%f, f_initial, f_min, nonzero_map, s%spfj)
 
-! Start Newton-Raphson loop to generate estimates f_1, f_2, f_3,... for f(t=n+1)
+! Start Newton-Raphson loop to generate estimates f_1, f_2, f_3,... for s%f(t=n+1)
 DO iter=1,ukca_config%nrsteps
 
   ifi = 0
@@ -392,7 +392,7 @@ DO iter=1,ukca_config%nrsteps
 
   IF (nstst /= 0 .AND. ifi ==0) CALL asad_steady( n_points )
 
-  IF (ltrig .AND. printstatus >= prstatus_oper) THEN
+  IF (s%ltrig .AND. printstatus >= prstatus_oper) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
       CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -400,16 +400,16 @@ DO iter=1,ukca_config%nrsteps
         WRITE(umMessage,cmessage1) iter-1,(f_initial(jl,jtr),jtr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
         WRITE(umMessage,cmessage1) iter-1,                                     &
-                      ((f_initial(jl,jtr)+cdt*fdot(jl,jtr)),jtr=1,jpcspf)
+                      ((f_initial(jl,jtr)+s%cdt*fdot(jl,jtr)),jtr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
       END IF
-      WRITE(umMessage,cmessage1) iter-1, (f(jl,jtr),jtr=1,jpcspf),             &
-                                                                 (y(jl,i),i=1,2)
+      WRITE(umMessage,cmessage1) iter-1, (s%f(jl,jtr),jtr=1,jpcspf),           &
+                                                             (s%y(jl,i),i=1,2)
       CALL umPrint(umMessage,src='asad_spimpmjp')
     END DO
   END IF
 
-  CALL asad_diffun( n_points ) ! calculates fdot
+  CALL asad_diffun( n_points ) ! calculates s%fdot
 
   IF (error_norm < RelTol_error) THEN
     exit_code = 0           ! Successful exit
@@ -422,9 +422,9 @@ DO iter=1,ukca_config%nrsteps
     GO TO 9999
   END IF
 
-  ! Calculate G_f = (f(t=n+1) - f(t=n))/dt - fdot.
-  ! Find f(t=n+1) such that G_f = 0.
-  G_f = (f - f_initial)*deltt - fdot
+  ! Calculate G_f = (s%f(t=n+1) - s%f(t=n))/dt - s%fdot.
+  ! Find s%f(t=n+1) such that G_f = 0.
+  G_f = (s%f - f_initial)*deltt - s%fdot
 
   ! Calculate residual error (the relative magnitude of G_f)
   CALL calc_residual_error(n_points,residual_error,G_f,f_min)
@@ -436,7 +436,7 @@ DO iter=1,ukca_config%nrsteps
 
   DO jl=1,n_points
     DO jtr=1,jpcspf
-      IF (f(jl,jtr) > f_max) THEN
+      IF (s%f(jl,jtr) > f_max) THEN
         ! Exit solver if chemical species is larger than f_max
         exit_code = 3
       END IF
@@ -448,43 +448,43 @@ DO iter=1,ukca_config%nrsteps
     GO TO 9999
   END IF
 
-  CALL spfuljac(n_points,cdt,f_min,nonzero_map,spfj)
+  CALL spfuljac(n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
-  IF (ltrig .AND. printstatus == PrStatus_Diag) THEN
+  IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     WRITE(umMessage,"('Iteration ',i4)") iter
     CALL umPrint(umMessage,src='asad_spimpmjp')
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
       CALL umPrint(umMessage,src='asad_spimpmjp')
-      fj(jl,:,:) = 0.0
+      s%fj(jl,:,:) = 0.0
       DO jtr=1,jpcspf
         DO itr=1,jpcspf
           IF (nonzero_map(jtr,itr) > 0)                                        &
-            fj(jl,jtr,itr) = spfj(jl,nonzero_map(jtr,itr))
+            s%fj(jl,jtr,itr) = s%spfj(jl,nonzero_map(jtr,itr))
         END DO
       END DO
       DO jtr=1,jpcspf
-        WRITE(umMessage,cmessage1) jtr, (fj(jl,jtr,itr),itr=1,jpcspf)
+        WRITE(umMessage,cmessage1) jtr, (s%fj(jl,jtr,itr),itr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
       END DO
     END DO
   END IF
 
   CALL splinslv2(n_points,G_f,f_incr,f_min,f_max,nonzero_map_unordered,        &
-                    modified_map,spfj)
+                    s%modified_map,spfj)
 
-  IF (ltrig .AND. printstatus == PrStatus_Diag) THEN
+  IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
       CALL umPrint(umMessage,src='asad_spimpmjp')
       WRITE(umMessage,cmessage2) 'G_f',(G_f(jl,jtr),jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
-      WRITE(umMessage,cmessage2) 'fdt',(fdot(jl,jtr),jtr=1,jpcspf)
+      WRITE(umMessage,cmessage2) 'fdt',(s%fdot(jl,jtr),jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
       WRITE(umMessage,cmessage2) 'del',                                        &
-                            ((f(jl,jtr)-f_initial(jl,jtr))*deltt,jtr=1,jpcspf)
+                            ((s%f(jl,jtr)-f_initial(jl,jtr))*deltt,jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
-      WRITE(umMessage,cmessage2) 'f  ',(f(jl,jtr),jtr=1,jpcspf)
+      WRITE(umMessage,cmessage2) 's%f  ',(s%f(jl,jtr),jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
       WRITE(umMessage,cmessage2) 'f_incr',(f_incr(jl,jtr),jtr=1,jpcspf)
       CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -496,10 +496,10 @@ DO iter=1,ukca_config%nrsteps
       DO jtr=1,jpcspf
         zsum(jtr) = 0.0
         DO itr=1,jpcspf
-          zsum(jtr)=zsum(jtr)+fj(jl,jtr,itr)*f_incr(jl,itr)
+          zsum(jtr)=zsum(jtr)+s%fj(jl,jtr,itr)*f_incr(jl,itr)
         END DO
         WRITE(umMessage,cmessage1) jtr,                                        &
-                                  (fj(jl,jtr,itr)*f_incr(jl,itr),itr=1,jpcspf)
+                                  (s%fj(jl,jtr,itr)*f_incr(jl,itr),itr=1,jpcspf)
         CALL umPrint(umMessage,src='asad_spimpmjp')
       END DO
       WRITE(umMessage,cmessage2) 'sum', (zsum(jtr),jtr=1,jpcspf)
@@ -512,17 +512,17 @@ DO iter=1,ukca_config%nrsteps
 
   !  Filter increments
   f_incr = MIN(MAX(f_incr,-f_max),f_max)
-  CALL calc_error_norm(n_points,error_norm,f,f_incr,f_min)
+  CALL calc_error_norm(n_points,error_norm,s%f,f_incr,f_min)
 
   ! Apply increment f_k+1 = f_k + f_incr
   count_negatives = 0
   DO jtr=1,jpcspf
     DO jl=1,n_points
       !  New mixing ratios
-      ztmp = f(jl,jtr) + f_incr(jl,jtr)
+      ztmp = s%f(jl,jtr) + f_incr(jl,jtr)
       !  Put limit on increment for first few iterations
       IF (iter < incr_limiter) THEN
-        ztmp = MAX(rafmin*f(jl,jtr),MIN(rafmax*f(jl,jtr),ztmp))
+        ztmp = MAX(rafmin*s%f(jl,jtr),MIN(rafmax*s%f(jl,jtr),ztmp))
       END IF
 
             !  Filter negatives and zeros
@@ -532,7 +532,7 @@ DO iter=1,ukca_config%nrsteps
         count_negatives = count_negatives + 1
       END IF
       !  Final mixing ratios
-      f(jl,jtr) = ztmp
+      s%f(jl,jtr) = ztmp
     END DO
   END DO
 
@@ -553,10 +553,10 @@ DO iter=1,ukca_config%nrsteps
 
       CALL asad_ftoy(not_first_call,ifi, iter, n_points, ix, jy, nlev)
       CALL asad_steady(n_points)
-      CALL asad_diffun(n_points) ! updates fdot
+      CALL asad_diffun(n_points) ! updates s%fdot
 
       G_f_old = G_f
-      G_f     = (f - f_initial)*deltt - fdot
+      G_f     = (s%f - f_initial)*deltt - s%fdot
       delta_G = G_f - G_f_old
 
       DO jl=1,n_points
@@ -565,13 +565,13 @@ DO iter=1,ukca_config%nrsteps
         G_ftmp(jl,:) = G_f(jl,:)*(1.0 - coeff)
       END DO
 
-      CALL spresolv2(n_points,G_ftmp,f_incr,f_min,modified_map,spfj,max_val)
+      CALL spresolv2(n_points,G_ftmp,f_incr,f_min,s%modified_map,spfj,max_val)
 
-      f = f + f_incr
+      s%f = s%f + f_incr
       ! remove negative values. Does not need to be done in
       ! as intelligent a way as above, as we are not exiting
       ! the routine directly after this step.
-      f = ABS(f)
+      s%f = ABS(s%f)
     END IF
   END IF ! l_ukca_quasinewton
 
@@ -581,7 +581,7 @@ END DO
 
 IF (exit_code /= 0) THEN
   ! Solver has not found a solution.
-  f = f_initial
+  s%f = f_initial
   solver_iter = iter
 
   IF (count_negatives > maxneg) THEN

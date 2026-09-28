@@ -104,13 +104,14 @@ SUBROUTINE setup_spfuljac()
 !    posterms, negterms and fracterms are used in calculating the values for
 !    the Jacobian matrix.
 
-USE asad_mod, ONLY: specf, frpx, jpcspf, jpfrpx, jpmsp, jpspec,                &
-                    madvtr, modified_map, ndepd, ndepw, nfrpx, njcoth, nltrf,  &
-                    nmsjac, nmzjac, nonzero_map, nonzero_map_unordered,        &
-                    npdfr, nsjac1, nstst, ntabpd, ntrf, ntro3, nzjac1,         &
-                    reorder, spfjsize_max, maxterms, maxfterms,                &
-                    nposterms, nnegterms, nfracterms, posterms, negterms,      &
-                    fracterms, base_tracer, ffrac, ztabpd, total
+USE asad_mod, ONLY: specf, frpx, jpcspf, jpfrpx, jpmsp,                        &
+                    jpspec, madvtr, ndepd, ndepw, nfrpx,                       &
+                    njcoth, nltrf, nmsjac, nmzjac, nonzero_map,                &
+                    nonzero_map_unordered, npdfr, nsjac1, nstst, ntabpd,       &
+                    ntrf, ntro3, nzjac1, reorder, spfjsize_max,                &
+                    maxterms, maxfterms, nposterms, nnegterms, nfracterms,     &
+                    posterms, negterms, fracterms, base_tracer, ffrac,         &
+                    ztabpd, total, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
@@ -304,20 +305,20 @@ IF (ALLOCATED(map))     DEALLOCATE(map)
 ! Calculate the number of nonzero matrix elements in the LU factorization of the
 ! array PAP' and check that it is less than spfjsize_max.
 total1 = total
-modified_map(:,:) = nonzero_map_unordered(:,:)
+s%modified_map(:,:) = nonzero_map_unordered(:,:)
 DO kr = 1, jpcspf
   DO i = kr+1, jpcspf
-    ikr = modified_map(i,kr)
+    ikr = s%modified_map(i,kr)
     IF (ikr > 0) THEN
       DO j = kr+1, jpcspf
-        krj = modified_map(kr,j)
+        krj = s%modified_map(kr,j)
         IF (krj > 0) THEN
-          ij = modified_map(i,j)
+          ij = s%modified_map(i,j)
           ! Distinguish whether matrix element is zero or not. If not, proceed
           ! as in dense case. If it is, create new matrix element.
           IF (ij <= 0) THEN
             total1 = total1 + 1
-            modified_map(i,j) = total1
+            s%modified_map(i,j) = total1
           END IF
         END IF
       END DO
@@ -453,11 +454,12 @@ SUBROUTINE spfuljac(n_points, cdt, min_pivot, nonzero_map, spfj)
 !
 !  Routine to calculate the Jacobian in sparse format
 !
-USE asad_mod, ONLY: ctype, deriv, dpd, dpw, f, jpcspf, jpfm, jpif, jpmsp,      &
-                    jpspec, linfam, madvtr, moffam, ndepd, ndepw, njcoth,      &
-                    nmsjac, nodd, nsjac1, nstst, ntro3, prk, spfjsize_max,     &
-                    nposterms, nnegterms, nfracterms, posterms, negterms,      &
-                    fracterms, base_tracer, ffrac, y, total
+USE asad_mod, ONLY: ctype, jpcspf, jpfm, jpif, jpmsp,                          &
+                    jpspec, madvtr, moffam, ndepd, ndepw,                      &
+                    njcoth, nmsjac, nodd, nsjac1, nstst,                       &
+                    ntro3, spfjsize_max, nposterms, nnegterms, nfracterms,     &
+                    posterms, negterms, fracterms, base_tracer, ffrac,         &
+                    total, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -495,12 +497,12 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='SPFULJAC'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-! At the bottom of this routine we divide by f, so ensure that
-! f is not too small.
+! At the bottom of this routine we divide by s%f, so ensure that
+! s%f is not too small.
 DO i = 1, jpcspf
   DO jl = 1, n_points
-    IF (f(jl, i) < min_pivot) THEN
-      f(jl, i) = min_pivot
+    IF (s%f(jl, i) < min_pivot) THEN
+      s%f(jl, i) = min_pivot
     END IF
   END DO
 END DO
@@ -510,7 +512,7 @@ deltt = 1.0 / cdt
 ! Calculate diagonal element of Jacobian
 spfj(:,:) = 0.0
 DO i = 1, jpcspf
-  spfj(:,nonzero_map(i,i)) = -deltt*f(:,i)
+  spfj(:,nonzero_map(i,i)) = -deltt*s%f(:,i)
 END DO
 !
 !
@@ -522,13 +524,13 @@ END DO
 
 DO p = 1, total
   DO i = nposterms(p), 1, -1
-    spfj(:,p) = spfj(:,p) + prk(:,posterms(p,i))
+    spfj(:,p) = spfj(:,p) + s%prk(:,posterms(p,i))
   END DO
   DO i = nnegterms(p), 1, -1
-    spfj(:,p) = spfj(:,p) - prk(:,negterms(p,i))
+    spfj(:,p) = spfj(:,p) - s%prk(:,negterms(p,i))
   END DO
   DO i = nfracterms(p), 1, -1
-    spfj(:,p) = spfj(:,p) + ffrac(p,i)*prk(:,fracterms(p,i))
+    spfj(:,p) = spfj(:,p) + ffrac(p,i)*s%prk(:,fracterms(p,i))
   END DO
 END DO
 
@@ -544,9 +546,9 @@ DO jc = 1, nstst
       IF (ij /= 0) THEN
         p = nonzero_map(ij,ntro3)
         IF (jn < 3) THEN
-          spfj(:,p) = spfj(:,p) - prk(:,irj)*deriv(:,jc,1)
+          spfj(:,p) = spfj(:,p) - s%prk(:,irj)*s%deriv(:,jc,1)
         ELSE
-          spfj(:,p) = spfj(:,p) + prk(:,irj)*deriv(:,jc,1)
+          spfj(:,p) = spfj(:,p) + s%prk(:,irj)*s%deriv(:,jc,1)
         END IF
       END IF
     END DO
@@ -566,14 +568,16 @@ IF ((ndepw /= 0) .OR. (ndepd /= 0)) THEN
     IF (ifamd /= 0) THEN
       p = nonzero_map(ifamd,ifamd)
       DO jl = 1, n_points
-        IF ((ityped == jpfm) .OR. ((ityped == jpif) .AND. linfam(jl,itrd))) THEN
-          spfj(jl,p) = spfj(jl,p) - nodd(js)*(dpd(jl,js) + dpw(jl,js))*y(jl,js)
+        IF ((ityped == jpfm) .OR. ((ityped == jpif) .AND.                      &
+                                   s%linfam(jl,itrd))) THEN
+          spfj(jl,p) = spfj(jl,p) - nodd(js)*(s%dpd(jl,js) +                   &
+                       s%dpw(jl,js))*s%y(jl,js)
         END IF
       END DO
     END IF
     IF (itrd /= 0) THEN
       p = nonzero_map(itrd,itrd)
-      spfj(:,p) = spfj(:,p) - (dpd(:,js) + dpw(:,js))*y(:,js)
+      spfj(:,p) = spfj(:,p) - (s%dpd(:,js) + s%dpw(:,js))*s%y(:,js)
     END IF
   END DO
 END IF
@@ -583,7 +587,7 @@ END IF
 !              -------- -------- -- ----- ----
 !
 DO p = 1, total
-  spfj(:,p) = spfj(:,p) / f(:,base_tracer(p))   ! filter f earlier!
+  spfj(:,p) = spfj(:,p) / s%f(:,base_tracer(p))   ! filter s%f earlier!
 END DO
 
 !

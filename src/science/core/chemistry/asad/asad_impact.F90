@@ -91,10 +91,9 @@ CONTAINS
 
 SUBROUTINE asad_impact(n_points, ix, jy, nlev)
 
-USE asad_mod,        ONLY: cdt, ctype, ej, f, fdot, jpif,                      &
-                           linfam, ljacx, madvtr, majors, moffam,              &
-                           nlpdv, nltrim, nitnr, nprkx,                        &
-                           nspi, peps, pmintnd, ptol, rk, y, jpcspf
+USE asad_mod,        ONLY: ctype, jpif, ljacx, madvtr, majors,                 &
+                           moffam, nlpdv, nltrim, nitnr, nprkx,                &
+                           nspi, peps, ptol, jpcspf, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -164,7 +163,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_IMPACT'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 inl = 0
 DO jl = 1, n_points
-  IF ( rk(jl,nprkx(1)) > peps ) THEN
+  IF ( s%rk(jl,nprkx(1)) > peps ) THEN
     inl = inl + 1
     lphot(inl) = jl
   END IF
@@ -183,25 +182,25 @@ END IF
 !$OMP END CRITICAL (asad_impact_init)
 
 !       1.1  Do the linearised first guess to give first approx.
-!            solution at y(n+1).
+!            solution at s%y(n+1).
 
 nl = n_points
 DO jtr = 1, jpcspf
   isp = majors(jtr)
   DO jl = 1, n_points
-    zf(jl,jtr) = f(jl,jtr)
+    zf(jl,jtr) = s%f(jl,jtr)
 
     !           1.2  Test Jacobian has not gone positive. Possible since
     !                we only use approximate form. If it has, use
     !                an explicit step.
 
-    IF ( ej(jl,jtr) > 0.0 ) THEN
-      f(jl,jtr) = zf(jl,jtr) + cdt*fdot(jl,jtr)
+    IF ( s%ej(jl,jtr) > 0.0 ) THEN
+      s%f(jl,jtr) = zf(jl,jtr) + s%cdt*fdot(jl,jtr)
     ELSE
-      f(jl,jtr) = zf(jl,jtr) + ( cdt*fdot(jl,jtr) )                            &
-                       / ( 1.0 - cdt*ej(jl,jtr) )
+      s%f(jl,jtr) = zf(jl,jtr) + ( s%cdt*fdot(jl,jtr) )                        &
+                       / ( 1.0 - s%cdt*ej(jl,jtr) )
     END IF
-    IF ( linfam(jl,jtr) ) f(jl,jtr) = y(jl,isp)
+    IF ( s%linfam(jl,jtr) ) s%f(jl,jtr) = s%y(jl,isp)
 
   END DO
 END DO
@@ -232,13 +231,13 @@ DO jit = 1, ukca_config%nrsteps
   DO jtr = 1, jpcspf
     isp = majors(jtr)
     DO jl = 1, n_points
-      zprf(jl,jtr) = f(jl,jtr)
-      binv(jl,jtr) = 1.0 / ( 1.0 - cdt*ej(jl,jtr) )
+      zprf(jl,jtr) = s%f(jl,jtr)
+      binv(jl,jtr) = 1.0 / ( 1.0 - s%cdt*ej(jl,jtr) )
       dely(jl,jtr) = binv(jl,jtr) *                                            &
-             ( (zf(jl,jtr) - f(jl,jtr)) + cdt*fdot(jl,jtr) )
-      f(jl,jtr) = f(jl,jtr) + dely(jl,jtr)
+             ( (zf(jl,jtr) - s%f(jl,jtr)) + s%cdt*fdot(jl,jtr) )
+      s%f(jl,jtr) = s%f(jl,jtr) + dely(jl,jtr)
 
-      IF ( linfam(jl,jtr) ) f(jl,jtr) = y(jl,isp)
+      IF ( s%linfam(jl,jtr) ) s%f(jl,jtr) = s%y(jl,isp)
     END DO
   END DO
 
@@ -289,7 +288,7 @@ DO jit = 1, ukca_config%nrsteps
             isp = nspi(irk,1)
             DO j = 1, inl
               jl    = lphot(j)
-              dd(j) = dd(j) + rk(jl,irk)*y(jl,isp)
+              dd(j) = dd(j) + s%rk(jl,irk)*s%y(jl,isp)
             END DO
             ipos = ipos + 1
           END DO
@@ -310,10 +309,10 @@ DO jit = 1, ukca_config%nrsteps
             isp = nspi(irk,1)
             DO j = 1, inl
               jl = lphot(j)
-              IF ( linfam(jl,ireac) ) THEN
-                dd(j) = dd(j)+rk(jl,irk)*y(jl,isp)/zprf(jl,ireac)
+              IF ( s%linfam(jl,ireac) ) THEN
+                dd(j) = dd(j)+s%rk(jl,irk)*s%y(jl,isp)/zprf(jl,ireac)
               ELSE
-                dd(j) = dd(j)+rk(jl,irk)
+                dd(j) = dd(j)+s%rk(jl,irk)
               END IF
             END DO
             ipos = ipos + 1
@@ -330,7 +329,7 @@ DO jit = 1, ukca_config%nrsteps
 
       !             2.4.3  Now add correction to the tracer (rows). If the
       !                    tracer is of type 'FT', then for each pt, we must
-      !                    check whether the tracer has been put into the f
+      !                    check whether the tracer has been put into the s%f
       !                    or not. If it has, we add the correction to the
       !                    family and not to the tracer.
 
@@ -340,13 +339,13 @@ DO jit = 1, ukca_config%nrsteps
         DO j = 1, inl
           jl    = lphot(j)
           iprod = nltrim(jt1,1)
-          IF ( linfam(jl,iprod) ) iprod = moffam(isp)
-          f(jl,iprod) = f(jl,iprod)+cdt*binv(jl,iprod)*corrn(j)
+          IF ( s%linfam(jl,iprod) ) iprod = moffam(isp)
+          s%f(jl,iprod) = s%f(jl,iprod)+s%cdt*binv(jl,iprod)*corrn(j)
         END DO
       ELSE
         DO j = 1, inl
           jl = lphot(j)
-          f(jl,iprod) = f(jl,iprod)+cdt*binv(jl,iprod)*corrn(j)
+          s%f(jl,iprod) = s%f(jl,iprod)+s%cdt*binv(jl,iprod)*corrn(j)
         END DO
       END IF
 
@@ -359,8 +358,8 @@ DO jit = 1, ukca_config%nrsteps
   gconv = .TRUE.
   DO jtr = 1,jpcspf
     DO jl = 1, n_points
-      IF ( ABS(f(jl,jtr)-zprf(jl,jtr)) >  ptol*f(jl,jtr)                       &
-      .AND. f(jl,jtr) >  pmintnd(jl) ) gconv=.FALSE.
+      IF ( ABS(s%f(jl,jtr)-zprf(jl,jtr)) >  ptol*s%f(jl,jtr)                   &
+      .AND. s%f(jl,jtr) >  s%pmintnd(jl) ) gconv=.FALSE.
     END DO
     IF ( .NOT. gconv ) EXIT
   END DO

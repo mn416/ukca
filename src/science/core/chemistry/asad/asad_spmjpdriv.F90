@@ -105,8 +105,7 @@ CONTAINS
 
 SUBROUTINE asad_spmjpdriv(ix,jy,nlev,n_points)
 
-USE asad_mod, ONLY: cdt, f, jpcspf, jpspec, ltrig,                             &
-                    ncsteps, ncsteps_factor, nitfg, speci, y
+USE asad_mod, ONLY: jpcspf, jpspec, nitfg, speci, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -147,7 +146,7 @@ LOGICAL :: not_first_call = .FALSE.
 CHARACTER(LEN=errormessagelength) :: cmessage
 
 REAL :: cdt_initial                 ! Initial chemistry timestep
-REAL :: f_initial(n_points,jpcspf)  ! Saved f array from previous solver call
+REAL :: f_initial(n_points,jpcspf)  ! Saved s%f array from previous solver call
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -159,12 +158,12 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_SPMJPDRIV'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Stash initial values
-ncsteps_initial = ncsteps
-cdt_initial = cdt
-iredo = ncsteps_factor
-f_initial(1:n_points,:)=f(1:n_points,:)
+ncsteps_initial = s%ncsteps
+cdt_initial = s%cdt
+iredo = s%ncsteps_factor
+f_initial(1:n_points,:)=s%f(1:n_points,:)
 
-ltrig=.FALSE.
+s%ltrig=.FALSE.
 
 IF (ukca_config%l_ukca_asad_full) THEN
   location = 1
@@ -186,27 +185,27 @@ DO WHILE (iter <= iredo)
     ! Solver convergence
     iter = iter + 1
   ELSE
-    f(1:n_points,:)=f_initial(1:n_points,:)
+    s%f(1:n_points,:)=f_initial(1:n_points,:)
 
     IF (exit_code == 4) THEN
       ! Debug slow convergence systems - switch this on in 'spimpmjp'
-      IF (ltrig) THEN
+      IF (s%ltrig) THEN
         errcode=1
         cmessage='Slow-converging system, Set printstatus for Jacobian debug'
         DO js=1,jpspec
-          WRITE(umMessage,'(a4,i6,a12,2e14.5,i12)') 'y: ',js,speci(js),        &
-              MAXVAL(y(:,js)), MINVAL(y(:,js)),SIZE(y(:,js))
+          WRITE(umMessage,'(a4,i6,a12,2e14.5,i12)') 's%y: ',js,speci(js),      &
+              MAXVAL(s%y(:,js)), MINVAL(s%y(:,js)),SIZE(s%y(:,js))
           CALL umPrint(umMessage,src='asad_spmjpdriv')
         END DO
         CALL ereport('ASAD_SPMJPDRIV',errcode,cmessage)
       END IF
 
-      ltrig=.TRUE.
+      s%ltrig=.TRUE.
     ELSE
 
       ! Reset for failed convergence
-      ncsteps = ncsteps*2
-      cdt = cdt/2.0
+      s%ncsteps = s%ncsteps*2
+      s%cdt = s%cdt/2.0
       iredo = iredo*2
 
       IF (ukca_config%l_ukca_debug_asad) THEN
@@ -215,12 +214,12 @@ DO WHILE (iter <= iredo)
               location
         CALL umPrint(umMessage,src='asad_spmjpdriv')
         WRITE(umMessage,'(A,I0,A,I0,A,E18.8)')                                 &
-              'ASAD: halving timestep: ncsteps = ', ncsteps,                   &
-              ' iredo = ', iredo, ' cdt = ', cdt
+              'ASAD: halving timestep: s%ncsteps = ', s%ncsteps,               &
+              ' iredo = ', iredo, ' s%cdt = ', s%cdt
         CALL umPrint(umMessage,src='asad_spmjpdriv')
       END IF
 
-      IF (cdt < 1.0e-05) THEN
+      IF (s%cdt < 1.0e-05) THEN
         errcode=2
         cmessage=' Time step now too short'
         CALL ereport('ASAD_SPMJPDRIV',errcode,cmessage)
@@ -240,7 +239,7 @@ DO WHILE (iter <= iredo)
 
     END IF
 
-    ! Call asad_ftoy with jit = 0 to reinitialise y array
+    ! Call asad_ftoy with jit = 0 to reinitialise s%y array
     jit = 0
     CALL asad_ftoy( not_first_call, nitfg, jit, n_points, ix, jy, nlev )
     CALL asad_diffun( n_points )
@@ -269,8 +268,8 @@ IF (ukca_config%l_ukca_debug_asad) THEN
   CALL umPrint(umMessage,src='asad_spmjpdriv')
 END IF
 
-ncsteps = ncsteps_initial
-cdt = cdt_initial
+s%ncsteps = ncsteps_initial
+s%cdt = cdt_initial
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

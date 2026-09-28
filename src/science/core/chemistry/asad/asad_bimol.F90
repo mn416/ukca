@@ -77,8 +77,8 @@ CONTAINS
 
 SUBROUTINE asad_bimol( n_points, stratflag_opt )
 
-USE asad_mod,        ONLY: t, t300, specf, spb, ab, rk, tnd, p,                &
-                           wp, f, peps, nbrkx, jpspb, jpcspf, jpbk
+USE asad_mod,        ONLY: specf, spb, ab, peps, nbrkx,                        &
+                           jpspb, jpcspf, jpbk, s=>asad_state
 USE asad_findreaction_mod, ONLY: asad_findreaction
 USE ukca_config_specification_mod, ONLY: ukca_config
 
@@ -185,8 +185,8 @@ END IF
 
 !       Compute intermediate results
 
-t300(1:n_points) = t(1:n_points) / 300.0
-CALL oneover_v(n_points, t, inv_t)
+s%t300(1:n_points) = s%t(1:n_points) / 300.0
+CALL oneover_v(n_points, s%t, inv_t)
 
 !       Check if H2O is an advected tracer
 
@@ -361,19 +361,19 @@ DO j = 1, jpbk
   jr = nbrkx(j)
 
   IF ( ABS(ab(j,2)) < peps .AND. ABS(ab(j,3)) < peps ) THEN
-    rk(1:n_points,jr) = ab(j,1)
+    s%rk(1:n_points,jr) = ab(j,1)
   ELSE IF ( ABS(ab(j,2)) < peps ) THEN
     tmp(1:n_points) = -ab(j,3)*inv_t(1:n_points)
     CALL exp_v(n_points,tmp,tmp_out)
-    rk(1:n_points,jr) = ab(j,1) * tmp_out(1:n_points)
+    s%rk(1:n_points,jr) = ab(j,1) * tmp_out(1:n_points)
   ELSE IF ( ABS(ab(j,3)) < peps ) THEN
-    CALL powr_v(n_points,t300,ab(j,2),tmp1)
-    rk(1:n_points,jr) = ab(j,1) * tmp1(1:n_points)
+    CALL powr_v(n_points,s%t300,ab(j,2),tmp1)
+    s%rk(1:n_points,jr) = ab(j,1) * tmp1(1:n_points)
   ELSE
     tmp(1:n_points) = -ab(j,3)*inv_t(1:n_points)
     CALL exp_v(n_points,tmp,tmp_out)
-    CALL powr_v(n_points,t300,ab(j,2),tmp1)
-    rk(1:n_points,jr) = ab(j,1) * tmp1(1:n_points) * tmp_out(1:n_points)
+    CALL powr_v(n_points,s%t300,ab(j,2),tmp1)
+    s%rk(1:n_points,jr) = ab(j,1) * tmp1(1:n_points) * tmp_out(1:n_points)
   END IF
 END DO  ! end of loop (j) over jpbk
 
@@ -387,8 +387,8 @@ END DO  ! end of loop (j) over jpbk
 ! Paul suggests the reaction would probably go with [O2] anyway.
 
 IF ( iohco /= 0 ) THEN
-  rk(1:n_points,iohco)=rk(1:n_points,iohco)*                                   &
-                  (1.0 + tnd(1:n_points)/4.2e19)
+  s%rk(1:n_points,iohco)=s%rk(1:n_points,iohco)*                               &
+                  (1.0 + s%tnd(1:n_points)/4.2e19)
 END IF
 
 ! OH + HONO2; no change with IUPAC Jan 2009 (CJ)
@@ -398,11 +398,11 @@ IF ( iohhno3 /= 0 ) THEN
   z1(:) = 2.4e-14 * tmp_out(1:n_points)
   tmp(1:n_points) = 1335.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
-  z3(:) = (6.5e-34 * tmp_out(1:n_points)) * tnd(1:n_points)
+  z3(:) = (6.5e-34 * tmp_out(1:n_points)) * s%tnd(1:n_points)
   tmp(1:n_points) = 2199.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   z4(:) = 2.7e-17 * tmp_out(1:n_points)
-  rk(1:n_points,iohhno3) = z1(:) + z3(:)/(1.0+z3(:)/z4(:))
+  s%rk(1:n_points,iohhno3) = z1(:) + z3(:)/(1.0+z3(:)/z4(:))
 END IF
 
 ! HO2 + HO2; no change with IUPAC Nov 2003 (Paul Young)
@@ -410,41 +410,41 @@ IF ( ih2o /= 0 .AND. iho2 /= 0) THEN
   !       water is an advected tracer
   tmp(1:n_points) = 2200.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
-  rk(1:n_points,iho2) = rk(1:n_points,iho2) *                                  &
-    (1.0+1.4e-21*f(1:n_points,ih2o)*tmp_out(1:n_points))
+  s%rk(1:n_points,iho2) = s%rk(1:n_points,iho2) *                              &
+    (1.0+1.4e-21*s%f(1:n_points,ih2o)*tmp_out(1:n_points))
 ELSE IF (ih2o == 0 .AND. iho2 /= 0) THEN
   !       use model water concentration
   tmp(1:n_points) = 2200.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
-  rk(1:n_points,iho2) = rk(1:n_points,iho2) *                                  &
-    (1.0+1.4e-21*wp(1:n_points)*tnd(1:n_points)*                               &
+  s%rk(1:n_points,iho2) = s%rk(1:n_points,iho2) *                              &
+    (1.0+1.4e-21*s%wp(1:n_points)*s%tnd(1:n_points)*                           &
      tmp_out(1:n_points))
 END IF
 
 ! HO2 + NO -> HONO2 (with extra temp and pressure dependence)
 ! Added by Alex 2012
 IF ( iho2no /= 0 ) THEN
-  rk(1:n_points,iho2no)=rk(1:n_points,iho2no)*                                 &
+  s%rk(1:n_points,iho2no)=s%rk(1:n_points,iho2no)*                             &
    ((530.0*inv_t(1:n_points)) +                                                &
-    8.53e-4*(1e-2*p(1:n_points))-1.73)/100.0
+    8.53e-4*(1e-2*s%p(1:n_points))-1.73)/100.0
 END IF
 
 ! Keep B85 (N2O5 + H2O) in the troposphere only when fix is enabled.
 IF (ukca_config%l_fix_ukca_n2o5_h2o .AND. in2o5_h2o > 0) THEN
   WHERE (stratflag(1:n_points))
-    rk(1:n_points,in2o5_h2o) = 0.0
+    s%rk(1:n_points,in2o5_h2o) = 0.0
   END WHERE
 END IF
 
 ! SO3 + H2O: 2nd H2O molecule dealt with here by multiplying rate by [H2O]
 IF ( ih2o /= 0 .AND. iso3h2o /= 0 ) THEN
   !       water is an advected tracer
-  rk(1:n_points,iso3h2o) = rk(1:n_points,iso3h2o) *                            &
-       f(1:n_points,ih2o)
+  s%rk(1:n_points,iso3h2o) = s%rk(1:n_points,iso3h2o) *                        &
+       s%f(1:n_points,ih2o)
 ELSE IF (ih2o == 0 .AND. iso3h2o /= 0) THEN
   !       use model water concentration
-  rk(1:n_points,iso3h2o) = rk(1:n_points,iso3h2o) *                            &
-       wp(1:n_points)*tnd(1:n_points)
+  s%rk(1:n_points,iso3h2o) = s%rk(1:n_points,iso3h2o) *                        &
+       s%wp(1:n_points)*s%tnd(1:n_points)
 END IF
 
 
@@ -453,8 +453,8 @@ IF ( ics2oh /= 0 ) THEN
   tmp(1:n_points) = 3400.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   z6(:) = 1.81e-3 * tmp_out(1:n_points)
-  rk(1:n_points,ics2oh) =                                                      &
-        rk(1:n_points,ics2oh)/(t(1:n_points)+z6(:))
+  s%rk(1:n_points,ics2oh) =                                                    &
+        s%rk(1:n_points,ics2oh)/(s%t(1:n_points)+z6(:))
 END IF
 
 ! DMS + OH: Multiply by factor alpha/(1 + alpha) from Pham et al. (1995)
@@ -462,15 +462,15 @@ IF ( idmsoh /= 0) THEN
   ALLOCATE(alpha(1:n_points))
   tmp(1:n_points) = 7460.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
-  alpha(:) = 1.106e-31*tmp_out(1:n_points)* tnd(1:n_points)
-  rk(1:n_points,idmsoh) = rk(1:n_points,idmsoh)*                               &
+  alpha(:) = 1.106e-31*tmp_out(1:n_points)* s%tnd(1:n_points)
+  s%rk(1:n_points,idmsoh) = s%rk(1:n_points,idmsoh)*                           &
                           alpha(:)/(1.0 + alpha(:))
 END IF
 
 !       3. Temperature-Dependent branching ratios
 !          ----------- --------- --------- ------
-!       rk above was calculated using the total rate coefficients.
-!       Here, rk is reduced according to the branching ratio.
+!       s%rk above was calculated using the total rate coefficients.
+!       Here, s%rk is reduced according to the branching ratio.
 
 
 !  OH + C3H8 -> n-PrOO ... Branch A
@@ -478,11 +478,11 @@ END IF
 IF (iohc3h8a /= 0 .AND. iohc3h8b /=0) THEN
   tmp(1:n_points) = -816.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
-  CALL powr_v(n_points,t,(-0.64),tmp1)
+  CALL powr_v(n_points,s%t,(-0.64),tmp1)
   ratioa2b(1:n_points) = 226.0 * tmp1(1:n_points)* tmp_out(1:n_points)
-  rk(1:n_points,iohc3h8a) = rk(1:n_points,iohc3h8a) *                          &
+  s%rk(1:n_points,iohc3h8a) = s%rk(1:n_points,iohc3h8a) *                      &
                (ratioa2b(1:n_points)/(ratioa2b(1:n_points)+1.0))
-  rk(1:n_points,iohc3h8b) = rk(1:n_points,iohc3h8b)/                           &
+  s%rk(1:n_points,iohc3h8b) = s%rk(1:n_points,iohc3h8b)/                       &
                               (ratioa2b(1:n_points)+1.0)
 END IF
 
@@ -500,9 +500,9 @@ IF ((imeoo2a /= 0 .AND. imeoo2b /=0) .AND.                                     &
   CALL exp_v(n_points,tmp,tmp_out)
   ratiob2total(1:n_points) = 1.0/(1.0+ tmp_out(1:n_points)/33.0)
 
-  rk(1:n_points,imeoo2a) = rk(1:n_points,imeoo2a)*                             &
+  s%rk(1:n_points,imeoo2a) = s%rk(1:n_points,imeoo2a)*                         &
                              (1.0-ratiob2total(1:n_points))
-  rk(1:n_points,imeoo2b) = rk(1:n_points,imeoo2b)*                             &
+  s%rk(1:n_points,imeoo2b) = s%rk(1:n_points,imeoo2b)*                         &
                              (ratiob2total(1:n_points))
 END IF
 
@@ -514,9 +514,9 @@ IF ( imeooho2a /= 0 .AND. imeooho2b /= 0 ) THEN
   tmp(1:n_points) = -1160.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   ratiob2total(1:n_points) = 1.0 / (1.0 + 498.0* tmp_out(1:n_points))
-  rk(1:n_points,imeooho2a) = rk(1:n_points,imeooho2a)*                         &
+  s%rk(1:n_points,imeooho2a) = s%rk(1:n_points,imeooho2a)*                     &
                                (1.0-ratiob2total(1:n_points))
-  rk(1:n_points,imeooho2b) = rk(1:n_points,imeooho2b)*                         &
+  s%rk(1:n_points,imeooho2b) = s%rk(1:n_points,imeooho2b)*                     &
                                (ratiob2total(1:n_points))
 END IF
 

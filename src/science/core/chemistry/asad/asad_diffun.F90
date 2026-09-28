@@ -74,9 +74,8 @@ CONTAINS
 
 SUBROUTINE asad_diffun( kl )
 
-USE asad_mod,               ONLY: fdot, ydot, prod, slos,                      &
-                                  linfam, nodd, moffam, madvtr,                &
-                                  nf, nlf, jpcspf
+USE asad_mod,               ONLY: nodd, moffam, madvtr, nf, nlf,               &
+                                  jpcspf, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE asad_prls_mod, ONLY: asad_prls
@@ -110,7 +109,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_DIFFUN'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO jtr = 1, jpcspf
   DO jl = 1, kl
-    fdot(jl,jtr) = 0.0
+    s%fdot(jl,jtr) = 0.0
   END DO
 END DO
 
@@ -132,18 +131,18 @@ DO j = 1, nf
 
     !           3.1 Tendencies of individual species
 
-    ydot(jl,js) = prod(jl,js) - slos(jl,js)
+    s%ydot(jl,js) = s%prod(jl,js) - s%slos(jl,js)
 
     !           3.2 Tendencies of families
     !            (add in/out species if in family).
 
-    IF ( gfam .AND. ( .NOT. gtr .OR. gtr .AND. linfam(jl,itr) ) )              &
-       fdot(jl,ifam) = fdot(jl,ifam) + nodd(js) * ydot(jl,js)
+    IF ( gfam .AND. ( .NOT. gtr .OR. gtr .AND. s%linfam(jl,itr) ) )            &
+       s%fdot(jl,ifam) = s%fdot(jl,ifam) + nodd(js) * s%ydot(jl,js)
 
     !           3.3 Tendencies of non-family tracers
     !           (and in/out species).
 
-    IF ( gtr ) fdot(jl,itr) = ydot(jl,js)
+    IF ( gtr ) s%fdot(jl,itr) = s%ydot(jl,js)
 
   END DO
 END DO

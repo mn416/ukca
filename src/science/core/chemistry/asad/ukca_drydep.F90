@@ -39,7 +39,7 @@ CONTAINS
 
 SUBROUTINE ukca_drydep(nlev, dryrt, n_points)
 
-USE asad_mod,       ONLY: ndepd, nldepd, dpd, jpdd
+USE asad_mod,       ONLY: ndepd, nldepd, jpdd, s=>asad_state
 USE ukca_config_specification_mod,ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -70,7 +70,7 @@ IF (nlev == 1 .OR. ukca_config%l_ukca_intdd) THEN
   DO js = 1,ndepd
     nspec = nldepd(js)
     DO i = 1,n_points
-      dpd(i,nspec) = dryrt(i,js)
+      s%dpd(i,nspec) = dryrt(i,js)
     END DO
   END DO
 
@@ -80,7 +80,7 @@ ELSE
   DO js = 1,ndepd
     nspec = nldepd(js)
     DO i = 1,n_points
-      dpd(i,nspec) = 0.0
+      s%dpd(i,nspec) = 0.0
     END DO
   END DO
 

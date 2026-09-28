@@ -81,15 +81,12 @@ CONTAINS
 
 SUBROUTINE asad_fuljac(n_points)
 
-USE asad_mod,        ONLY: cdt, ctype, deriv, dpd, dpw,                        &
-                           f, fj, frpx,                                        &
-                           jpfm, jpif, jpmsp, linfam,                          &
+USE asad_mod,        ONLY: ctype, frpx, jpfm, jpif, jpmsp,                     &
                            madvtr, moffam, ndepd, ndepw, nfrpx,                &
                            njcoth, nltrf, nmzjac, nmsjac, nodd,                &
-                           npdfr, nsjac1, nstst, ntabpd,                       &
-                           ntrf, ntrho2, ntro3, ntroh, ntrno,                  &
-                           nzjac1, prk, y, ztabpd,                             &
-                           jpspec, jpcspf
+                           npdfr, nsjac1, nstst, ntabpd, ntrf,                 &
+                           ntrho2, ntro3, ntroh, ntrno, nzjac1,                &
+                           ztabpd, jpspec, jpcspf, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -126,11 +123,11 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_FULJAC'
 
 !
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-deltt=1.0/cdt
+deltt=1.0/s%cdt
 !
-fj = 0.0
+s%fj = 0.0
 DO i=1,jpcspf
-  fj(:,i,i)=-deltt*f(:,i)
+  s%fj(:,i,i)=-deltt*s%f(:,i)
 END DO
 !
 !
@@ -150,8 +147,8 @@ DO jc = 1, ntrf
     DO jn=1,2
       IF (lj(jn)) THEN
         DO jl=1,n_points
-          fj(jl,ij(jn),itrcr) =                                                &
-                        fj(jl,ij(jn),itrcr) - prk(jl,irj)
+          s%fj(jl,ij(jn),itrcr) =                                              &
+                        s%fj(jl,ij(jn),itrcr) - s%prk(jl,irj)
         END DO
       END IF
     END DO
@@ -159,8 +156,8 @@ DO jc = 1, ntrf
       DO jn=3,jpmsp
         IF (lj(jn)) THEN
           DO jl=1,n_points
-            fj(jl,ij(jn),itrcr) =                                              &
-                        fj(jl,ij(jn),itrcr) + prk(jl,irj)
+            s%fj(jl,ij(jn),itrcr) =                                            &
+                        s%fj(jl,ij(jn),itrcr) + s%prk(jl,irj)
           END DO
         END IF
       END DO
@@ -169,8 +166,8 @@ DO jc = 1, ntrf
         IF (lj(jn)) THEN
           fr=frpx(nfrpx(irj)+jn-3)
           DO jl=1,n_points
-            fj(jl,ij(jn),itrcr) =                                              &
-                        fj(jl,ij(jn),itrcr) + fr*prk(jl,irj)
+            s%fj(jl,ij(jn),itrcr) =                                            &
+                        s%fj(jl,ij(jn),itrcr) + fr*s%prk(jl,irj)
           END DO
         END IF
       END DO
@@ -183,7 +180,7 @@ DO jc = 1, ntrf
         iss = ntabpd(jn,1)
         fr = ztabpd(jn,1)
         DO jl=1,n_points
-          fj(jl,iss,itrcr) = fj(jl,iss,itrcr) + fr*prk(jl,irj)
+          s%fj(jl,iss,itrcr) = s%fj(jl,iss,itrcr) + fr*s%prk(jl,irj)
         END DO
       END DO
     END IF
@@ -203,31 +200,31 @@ DO jc = 1, nstst
     DO jn=1,2
       IF (lj(jn)) THEN
         DO jl=1,n_points
-          fj(jl,ij(jn),ntro3 ) =                                               &
-             fj(jl,ij(jn),ntro3 ) - prk(jl,irj)*deriv(jl,jc,1)
-          fj(jl,ij(jn),ntroh ) =                                               &
-             fj(jl,ij(jn),ntroh ) - prk(jl,irj)*deriv(jl,jc,2)
-          fj(jl,ij(jn),ntrho2) =                                               &
-             fj(jl,ij(jn),ntrho2) - prk(jl,irj)*deriv(jl,jc,3)
-          fj(jl,ij(jn),ntrno ) =                                               &
-             fj(jl,ij(jn),ntrno ) - prk(jl,irj)*deriv(jl,jc,4)
+          s%fj(jl,ij(jn),ntro3 ) =                                             &
+             s%fj(jl,ij(jn),ntro3 ) - s%prk(jl,irj)*s%deriv(jl,jc,1)
+          s%fj(jl,ij(jn),ntroh ) =                                             &
+             s%fj(jl,ij(jn),ntroh ) - s%prk(jl,irj)*s%deriv(jl,jc,2)
+          s%fj(jl,ij(jn),ntrho2) =                                             &
+             s%fj(jl,ij(jn),ntrho2) - s%prk(jl,irj)*s%deriv(jl,jc,3)
+          s%fj(jl,ij(jn),ntrno ) =                                             &
+             s%fj(jl,ij(jn),ntrno ) - s%prk(jl,irj)*s%deriv(jl,jc,4)
         END DO
       END IF
     END DO
     DO jn=3,jpmsp
       IF (lj(jn)) THEN
-        fj(1:n_points,ij(jn),ntro3) =                                          &
-          fj(1:n_points,ij(jn),ntro3)  +                                       &
-          prk(1:n_points,irj)*deriv(1:n_points,jc,1)
-        fj(1:n_points,ij(jn),ntroh) =                                          &
-          fj(1:n_points,ij(jn),ntroh)  +                                       &
-          prk(1:n_points,irj)*deriv(1:n_points,jc,2)
-        fj(1:n_points,ij(jn),ntrho2) =                                         &
-          fj(1:n_points,ij(jn),ntrho2) +                                       &
-          prk(1:n_points,irj)*deriv(1:n_points,jc,3)
-        fj(1:n_points,ij(jn),ntrno ) =                                         &
-          fj(1:n_points,ij(jn),ntrno ) +                                       &
-          prk(1:n_points,irj)*deriv(1:n_points,jc,4)
+        s%fj(1:n_points,ij(jn),ntro3) =                                        &
+          s%fj(1:n_points,ij(jn),ntro3)  +                                     &
+          s%prk(1:n_points,irj)*s%deriv(1:n_points,jc,1)
+        s%fj(1:n_points,ij(jn),ntroh) =                                        &
+          s%fj(1:n_points,ij(jn),ntroh)  +                                     &
+          s%prk(1:n_points,irj)*s%deriv(1:n_points,jc,2)
+        s%fj(1:n_points,ij(jn),ntrho2) =                                       &
+          s%fj(1:n_points,ij(jn),ntrho2) +                                     &
+          s%prk(1:n_points,irj)*s%deriv(1:n_points,jc,3)
+        s%fj(1:n_points,ij(jn),ntrno ) =                                       &
+          s%fj(1:n_points,ij(jn),ntrno ) +                                     &
+          s%prk(1:n_points,irj)*s%deriv(1:n_points,jc,4)
       END IF
     END DO
   END DO
@@ -246,15 +243,15 @@ IF ( ndepw  /=  0 .OR. ndepd  /=  0 ) THEN
     IF ( ifamd /= 0 ) THEN
       DO jl=1,n_points
         IF ((ityped == jpfm) .OR. (ityped == jpif .AND.                        &
-        linfam(jl,itrd)))                                                      &
-           fj(jl,ifamd,ifamd)=fj(jl,ifamd,ifamd)                               &
-         - nodd(js)*(dpd(jl,js)+dpw(jl,js))                                    &
-          *y(jl,js)
+        s%linfam(jl,itrd)))                                                    &
+           s%fj(jl,ifamd,ifamd)=s%fj(jl,ifamd,ifamd)                           &
+         - nodd(js)*(s%dpd(jl,js)+s%dpw(jl,js))                                &
+          *s%y(jl,js)
       END DO
     END IF
     IF ( itrd /= 0 ) THEN
-      fj(1:n_points,itrd,itrd) = fj(1:n_points,itrd,itrd)                      &
-       - (dpd(1:n_points,js)+dpw(1:n_points,js))*y(1:n_points,js)
+      s%fj(1:n_points,itrd,itrd) = s%fj(1:n_points,itrd,itrd)                  &
+       - (s%dpd(1:n_points,js)+s%dpw(1:n_points,js))*s%y(1:n_points,js)
     END IF
   END DO
 END IF
@@ -264,8 +261,8 @@ END IF
 !              -------- -------- -- ----- ----
 !
 DO j=1,jpcspf
-  fj(1:n_points,j,:)=fj(1:n_points,j,:)/f(1:n_points,:)
-  ! filter f earlier!
+  s%fj(1:n_points,j,:)=s%fj(1:n_points,j,:)/s%f(1:n_points,:)
+  ! filter s%f earlier!
 END DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

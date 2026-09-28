@@ -90,11 +90,11 @@ CONTAINS
 
 SUBROUTINE asad_jac(n_points)
 
-USE asad_mod, ONLY: ctype, dpd, dpw, ej, f, jpcspf, jpif, jpfm,                &
-                    jpmsp, jpnr, jpspec, linfam, madvtr, moffam,               &
-                    ndepd, ndepw, njacx1, njacx2, njacx3, njcgrp,              &
-                    nltr3, nltrf, nmpjac, nodd, npjac1, nspi,                  &
-                    ntr3, ntrf, peps, prk, y
+USE asad_mod, ONLY: ctype, jpcspf, jpif, jpfm, jpmsp,                          &
+                    jpnr, jpspec, madvtr, moffam, ndepd,                       &
+                    ndepw, njacx1, njacx2, njacx3, njcgrp,                     &
+                    nltr3, nltrf, nmpjac, nodd, npjac1,                        &
+                    nspi, ntr3, ntrf, peps, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -152,7 +152,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_JAC'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO jtr = 1, jpcspf
   DO jl = 1, n_points
-    ej(jl,jtr) = 0.0
+    s%ej(jl,jtr) = 0.0
   END DO
 END DO
 
@@ -177,8 +177,8 @@ DO jc = 1, ntrf
     i3 = njacx3(3,j3,itrcr)
 
     DO jl = 1, n_points
-      ej(jl,itrcr) = ej(jl,itrcr)                                              &
-                   - prk(jl,i1) - prk(jl,i2) - prk(jl,i3)
+      s%ej(jl,itrcr) = s%ej(jl,itrcr)                                          &
+                   - s%prk(jl,i1) - s%prk(jl,i2) - s%prk(jl,i3)
     END DO
   END DO
 
@@ -189,7 +189,7 @@ DO jc = 1, ntrf
     i1 = njacx2(1,itrcr)
     i2 = njacx2(2,itrcr)
     DO jl = 1, n_points
-      ej(jl,itrcr) = ej(jl,itrcr) - prk(jl,i1) - prk(jl,i2)
+      s%ej(jl,itrcr) = s%ej(jl,itrcr) - s%prk(jl,i1) - s%prk(jl,i2)
     END DO
   END DO
 
@@ -198,7 +198,7 @@ DO jc = 1, ntrf
   DO j1 = 1, ip1
     i1 = njacx1(itrcr)
     DO jl = 1, n_points
-      ej(jl,itrcr) = ej(jl,itrcr) - prk(jl,i1)
+      s%ej(jl,itrcr) = s%ej(jl,itrcr) - s%prk(jl,i1)
     END DO
   END DO
 
@@ -209,7 +209,7 @@ DO jc = 1, ntrf
   DO jp = 1, nmpjac(itrcr)
     i1 = npjac1(jp,itrcr)
     DO jl = 1, n_points
-      ej(jl,itrcr) = ej(jl,itrcr) + prk(jl,i1)
+      s%ej(jl,itrcr) = s%ej(jl,itrcr) + s%prk(jl,i1)
     END DO
   END DO
 
@@ -221,7 +221,7 @@ END DO
 !           For families with in/out species, we have to recompute
 !           which reactions contribute every dynamical step since
 !           this now varies with gridpoint. Duplicates the code in
-!           inijac.f
+!           inijac.s%f
 
 IF ( ntr3 /= 0 ) THEN
   DO jr = 1, jpnr
@@ -289,11 +289,11 @@ IF ( ntr3 /= 0 ) THEN
 
     IF ( gir1 ) THEN
       DO jl = 1, n_points
-        ginclude2 = (gif(2) .AND. linfam(jl,itr(2)) .OR. gtype(2))
-        ginclude3 = (gif(3) .AND. linfam(jl,itr(3)) .OR. gtype(3))
-        ginclude4 = (gif(4) .AND. linfam(jl,itr(4)) .OR. gtype(4))
-        ginclude5 = (gif(5) .AND. linfam(jl,itr(5)) .OR. gtype(5))
-        IF ( gif(1) .AND. .NOT. linfam(jl,itr(1)) ) THEN
+        ginclude2 = (gif(2) .AND. s%linfam(jl,itr(2)) .OR. gtype(2))
+        ginclude3 = (gif(3) .AND. s%linfam(jl,itr(3)) .OR. gtype(3))
+        ginclude4 = (gif(4) .AND. s%linfam(jl,itr(4)) .OR. gtype(4))
+        ginclude5 = (gif(5) .AND. s%linfam(jl,itr(5)) .OR. gtype(5))
+        IF ( gif(1) .AND. .NOT. s%linfam(jl,itr(1)) ) THEN
           ks = 0
         ELSE
           ks = -nodd(ir1)
@@ -303,7 +303,7 @@ IF ( ntr3 /= 0 ) THEN
           IF (ifam(5)==ifam(1) .AND. ginclude5) ks = ks+nodd(ip3)
         END IF
         IF ( ks  /=  0 )                                                       &
-          ej(jl,ifam(1)) = ej(jl,ifam(1)) + prk(jl,jr) * ks
+          s%ej(jl,ifam(1)) = s%ej(jl,ifam(1)) + s%prk(jl,jr) * ks
       END DO
     END IF
 
@@ -311,11 +311,11 @@ IF ( ntr3 /= 0 ) THEN
 
     IF ( gir2 ) THEN
       DO jl = 1, n_points
-        ginclude2 = (gif(2) .AND. linfam(jl,itr(2)) .OR. gtype(2))
-        ginclude3 = (gif(3) .AND. linfam(jl,itr(3)) .OR. gtype(3))
-        ginclude4 = (gif(4) .AND. linfam(jl,itr(4)) .OR. gtype(4))
-        ginclude5 = (gif(5) .AND. linfam(jl,itr(5)) .OR. gtype(5))
-        IF ( gif(2) .AND. .NOT. linfam(jl,itr(2)) ) THEN
+        ginclude2 = (gif(2) .AND. s%linfam(jl,itr(2)) .OR. gtype(2))
+        ginclude3 = (gif(3) .AND. s%linfam(jl,itr(3)) .OR. gtype(3))
+        ginclude4 = (gif(4) .AND. s%linfam(jl,itr(4)) .OR. gtype(4))
+        ginclude5 = (gif(5) .AND. s%linfam(jl,itr(5)) .OR. gtype(5))
+        IF ( gif(2) .AND. .NOT. s%linfam(jl,itr(2)) ) THEN
           ks = 0
         ELSE
           ks = -nodd(ir2)
@@ -325,7 +325,7 @@ IF ( ntr3 /= 0 ) THEN
           IF (ifam(5)==ifam(2) .AND. ginclude5) ks = ks+nodd(ip3)
         END IF
         IF ( ks  /=  0 )                                                       &
-          ej(jl,ifam(2)) = ej(jl,ifam(2)) + prk(jl,jr) * ks
+          s%ej(jl,ifam(2)) = s%ej(jl,ifam(2)) + s%prk(jl,jr) * ks
       END DO
     END IF
 
@@ -345,15 +345,15 @@ IF ( ndepw /= 0 .OR. ndepd /= 0 ) THEN
     IF ( ifamd /= 0 ) THEN
       DO jl = 1, n_points
         IF ((ityped == jpfm) .OR.                                              &
-           (ityped == jpif .AND. linfam(jl,itrd)))                             &
-          ej(jl,ifamd) = ej(jl,ifamd) - nodd(js) *                             &
-                    ( dpd(jl,js)+dpw(jl,js)) * y(jl,js)
+           (ityped == jpif .AND. s%linfam(jl,itrd)))                           &
+          s%ej(jl,ifamd) = s%ej(jl,ifamd) - nodd(js) *                         &
+                    ( s%dpd(jl,js)+s%dpw(jl,js)) * s%y(jl,js)
       END DO
     END IF
     IF ( itrd /= 0 ) THEN
       DO jl = 1, n_points
-        ej(jl,itrd) = ej(jl,itrd)                                              &
-                    - (dpd(jl,js)+dpw(jl,js))*y(jl,js)
+        s%ej(jl,itrd) = s%ej(jl,itrd)                                          &
+                    - (s%dpd(jl,js)+s%dpw(jl,js))*s%y(jl,js)
       END DO
     END IF
   END DO
@@ -364,10 +364,10 @@ END IF
 
 DO jtr = 1, jpcspf
   DO jl = 1, n_points
-    IF ( f(jl,jtr)  >   peps ) THEN
-      ej(jl,jtr) = ej(jl,jtr) / f(jl,jtr)
+    IF ( s%f(jl,jtr)  >   peps ) THEN
+      s%ej(jl,jtr) = s%ej(jl,jtr) / s%f(jl,jtr)
     ELSE
-      ej(jl,jtr) = 0.0
+      s%ej(jl,jtr) = 0.0
     END IF
   END DO
 END DO

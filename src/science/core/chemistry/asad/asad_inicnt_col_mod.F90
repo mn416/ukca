@@ -49,7 +49,7 @@ CONTAINS
 
 SUBROUTINE asad_inicnt_col( species, y_out, klen, ix, jy )
 
-USE asad_mod,              ONLY: wp, co2, tnd, nlfro2, f, jpro2
+USE asad_mod,              ONLY: nlfro2, jpro2, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_constants,        ONLY: c_oh, c_o3, c_no3, c_ho2
 USE ukca_environment_fields_mod,     ONLY: o3_offline, oh_offline,             &
@@ -98,10 +98,10 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 IF (species(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) THEN
   !  The CO2 field is set to the UM prognostic if it is available and
   !  is used in the chemical scheme.
-  y_out(:) = co2(:)
+  y_out(:) = s%co2(:)
 ELSE IF ( species(1:4) == 'H2O ' ) THEN
-  ! Note that wp is in units of volumetric mixing ratio
-  y_out(:) = wp(:)
+  ! Note that s%wp is in units of volumetric mixing ratio
+  y_out(:) = s%wp(:)
 
   ! First call to calculate total RO2, using initial concentration
   ! of all RO2 species in mechanism
@@ -112,10 +112,10 @@ ELSE IF (species(1:4) == 'RO2 ') THEN
     DO j = 1, jpro2
       ! Get index location of each RO2 species and sum
       iro2    = nlfro2(j)
-      fro2(:) = fro2(:) + f(:, iro2)
+      fro2(:) = fro2(:) + s%f(:, iro2)
     END DO   ! End iteration over RO2 species
     ! Convert to VMR - fro2 will be in molecules/cm3
-    y_out(:) = fro2(:)/tnd(:)
+    y_out(:) = fro2(:)/s%tnd(:)
   ELSE
     errcode = 126
     cmessage = 'RO2 should only be a species if l_ukca_ro2_perm == T'
@@ -148,7 +148,7 @@ ELSE
 END IF
 
 ! Convert to molecules/cm^3 from vmr
-y_out(:) = y_out(:)*tnd(:)
+y_out(:) = y_out(:)*s%tnd(:)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 

@@ -40,7 +40,7 @@ CONTAINS
 
 SUBROUTINE ukca_wetdep(wetrt,n_points)
 
-USE asad_mod,         ONLY: ndepw, nldepw, dpw, jpdw
+USE asad_mod,         ONLY: ndepw, nldepw, jpdw, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -69,7 +69,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO js = 1,ndepw
   nspec = nldepw(js)
   DO i = 1,n_points
-    dpw(i,nspec)= wetrt(i,js)
+    s%dpw(i,nspec)= wetrt(i,js)
   END DO
 END DO
 

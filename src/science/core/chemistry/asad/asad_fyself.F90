@@ -45,7 +45,7 @@ CONTAINS
 
 SUBROUTINE asad_fyself(n_points)
 
-USE asad_mod,        ONLY: qa, rk, nstst, nlstst, nspi, jpnr
+USE asad_mod,        ONLY: nstst, nlstst, nspi, jpnr, s=>asad_state
 USE parkind1,        ONLY: jprb, jpim
 USE yomhook,         ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -74,7 +74,7 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO j = 1, nstst
   js = nlstst(j)
   DO jl = 1, n_points
-    qa(jl,js) = 0.0
+    s%qa(jl,js) = 0.0
   END DO
 END DO
 
@@ -85,7 +85,7 @@ DO jr = 1, jpnr
   isp = nspi(jr,1)
   IF ( isp == nspi(jr,2) ) THEN
     DO jl = 1, n_points
-      qa(jl,isp) = qa(jl,isp) + 2.0 * rk(jl,jr)
+      s%qa(jl,isp) = s%qa(jl,isp) + 2.0 * s%rk(jl,jr)
     END DO
   END IF
 END DO

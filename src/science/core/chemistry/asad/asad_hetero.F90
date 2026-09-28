@@ -47,12 +47,11 @@ CONTAINS
 SUBROUTINE asad_hetero(n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
 
 USE asad_findreaction_mod, ONLY: asad_findreaction
-USE asad_mod,        ONLY: t, p, tnd, rk, ih_o3, ih_h2o2, ih_so2,              &
-                           ih_hno3, ihso3_h2o2, iho2_h, in2o5_h,               &
-                           iso3_o3, ihso3_o3, ih2o2_oh,                        &
+USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
+                           iho2_h, in2o5_h, iso3_o3, ihso3_o3, ih2o2_oh,       &
                            ihno3_oh, spb, sph, nbrkx, nhrkx,                   &
-                           jpspb, jpsph, jpeq, ih_o3_const,                    &
-                           jpbk, jphk, jpdw
+                           jpspb, jpsph, jpeq, ih_o3_const, jpbk,              &
+                           jphk, jpdw, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_chem_offline, ONLY: nwet_constant
 USE ukca_fdiss_constant_mod, ONLY: ukca_fdiss_constant
@@ -252,7 +251,7 @@ END IF        ! first_pass
 IF ((ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_offline_be) .AND.    &
     ANY(cld_l > qcl_min)) THEN
   ! send new H_plus array to calculate fraction dissolved in solvers
-  CALL ukca_fdiss(n_points, qcl_min, t, p, cld_l, fdiss, H_plus_1d_arr)
+  CALL ukca_fdiss(n_points, qcl_min, s%t, s%p, cld_l, fdiss, H_plus_1d_arr)
   todo(:) = cld_l(:) > qcl_min
 ELSE
   fdiss(:,:,:) = 0.0
@@ -265,7 +264,7 @@ IF (ANY(cld_l > qcl_min)) THEN
       nwet_constant > 0 ) THEN
     ALLOCATE(fdiss_constant(n_points, nwet_constant, jpeq+1))
     ! send H_plus array to calculate fraction dissolved in offline oxidants
-    CALL ukca_fdiss_constant(n_points, qcl_min, t, p, cld_l,                   &
+    CALL ukca_fdiss_constant(n_points, qcl_min, s%t, s%p, cld_l,               &
                            fdiss_constant, H_plus_1d_arr)
     fdiss_o3(:) = fdiss_constant(:,ih_o3_const,1)
     DEALLOCATE(fdiss_constant)
@@ -283,36 +282,36 @@ IF (ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_offline_be) THEN
   WHERE (todo(:))
 
     ! Convert clw in kg/kg to volume ratio
-    vr(:) = cld_l(:)*tnd(:)*m_air*(1e6/avogadro)/rho_water
+    vr(:) = cld_l(:)*s%tnd(:)*m_air*(1e6/avogadro)/rho_water
 
     ! HSO3- + H2O2(aq) => SO4--  [Kreidenweis et al. (2003), optimised]
     ! optimised means incorporated the EXP[(E/R)/298] part of the rate
     ! expression with K298 (7.45E7) from Kreidenweis (2003)
-    rk(:,ihso3_h2o2) = 2.1295e+14*EXP(-4430.0/t(:))*                           &
+    s%rk(:,ihso3_h2o2) = 2.1295e+14*EXP(-4430.0/s%t(:))*                       &
        (H_plus_1d_arr(:)/(1.0 + 13.0*H_plus_1d_arr(:)))                        &
        *cld_f(:)*fdiss(:,ih_so2,2)*fdiss(:,ih_h2o2,1)*1000.0/(avogadro*vr(:))
 
     ! HSO3- + O3(aq) => SO4--  [Kreidenweis et al. (2003), optimised]
     ! optimised means incorporated the EXP[(E/R)/298] part of the rate
     ! expression with K298 (3.5E5) from Kreidenweis (2003)
-    rk(:,ihso3_o3) = 4.0113e+13*EXP(-5530.0/t(:))*                             &
+    s%rk(:,ihso3_o3) = 4.0113e+13*EXP(-5530.0/s%t(:))*                         &
                      cld_f(:)*fdiss(:,ih_so2,2)*fdiss_o3(:)*                   &
                      1000.0/(avogadro*vr(:))
 
     ! SO3-- + O3(aq) => SO4-- [Kreidenweis et al. (2003), optimised]
     ! optimised means incorporated the EXP[(E/R)/298] part of the rate
     ! expression with K298 (1.5E9) from Kreidenweis (2003)
-    rk(:,iso3_o3) = 7.43e+16*EXP(-5280.0/t(:))*cld_f(:)*                       &
+    s%rk(:,iso3_o3) = 7.43e+16*EXP(-5280.0/s%t(:))*cld_f(:)*                   &
                        fdiss(:,ih_so2,3)*fdiss_o3(:)*                          &
                        1000.0/(avogadro*vr(:))
 
     ! H2O2 + OH: reduce to take account of dissolved fraction
-    rk(:,ih2o2_oh) = rk(:,ih2o2_oh)*                                           &
+    s%rk(:,ih2o2_oh) = s%rk(:,ih2o2_oh)*                                       &
           (1.0 - (fdiss(:,ih_h2o2,1)+fdiss(:,ih_h2o2,2))*cld_f(:))
   ELSE WHERE
-    rk(:,ihso3_h2o2) = 0.0
-    rk(:,ihso3_o3) = 0.0
-    rk(:,iso3_o3) = 0.0
+    s%rk(:,ihso3_h2o2) = 0.0
+    s%rk(:,ihso3_o3) = 0.0
+    s%rk(:,iso3_o3) = 0.0
   END WHERE
 
 END IF      ! l_ukca_achem .....
@@ -320,20 +319,20 @@ END IF      ! l_ukca_achem .....
 IF (ukca_config%l_ukca_achem) THEN
   !  HNO3 + OH : reduce to take account of dissolved fraction
   WHERE (todo(:))
-    rk(:,ihno3_oh) = rk(:,ihno3_oh)*                                           &
+    s%rk(:,ihno3_oh) = s%rk(:,ihno3_oh)*                                       &
         (1.0 - (fdiss(:,ih_hno3,1)+fdiss(:,ih_hno3,2))*cld_f(:))
   END WHERE
 END IF
 
 IF (ukca_config%l_ukca_trophet) THEN
   ! N2O5 => HNO3 (heterogeneous)
-  rk(:,in2o5_h) = rc_het(:,1)
+  s%rk(:,in2o5_h) = rc_het(:,1)
 
   ! HO2 + HO2 => H2O2 (heterogeneous)
-  rk(:,iho2_h) = rc_het(:,2)
+  s%rk(:,iho2_h) = rc_het(:,2)
 ELSE
-  IF (in2o5_h > 0) rk(:,in2o5_h) = 0.0
-  IF (iho2_h > 0)  rk(:,iho2_h) = 0.0
+  IF (in2o5_h > 0) s%rk(:,in2o5_h) = 0.0
+  IF (iho2_h > 0)  s%rk(:,iho2_h) = 0.0
 END IF
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)

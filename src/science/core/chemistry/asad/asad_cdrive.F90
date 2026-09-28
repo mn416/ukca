@@ -93,14 +93,10 @@ SUBROUTINE asad_cdrive(ftr, pp, pt, pq, co2_1d, cld_f, cld_l,                  &
                        ix, jy, nlev, dryrt, wetrt, rc_het, prt,                &
                        n_points, have_nat, stratflag, H_plus_1d_arr)
 
-USE asad_mod,        ONLY: ctype, fdot, f,                                     &
-                           jpspec, jpcspf, jppj,                               &
-                           jpdd, jpdw, jpif, jsubs,                            &
-                           linfam, lvmr,                                       &
-                           madvtr, method, moffam,                             &
-                           ncsteps, ndepd, ndepw,                              &
-                           nfphot, nit0, nitfg, nodd,                          &
-                           p, t, tnd, wp, co2
+USE asad_mod,        ONLY: ctype, jpspec, jpcspf, jppj, jpdd,                  &
+                           jpdw, jpif, lvmr, madvtr, method,                   &
+                           moffam, ndepd, ndepw, nfphot, nit0,                 &
+                           nitfg, nodd, s=>asad_state
 USE ukca_hetero_mod, ONLY: ukca_hetero, ukca_solidphase
 USE ukca_config_specification_mod, ONLY: ukca_config
 
@@ -189,15 +185,15 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 !       1.1  Copy pressure and temperature to asad_mod
 
 DO jl = 1, n_points
-  p(jl) = pp(jl)
-  t(jl) = pt(jl)
+  s%p(jl) = pp(jl)
+  s%t(jl) = pt(jl)
 END DO
 
-!       1.1.1 Copy water vapor and co2 to asad_mod
+!       1.1.1 Copy water vapor and s%co2 to asad_mod
 
 DO jl = 1, n_points
-  wp(jl) = pq(jl)
-  co2(jl) = co2_1d(jl)
+  s%wp(jl) = pq(jl)
+  s%co2(jl) = co2_1d(jl)
 END DO
 
 !       2.  Calculate total number densities
@@ -210,14 +206,14 @@ CALL asad_totnud(n_points)
 IF ( lvmr ) THEN
   DO jtr = 1, jpcspf
     DO jl  = 1, n_points
-      ftr(jl,jtr) = ftr(jl,jtr) * tnd(jl)
-      f(jl,jtr)   = ftr(jl,jtr)
+      ftr(jl,jtr) = ftr(jl,jtr) * s%tnd(jl)
+      s%f(jl,jtr)   = ftr(jl,jtr)
     END DO
   END DO
 ELSE
   DO jtr = 1, jpcspf
     DO jl  = 1, n_points
-      f(jl,jtr)   = ftr(jl,jtr)
+      s%f(jl,jtr)   = ftr(jl,jtr)
     END DO
   END DO
 END IF
@@ -268,10 +264,10 @@ CASE (1)
   !          and photolysis rates, species and tendencies.
   !          ===============================================
 
-  DO js = 1, ncsteps
-    jsubs = js
-    gfirst = jsubs == 1
-    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(jsubs-1,nfphot) == 0
+  DO js = 1, s%ncsteps
+    s%jsubs = js
+    gfirst = s%jsubs == 1
+    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(s%jsubs-1,nfphot) == 0
 
     ! pass num_iter to asad_ftoy
     num_iter=0
@@ -290,10 +286,10 @@ CASE (3)
   !     6.3   Sparse Newton-Raphson solver
   !           ============================
   !
-  !     NOTE: Looping over ncsteps happens inside the asad_spmjpdriv call.
+  !     NOTE: Looping over s%ncsteps happens inside the asad_spmjpdriv call.
 
   gfirst = .TRUE.
-  jsubs = 1
+  s%jsubs = 1
 
   ! pass num_iter to asad_ftoy
   num_iter=0
@@ -310,10 +306,10 @@ CASE (5)
   !     6.5   Backward Euler solver
   !           =====================
 
-  DO js = 1, ncsteps
-    jsubs = js
-    gfirst = jsubs == 1
-    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(jsubs-1,nfphot) == 0
+  DO js = 1, s%ncsteps
+    s%jsubs = js
+    gfirst = s%jsubs == 1
+    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(s%jsubs-1,nfphot) == 0
 
     ! pass num_iter to asad_ftoy
     num_iter=0
@@ -348,7 +344,7 @@ DO js = 1, jpspec
     itr  = madvtr(js)
     iodd = nodd(js)
     DO jl = 1, n_points
-      IF ( linfam(jl,itr) ) f(jl,ifam) = f(jl,ifam) - iodd*f(jl,itr)
+      IF ( s%linfam(jl,itr) ) s%f(jl,ifam) = s%f(jl,ifam) - iodd*s%f(jl,itr)
     END DO
   END IF
 END DO
@@ -357,7 +353,7 @@ END DO
 
 DO jtr = 1, jpcspf
   DO jl = 1, n_points
-    ftr(jl,jtr) = f(jl,jtr)
+    ftr(jl,jtr) = s%f(jl,jtr)
   END DO
 END DO
 
@@ -368,7 +364,7 @@ END DO
 IF ( lvmr ) THEN
   DO jtr = 1, jpcspf
     DO jl = 1, n_points
-      ftr(jl,jtr)  = ftr(jl,jtr) / tnd(jl)
+      ftr(jl,jtr)  = ftr(jl,jtr) / s%tnd(jl)
     END DO
   END DO
 END IF

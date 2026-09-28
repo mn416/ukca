@@ -55,12 +55,12 @@ CONTAINS
 
 SUBROUTINE asad_bedriv(nslon,nslat, n_points, nlev)
 
-USE asad_mod,        ONLY: cdt, ctype, dpd, dpw, f, frpx,                      &
-                           jpif, jpmsp, jpna, jpnr, jpsp, jpoo,                &
-                           ldepd, ldepw, nfrpx, nnfrp, nprkx,                  &
-                           nspi, nstst, ntabfp, ntrkx, nuni,                   &
-                           p, rk, speci, spj, spt, y, ydot,                    &
-                           jpspec, jpcspf, jptk, jppj
+USE asad_mod,        ONLY: ctype, frpx, jpif, jpmsp, jpna,                     &
+                           jpnr, jpsp, jpoo, ldepd, ldepw,                     &
+                           nfrpx, nnfrp, nprkx, nspi, nstst,                   &
+                           ntabfp, ntrkx, nuni, speci, spj,                    &
+                           spt, jpspec, jpcspf, jptk, jppj,                    &
+                           s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
@@ -365,16 +365,16 @@ END IF  ! End of initialization
 !$OMP END CRITICAL (asad_bedriv_init)
 
 ! find parameters needed in chemistry, special reactions etc
-! Assign sensible values to species array y
+! Assign sensible values to species array s%y
 iter  = 1
-jit   = 0 ! Current iteration No. 0: initialising y
+jit   = 0 ! Current iteration No. 0: initialising s%y
 CALL asad_ftoy(not_first_call, iter, jit, n_points, nslon, nslat, nlev)
 IF (nstst  /=  0) THEN
   CALL asad_steady( n_points )
 END IF
 
 ! Save previous state of species array
-ydot = y
+s%ydot = s%y
 !
 !  Start Loop - perform backward Euler iteration
 DO jit=1,besteps
@@ -395,25 +395,25 @@ DO jit=1,besteps
         jr2 = uprodreac(js,k1-1)
         jr3 = uprodreac(js,k1-2)
         jr4 = uprodreac(js,k1-3)
-        pdn = rk(:,jr1) * y(:,nspi(jr1,1))                                     &
-          + rk(:,jr2) * y(:,nspi(jr2,1))                                       &
-          + rk(:,jr3) * y(:,nspi(jr3,1))                                       &
-          + rk(:,jr4) * y(:,nspi(jr4,1))
+        pdn = s%rk(:,jr1) * s%y(:,nspi(jr1,1))                                 &
+          + s%rk(:,jr2) * s%y(:,nspi(jr2,1))                                   &
+          + s%rk(:,jr3) * s%y(:,nspi(jr3,1))                                   &
+          + s%rk(:,jr4) * s%y(:,nspi(jr4,1))
       CASE (3)
         jr1 = uprodreac(js,k1  )
         jr2 = uprodreac(js,k1-1)
         jr3 = uprodreac(js,k1-3)
-        pdn = rk(:,jr1) * y(:,nspi(jr1,1))                                     &
-          + rk(:,jr2) * y(:,nspi(jr2,1))                                       &
-          + rk(:,jr3) * y(:,nspi(jr3,1))
+        pdn = s%rk(:,jr1) * s%y(:,nspi(jr1,1))                                 &
+          + s%rk(:,jr2) * s%y(:,nspi(jr2,1))                                   &
+          + s%rk(:,jr3) * s%y(:,nspi(jr3,1))
       CASE (2)
         jr1 = uprodreac(js,k1  )
         jr2 = uprodreac(js,k1-1)
-        pdn = rk(:,jr1) * y(:,nspi(jr1,1))                                     &
-          + rk(:,jr2) * y(:,nspi(jr2,1))
+        pdn = s%rk(:,jr1) * s%y(:,nspi(jr1,1))                                 &
+          + s%rk(:,jr2) * s%y(:,nspi(jr2,1))
       CASE (1)
         jr1 = uprodreac(js,k1  )
-        pdn = rk(:,jr1) * y(:,nspi(jr1,1))
+        pdn = s%rk(:,jr1) * s%y(:,nspi(jr1,1))
       CASE (0)
         pdn = 0.0
       END SELECT
@@ -423,11 +423,11 @@ DO jit=1,besteps
         jr3 = uprodreac(js,k+2)
         jr4 = uprodreac(js,k+3)
         jr5 = uprodreac(js,k+4)
-        pdn = pdn + rk(:,jr1) * y(:,nspi(jr1,1))                               &
-              + rk(:,jr2) * y(:,nspi(jr2,1))                                   &
-              + rk(:,jr3) * y(:,nspi(jr3,1))                                   &
-              + rk(:,jr4) * y(:,nspi(jr4,1))                                   &
-              + rk(:,jr5) * y(:,nspi(jr5,1))
+        pdn = pdn + s%rk(:,jr1) * s%y(:,nspi(jr1,1))                           &
+              + s%rk(:,jr2) * s%y(:,nspi(jr2,1))                               &
+              + s%rk(:,jr3) * s%y(:,nspi(jr3,1))                               &
+              + s%rk(:,jr4) * s%y(:,nspi(jr4,1))                               &
+              + s%rk(:,jr5) * s%y(:,nspi(jr5,1))
       END DO
 
       ! Production by bimolecular reactions, integer products
@@ -438,11 +438,11 @@ DO jit=1,besteps
         jr3 = bprodreac(js,k-2)
         jr4 = bprodreac(js,k-3)
         jr5 = bprodreac(js,k-4)
-        pdn = pdn + rk(:,jr1)*y(:,nspi(jr1,1))*y(:,nspi(jr1,2))                &
-              + rk(:,jr2)*y(:,nspi(jr2,1))*y(:,nspi(jr2,2))                    &
-              + rk(:,jr3)*y(:,nspi(jr3,1))*y(:,nspi(jr3,2))                    &
-              + rk(:,jr4)*y(:,nspi(jr4,1))*y(:,nspi(jr4,2))                    &
-              + rk(:,jr5)*y(:,nspi(jr5,1))*y(:,nspi(jr5,2))
+        pdn = pdn + s%rk(:,jr1)*s%y(:,nspi(jr1,1))*s%y(:,nspi(jr1,2))          &
+              + s%rk(:,jr2)*s%y(:,nspi(jr2,1))*s%y(:,nspi(jr2,2))              &
+              + s%rk(:,jr3)*s%y(:,nspi(jr3,1))*s%y(:,nspi(jr3,2))              &
+              + s%rk(:,jr4)*s%y(:,nspi(jr4,1))*s%y(:,nspi(jr4,2))              &
+              + s%rk(:,jr5)*s%y(:,nspi(jr5,1))*s%y(:,nspi(jr5,2))
         k = k - 5
       END DO
       SELECT CASE (k)
@@ -451,33 +451,33 @@ DO jit=1,besteps
         jr2 = bprodreac(js,2)
         jr3 = bprodreac(js,3)
         jr4 = bprodreac(js,4)
-        pdn = pdn + rk(:,jr1)*y(:,nspi(jr1,1))*y(:,nspi(jr1,2))                &
-              + rk(:,jr2)*y(:,nspi(jr2,1))*y(:,nspi(jr2,2))                    &
-              + rk(:,jr3)*y(:,nspi(jr3,1))*y(:,nspi(jr3,2))                    &
-              + rk(:,jr4)*y(:,nspi(jr4,1))*y(:,nspi(jr4,2))
+        pdn = pdn + s%rk(:,jr1)*s%y(:,nspi(jr1,1))*s%y(:,nspi(jr1,2))          &
+              + s%rk(:,jr2)*s%y(:,nspi(jr2,1))*s%y(:,nspi(jr2,2))              &
+              + s%rk(:,jr3)*s%y(:,nspi(jr3,1))*s%y(:,nspi(jr3,2))              &
+              + s%rk(:,jr4)*s%y(:,nspi(jr4,1))*s%y(:,nspi(jr4,2))
       CASE (3)
         jr1 = bprodreac(js,1)
         jr2 = bprodreac(js,2)
         jr3 = bprodreac(js,3)
-        pdn = pdn + rk(:,jr1)*y(:,nspi(jr1,1))*y(:,nspi(jr1,2))                &
-              + rk(:,jr2)*y(:,nspi(jr2,1))*y(:,nspi(jr2,2))                    &
-              + rk(:,jr3)*y(:,nspi(jr3,1))*y(:,nspi(jr3,2))
+        pdn = pdn + s%rk(:,jr1)*s%y(:,nspi(jr1,1))*s%y(:,nspi(jr1,2))          &
+              + s%rk(:,jr2)*s%y(:,nspi(jr2,1))*s%y(:,nspi(jr2,2))              &
+              + s%rk(:,jr3)*s%y(:,nspi(jr3,1))*s%y(:,nspi(jr3,2))
       CASE (2)
         jr1 = bprodreac(js,1)
         jr2 = bprodreac(js,2)
-        pdn = pdn + rk(:,jr1)*y(:,nspi(jr1,1))*y(:,nspi(jr1,2))                &
-              + rk(:,jr2)*y(:,nspi(jr2,1))*y(:,nspi(jr2,2))
+        pdn = pdn + s%rk(:,jr1)*s%y(:,nspi(jr1,1))*s%y(:,nspi(jr1,2))          &
+              + s%rk(:,jr2)*s%y(:,nspi(jr2,1))*s%y(:,nspi(jr2,2))
       CASE (1)
         jr1 = bprodreac(js,1)
-        pdn = pdn + rk(:,jr1)*y(:,nspi(jr1,1))*y(:,nspi(jr1,2))
+        pdn = pdn + s%rk(:,jr1)*s%y(:,nspi(jr1,1))*s%y(:,nspi(jr1,2))
       END SELECT
 
       ! Fractional products here. Note that only bimolecular reactions
       ! can have fractional products at the moment.
       DO k=nbintprod(js) + 1, nfracprod(js)
         jr = bprodreac(js,k)
-        pdn = pdn + rk(:,jr) * y(:,nspi(jr,1)) *                               &
-                y(:,nspi(jr,2)) * frac_prod(js,k)
+        pdn = pdn + s%rk(:,jr) * s%y(:,nspi(jr,1)) *                           &
+                s%y(:,nspi(jr,2)) * frac_prod(js,k)
       END DO
 
       ! Calculate loss. Unroll loss loops in groups of 5, to speed up
@@ -486,54 +486,54 @@ DO jit=1,besteps
       k1 = nuloss(js)
       SELECT CASE (mod5(k1))
       CASE (4)
-        l = rk(:,ulossreac(js,k1  ))+rk(:,ulossreac(js,k1-1))                  &
-          + rk(:,ulossreac(js,k1-2))+rk(:,ulossreac(js,k1-3))
+        l = s%rk(:,ulossreac(js,k1  ))+s%rk(:,ulossreac(js,k1-1))              &
+          + s%rk(:,ulossreac(js,k1-2))+s%rk(:,ulossreac(js,k1-3))
       CASE (3)
-        l = rk(:,ulossreac(js,k1  ))+rk(:,ulossreac(js,k1-1))                  &
-          + rk(:,ulossreac(js,k1-2))
+        l = s%rk(:,ulossreac(js,k1  ))+s%rk(:,ulossreac(js,k1-1))              &
+          + s%rk(:,ulossreac(js,k1-2))
       CASE (2)
-        l = rk(:,ulossreac(js,k1  ))+rk(:,ulossreac(js,k1-1))
+        l = s%rk(:,ulossreac(js,k1  ))+s%rk(:,ulossreac(js,k1-1))
       CASE (1)
-        l = rk(:,ulossreac(js,k1))
+        l = s%rk(:,ulossreac(js,k1))
       CASE (0)
         l = 0.0
       END SELECT
       DO k=1,k1-4,5
-        l = l + rk(:,ulossreac(js,k  ))+rk(:,ulossreac(js,k+1))                &
-              + rk(:,ulossreac(js,k+2))+rk(:,ulossreac(js,k+3))                &
-              + rk(:,ulossreac(js,k+4))
+        l = l + s%rk(:,ulossreac(js,k  ))+s%rk(:,ulossreac(js,k+1))            &
+              + s%rk(:,ulossreac(js,k+2))+s%rk(:,ulossreac(js,k+3))            &
+              + s%rk(:,ulossreac(js,k+4))
       END DO
 
       ! bimolecular loss
       k = nbloss(js)
       DO WHILE (k >= 5)
-        l = l+rk(:,blossreac(js,k  ))*y(:,blosspartner(js,k  ))                &
-             +rk(:,blossreac(js,k-1))*y(:,blosspartner(js,k-1))                &
-             +rk(:,blossreac(js,k-2))*y(:,blosspartner(js,k-2))                &
-             +rk(:,blossreac(js,k-3))*y(:,blosspartner(js,k-3))                &
-             +rk(:,blossreac(js,k-4))*y(:,blosspartner(js,k-4))
+        l = l+s%rk(:,blossreac(js,k  ))*s%y(:,blosspartner(js,k  ))            &
+             +s%rk(:,blossreac(js,k-1))*s%y(:,blosspartner(js,k-1))            &
+             +s%rk(:,blossreac(js,k-2))*s%y(:,blosspartner(js,k-2))            &
+             +s%rk(:,blossreac(js,k-3))*s%y(:,blosspartner(js,k-3))            &
+             +s%rk(:,blossreac(js,k-4))*s%y(:,blosspartner(js,k-4))
         k = k - 5
       END DO
       SELECT CASE (k)
       CASE (4)
-        l = l+rk(:,blossreac(js,4))*y(:,blosspartner(js,4))                    &
-             +rk(:,blossreac(js,3))*y(:,blosspartner(js,3))                    &
-             +rk(:,blossreac(js,2))*y(:,blosspartner(js,2))                    &
-             +rk(:,blossreac(js,1))*y(:,blosspartner(js,1))
+        l = l+s%rk(:,blossreac(js,4))*s%y(:,blosspartner(js,4))                &
+             +s%rk(:,blossreac(js,3))*s%y(:,blosspartner(js,3))                &
+             +s%rk(:,blossreac(js,2))*s%y(:,blosspartner(js,2))                &
+             +s%rk(:,blossreac(js,1))*s%y(:,blosspartner(js,1))
       CASE (3)
-        l = l+rk(:,blossreac(js,3))*y(:,blosspartner(js,3))                    &
-             +rk(:,blossreac(js,2))*y(:,blosspartner(js,2))                    &
-             +rk(:,blossreac(js,1))*y(:,blosspartner(js,1))
+        l = l+s%rk(:,blossreac(js,3))*s%y(:,blosspartner(js,3))                &
+             +s%rk(:,blossreac(js,2))*s%y(:,blosspartner(js,2))                &
+             +s%rk(:,blossreac(js,1))*s%y(:,blosspartner(js,1))
       CASE (2)
-        l = l+rk(:,blossreac(js,2))*y(:,blosspartner(js,2))                    &
-             +rk(:,blossreac(js,1))*y(:,blosspartner(js,1))
+        l = l+s%rk(:,blossreac(js,2))*s%y(:,blosspartner(js,2))                &
+             +s%rk(:,blossreac(js,1))*s%y(:,blosspartner(js,1))
       CASE (1)
-        l = l+rk(:,blossreac(js,1))*y(:,blosspartner(js,1))
+        l = l+s%rk(:,blossreac(js,1))*s%y(:,blosspartner(js,1))
       END SELECT
 
       ! add dry and wet deposition terms
-      IF (ldepd(js)) l = l + dpd(:,js)
-      IF (ldepw(js)) l = l + dpw(:,js)
+      IF (ldepd(js)) l = l + s%dpd(:,js)
+      IF (ldepw(js)) l = l + s%dpw(:,js)
 
       ! calculate new concentration. Note that family chemistry is not supported
       ! by the BE solver
@@ -541,57 +541,57 @@ DO jit=1,besteps
       ! do steady-state species first
       IF (ctype(js) == jpna) THEN
 
-        y(:,js) = pdn/l
+        s%y(:,js) = pdn/l
 
         ! Do tracer here. Regular case first (i.e., tracer # NO3 or N2O5)
 
       ELSE IF (js  /=  ino3) THEN
 
-        y(:,js) = (ydot(:,js) + cdt*pdn)/(1.0 + cdt * l)
+        s%y(:,js) = (s%ydot(:,js) + s%cdt*pdn)/(1.0 + s%cdt * l)
 
       ELSE
 
         ! do NO3 and N2O5 tracers combined
 
         ! R1 =  N2O5 + h nu and N2O5 + M
-        r1 = rk(:,pn2o5) + rk(:,tn2o5)
+        r1 = s%rk(:,pn2o5) + s%rk(:,tn2o5)
 
         ! Pdn = all production terms for NO3 except N2O5 + h nu and N2O5 + M
-        pdn = pdn - r1 * y(:,in2o5)
+        pdn = pdn - r1 * s%y(:,in2o5)
         ! L = all loss terms for NO3 (unchanged)
 
 
         ! R2 = NO2 + NO3 + M
-        r2 = rk(:,tno2no3) * y(:,ino2)
+        r2 = s%rk(:,tno2no3) * s%y(:,ino2)
 
         ! L1 = all loss terms of N2O5
         l1 = 0.0
         ! Calculate loss
         DO k=1,nuloss(in2o5)
-          l1 = l1 + rk(:,ulossreac(in2o5,k))
+          l1 = l1 + s%rk(:,ulossreac(in2o5,k))
         END DO
         DO k=1,nbloss(in2o5)
-          l1 = l1 + rk(:,blossreac(in2o5,k)) *                                 &
-                    y(:,blosspartner(in2o5,k))
+          l1 = l1 + s%rk(:,blossreac(in2o5,k)) *                               &
+                    s%y(:,blosspartner(in2o5,k))
         END DO
 
         ! add dry and wet deposition terms
-        IF (ldepd(in2o5)) l1 = l1 + dpd(:,in2o5)
-        IF (ldepw(in2o5)) l1 = l1 + dpw(:,in2o5)
+        IF (ldepd(in2o5)) l1 = l1 + s%dpd(:,in2o5)
+        IF (ldepw(in2o5)) l1 = l1 + s%dpw(:,in2o5)
 
-        ! L2 = 1 + cdt * L
-        l2 = 1.0 + cdt * l
+        ! L2 = 1 + s%cdt * L
+        l2 = 1.0 + s%cdt * l
 
-        ! L3 = 1 + cdt * L1
-        l3 = 1.0 + cdt * l1
+        ! L3 = 1 + s%cdt * L1
+        l3 = 1.0 + s%cdt * l1
 
         ! New value for NO3
-        y(:,ino3) = (l3 * (ydot(:,js) + p*cdt) +                               &
-                     r1 * cdt * ydot(:,in2o5)) /                               &
-                    (l3 * l2 - r1 * r2 * cdt * cdt)
+        s%y(:,ino3) = (l3 * (s%ydot(:,js) + s%p*cdt) +                         &
+                     r1 * s%cdt * s%ydot(:,in2o5)) /                           &
+                    (l3 * l2 - r1 * r2 * s%cdt * s%cdt)
 
         ! New value for N2O5
-        y(:,in2o5) = (ydot(:,in2o5) + r2*cdt*y(:,js))/l3
+        s%y(:,in2o5) = (s%ydot(:,in2o5) + r2*s%cdt*y(:,js))/l3
 
       END IF    ! distinction between SS and TR species
     END IF      ! exclude N2O5 tracer
@@ -600,7 +600,7 @@ END DO          ! BE iteration loop
 
 ! update tracer information
 DO j = 1, jpcspf
-  f(:,j) = y(:,ilftra(j))
+  s%f(:,j) = s%y(:,ilftra(j))
 END DO
 
 ! finish BE step

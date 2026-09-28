@@ -52,8 +52,8 @@ CONTAINS
 
 SUBROUTINE asad_trimol(n_points)
 
-USE asad_mod,        ONLY: rk, at, ntrkx, spt, t300, t, peps,                  &
-                           tnd, f, wp, specf, jpcspf, jptk
+USE asad_mod,        ONLY: at, ntrkx, spt, peps, specf,                        &
+                           jpcspf, jptk, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ukca_um_legacy_mod, ONLY: exp_v, powr_v, oneover_v
@@ -65,7 +65,7 @@ INTEGER, INTENT(IN) :: n_points
 !       Local variables
 
 INTEGER, SAVE :: ih2o              ! Index for h2o in tracer array
-INTEGER       :: iho2              ! Index for ho2+ho2 in rk array
+INTEGER       :: iho2              ! Index for ho2+ho2 in s%rk array
 INTEGER       :: in2o5             ! Reaction index for N2O5+M
 INTEGER       :: ino2no3           ! Reaction index for NO2+NO3+M
 INTEGER       :: idmsoho2_a        ! Reaction index for DMS+OH+O2
@@ -119,7 +119,7 @@ zr =  0.0
 zi = 0.0
 zo = 0.0
 
-CALL oneover_v(n_points, t, inv_t)
+CALL oneover_v(n_points, s%t, inv_t)
 
 ! OMP CRITICAL will only allow one thread through this code at a time,
 ! while the other threads are held until completion.
@@ -175,20 +175,20 @@ DO j = 1, jptk
       spt(j,4) == 'MeOO      ')  idmsoho2_b = jr
 
 
-  CALL powr_v(n_points,t300,at(j,3),t_power3)
-  CALL powr_v(n_points,t300,at(j,6),t_power6)
+  CALL powr_v(n_points,s%t300,at(j,3),t_power3)
+  CALL powr_v(n_points,s%t300,at(j,6),t_power6)
   inv_t_power4(1:n_points) = -at(j,4)*inv_t(1:n_points)
   inv_t_power7(1:n_points) = -at(j,7)*inv_t(1:n_points)
   CALL exp_v(n_points,inv_t_power4,inv_t_power4_out)
   CALL exp_v(n_points,inv_t_power7,inv_t_power7_out)
   DO jl = 1, n_points
     zo = at(j,2) * t_power3(jl) *                                              &
-                   inv_t_power4_out(jl)  * tnd(jl)
+                   inv_t_power4_out(jl)  * s%tnd(jl)
     zi = at(j,5) * t_power6(jl) * inv_t_power7_out(jl)
     IF ( zo < peps ) THEN
-      rk(jl,jr) = zi
+      s%rk(jl,jr) = zi
     ELSE IF ( zi < peps ) THEN
-      rk(jl,jr) = zo
+      s%rk(jl,jr) = zo
     ELSE
 
       ! Special case for DMS+OH+O2 -> DMSO + HO2 / SO2 + MeOO
@@ -198,21 +198,21 @@ DO j = 1, jptk
       IF (idmsoho2_a /= 0 .OR. idmsoho2_b /= 0) THEN
         ! Multiply by 0.21 to give in terms of [O2] instead of [M]
         zo = zo * 0.2095
-        zi = zi * 0.2095 * tnd(jl)
-        rk(jl,jr) = zo/(1 + zi)
+        zi = zi * 0.2095 * s%tnd(jl)
+        s%rk(jl,jr) = zo/(1 + zi)
       ELSE
         nf2 = nf(j)
         IF ( at(j,1) <= 1.0 ) THEN
           zfc = at(j,1)
         ELSE IF ( in2o5 /= 0 .OR. ino2no3 /= 0 ) THEN ! dependent
                                                       ! reactions
-          zfc = 2.5*EXP(-1950.0/t(jl))+0.9*EXP(-t(jl)/at(j,1))
+          zfc = 2.5*EXP(-1950.0/s%t(jl))+0.9*EXP(-s%t(jl)/at(j,1))
         ELSE              ! temperature dependent Fc
-          zfc = EXP( -t(jl)/at(j,1) )
+          zfc = EXP( -s%t(jl)/at(j,1) )
           nf2 = 0.75 - 1.27*LOG10(zfc)
         END IF
         zr = zo / zi
-        rk(jl,jr) = (zo/(1.0+zr)) *                                            &
+        s%rk(jl,jr) = (zo/(1.0+zr)) *                                          &
                      zfc**(1.0/(1.0 + (LOG10(zr)/nf2)**2))
       END IF
     END IF
@@ -228,16 +228,16 @@ IF (ih2o /= 0 .AND. iho2 /= 0 ) THEN
   tmp(1:n_points) = 2200.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   DO jl = 1, n_points
-    rk(jl,iho2) = rk(jl,iho2) *                                                &
-    ( 1.0 + 1.4e-21*f(jl,ih2o)*tmp_out(jl) )
+    s%rk(jl,iho2) = s%rk(jl,iho2) *                                            &
+    ( 1.0 + 1.4e-21*s%f(jl,ih2o)*tmp_out(jl) )
   END DO
 ELSE IF (ih2o == 0 .AND. iho2 /= 0) THEN
   !         use modelled water concentration
   tmp(1:n_points) = 2200.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   DO jl = 1, n_points
-    rk(jl,iho2) = rk(jl,iho2) *                                                &
-    ( 1.0 + 1.4e-21*wp(jl)*tnd(jl)*tmp_out(jl) )
+    s%rk(jl,iho2) = s%rk(jl,iho2) *                                            &
+    ( 1.0 + 1.4e-21*s%wp(jl)*s%tnd(jl)*tmp_out(jl) )
   END DO
 END IF
 

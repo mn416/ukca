@@ -115,11 +115,9 @@ CONTAINS
 
 SUBROUTINE asad_prls( kl, knspec, kspec, ldepem )
 
-USE asad_mod,            ONLY: prod, slos, y, rk, prk,                         &
-                               dpd, dpw, pd,                                   &
-                               nuni, nspi, ngrp, nprdx1,                       &
-                               nprdx2, nprdx3, ntabfp, frpx,                   &
-                               nldepx, nnfrp, jpspec, jpnr
+USE asad_mod,            ONLY: nuni, nspi, ngrp, nprdx1, nprdx2,               &
+                               nprdx3, ntabfp, frpx, nldepx, nnfrp,            &
+                               jpspec, jpnr, s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 IMPLICIT NONE
@@ -170,8 +168,8 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_PRLS'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO js = 1, jpspec
   DO jl = 1, kl
-    prod(jl,js) = 0.0
-    slos(jl,js) = 0.0
+    s%prod(jl,js) = 0.0
+    s%slos(jl,js) = 0.0
   END DO
 END DO
 
@@ -185,7 +183,7 @@ DO jr = 1, nuni
   ir1 = nspi(jr,1)
 
   DO jl = 1, kl
-    prk(jl,jr) = rk(jl,jr) * y(jl,ir1)
+    s%prk(jl,jr) = s%rk(jl,jr) * s%y(jl,ir1)
   END DO
 END DO
 
@@ -196,7 +194,7 @@ DO jr = iunip1, jpnr
   ir1 = nspi(jr,1)
   ir2 = nspi(jr,2)
   DO jl = 1, kl
-    prk(jl,jr) = rk(jl,jr) * y(jl,ir1) * y(jl,ir2)
+    s%prk(jl,jr) = s%rk(jl,jr) * s%y(jl,ir1) * s%y(jl,ir2)
   END DO
 END DO
 
@@ -219,7 +217,7 @@ DO jskip = 0, jpspec, jpspec
       i3 = nprdx3(3,j3,js)
 
       DO jl = 1, kl
-        pd(jl,js) = pd(jl,js) + prk(jl,i1) + prk(jl,i2) + prk(jl,i3)
+        s%pd(jl,js) = s%pd(jl,js) + s%prk(jl,i1) + s%prk(jl,i2) + s%prk(jl,i3)
       END DO
     END DO
 
@@ -230,7 +228,7 @@ DO jskip = 0, jpspec, jpspec
       i1 = nprdx2(1,js)
       i2 = nprdx2(2,js)
       DO jl = 1, kl
-        pd(jl,js) = pd(jl,js) + prk(jl,i1) + prk(jl,i2)
+        s%pd(jl,js) = s%pd(jl,js) + s%prk(jl,i1) + s%prk(jl,i2)
       END DO
     END DO
 
@@ -239,7 +237,7 @@ DO jskip = 0, jpspec, jpspec
     DO j1 = 1, ip1
       i1 = nprdx1(js)
       DO jl = 1, kl
-        pd(jl,js) = pd(jl,js) + prk(jl,i1)
+        s%pd(jl,js) = s%pd(jl,js) + s%prk(jl,i1)
       END DO
     END DO
 
@@ -254,7 +252,7 @@ DO jr = 1, nnfrp
   ix = ntabfp(jr,3)
   fr = frpx(ix)
   DO jl = 1, kl
-    pd(jl,iss) = pd(jl,iss) + fr * prk(jl,ir)
+    s%pd(jl,iss) = s%pd(jl,iss) + fr * s%prk(jl,ir)
   END DO
 END DO
 
@@ -270,7 +268,8 @@ IF ( ldepem ) THEN
   DO j = istart, iend
     js = nldepx(j)
     DO  jl = 1, kl
-      slos(jl,js) = slos(jl,js) + ( dpd(jl,js) + dpw(jl,js) ) * y(jl,js)
+      s%slos(jl,js) = s%slos(jl,js) + ( s%dpd(jl,js) + s%dpw(jl,js) ) *        &
+                      s%y(jl,js)
     END DO
   END DO
 
@@ -281,7 +280,7 @@ IF ( ldepem ) THEN
   DO j = istart, iend
     js = nldepx(j)
     DO jl = 1, kl
-      slos(jl,js) = slos(jl,js) + dpd(jl,js) * y(jl,js)
+      s%slos(jl,js) = s%slos(jl,js) + s%dpd(jl,js) * s%y(jl,js)
     END DO
   END DO
 
@@ -292,7 +291,7 @@ IF ( ldepem ) THEN
   DO j = istart, iend
     js = nldepx(j)
     DO jl = 1, kl
-      slos(jl,js) = slos(jl,js) + dpw(jl,js) * y(jl,js)
+      s%slos(jl,js) = s%slos(jl,js) + s%dpw(jl,js) * s%y(jl,js)
     END DO
   END DO
 

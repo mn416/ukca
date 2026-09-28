@@ -58,25 +58,19 @@ CONTAINS
 
 SUBROUTINE asad_cinit()
 
-USE asad_mod,        ONLY: cdt, ctype, dpd, dpw, ej, emr,                      &
-                           f, fdot, frpb, frph, frpj, frpt, frpx,              &
-                           jpif, jpfm, jpfrpx, jppjac, kfphot,                 &
-                           ldepd, ldepw, linfam, ljacx,                        &
-                           method, nbrkx, ncsteps, ndepd, ndepw,               &
-                           nfphot, nfrpx, ngrp, nhrkx,                         &
-                           nit0, nitfg, nitnr,                                 &
-                           njacx1, njacx2, njacx3, njcgrp,                     &
-                           nlall, nldepd, nldepw, nldepx,                      &
-                           nlf, nlmajmin, nlstst,                              &
-                           nmpjac, nmsjac, nmzjac,                             &
-                           npdfr, npjac1,                                      &
-                           nprdx1, nprdx2, nprdx3, nprkx,                      &
-                           nsjac1, nspi,                                       &
-                           ntabfp, ntabpd, ntrkx, nzjac1,                      &
-                           peps, prk, prod, rk,                                &
-                           slos, spb, sph, spj, spt,                           &
-                           y, ydot, ztabpd, nrsteps_max,                       &
-                           jpspec, jpcspf, jpnr
+USE asad_mod,        ONLY: ctype, frpb, frph, frpj, frpt,                      &
+                           frpx, jpif, jpfm, jpfrpx, jppjac,                   &
+                           kfphot, ldepd, ldepw, ljacx, method,                &
+                           nbrkx, ndepd, ndepw, nfphot, nfrpx,                 &
+                           ngrp, nhrkx, nit0, nitfg, nitnr,                    &
+                           njacx1, njacx2, njacx3, njcgrp, nlall,              &
+                           nldepd, nldepw, nldepx, nlf, nlmajmin,              &
+                           nlstst, nmpjac, nmsjac, nmzjac, npdfr,              &
+                           npjac1, nprdx1, nprdx2, nprdx3, nprkx,              &
+                           nsjac1, nspi, ntabfp, ntabpd, ntrkx,                &
+                           nzjac1, peps, spb, sph, spj,                        &
+                           spt, ztabpd, nrsteps_max, jpspec, jpcspf,           &
+                           jpnr, s=>asad_state
 USE ukca_config_specification_mod, ONLY: ukca_config, int_method_nr,           &
                                          int_method_be_explicit
 
@@ -167,14 +161,14 @@ IF (kfphot < 0 .AND. ABS(kfphot) > INT(ukca_config%timestep)) THEN
   ' BE CALLED ONCE.'
   CALL umPrint(umMessage,src=RoutineName)
   nfphot = 0
-ELSE IF ( kfphot > 0 .AND. kfphot > ncsteps ) THEN
+ELSE IF ( kfphot > 0 .AND. kfphot > s%ncsteps ) THEN
   WRITE(umMessage,'(A,I0,A,A)') '**CINIT WARNING: FREQUENCY KFPHOT ',kfphot,   &
    ' EXCEEDS THE TOTAL NUMBER OF CHEMICAL SUBSTEPS. ROUTINE ',                 &
    ' PHOTOL WILL BE CALLED ONCE ONLY.'
   CALL umPrint(umMessage,src=RoutineName)
   nfphot = 0
 ELSE IF (kfphot < 0) THEN
-  nfphot = INT( ABS(kfphot)/cdt )
+  nfphot = INT( ABS(kfphot)/s%cdt )
 ELSE
   nfphot = kfphot
 END IF
@@ -192,25 +186,25 @@ peps  = 1.0e19 * sfmin
 
 !       4.  Clear the species arrays
 
-f      = 0.0
-fdot   = 0.0
-ej     = 0.0
-linfam = .FALSE.
+s%f      = 0.0
+s%fdot   = 0.0
+s%ej     = 0.0
+s%linfam = .FALSE.
 
-y    = 0.0
-ydot = 0.0
-prod = 0.0
-slos = 0.0
-dpd  = 0.0
-dpw  = 0.0
-emr  = 0.0
+s%y    = 0.0
+s%ydot = 0.0
+s%prod = 0.0
+s%slos = 0.0
+s%dpd  = 0.0
+s%dpw  = 0.0
+s%emr  = 0.0
 
 !       5.   Clear the rates and index arrays.
 !            ----- --- ----- --- ----- -------
 
 
-rk   = 0.0
-prk  = 0.0
+s%rk   = 0.0
+s%prk  = 0.0
 !$OMP END PARALLEL
 
 nspi = 0

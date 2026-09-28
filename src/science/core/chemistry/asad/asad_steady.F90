@@ -69,14 +69,12 @@ CONTAINS
 
 SUBROUTINE asad_steady( kl )
 
-USE asad_mod,               ONLY:  deriv, y, rk, peps,                         &
-                                   nspi, nssi, nssrt, nssrx,                   &
-                                   nssri, nsspt, nsspi, nsst,                  &
-                                   nspo1d, nspo3, nspoh,                       &
-                                   nspo3p, nsph, nuni,                         &
-                                   nspho2, nspno, nspn, nss_o3p,               &
-                                   nss_o1d, nss_n, nss_h,                      &
-                                   o3p_in_ss, n_in_ss, h_in_ss
+USE asad_mod,               ONLY: peps, nspi, nssi, nssrt, nssrx,              &
+                                  nssri, nsspt, nsspi, nsst, nspo1d,           &
+                                  nspo3, nspoh, nspo3p, nsph, nuni,            &
+                                  nspho2, nspno, nspn, nss_o3p, nss_o1d,       &
+                                  nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss,   &
+                                  s=>asad_state
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
@@ -117,7 +115,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_STEADY'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Initialise DERIV this timestep, first done in ASAD_INIT
-deriv(:,:,:) = 1.0
+s%deriv(:,:,:) = 1.0
 
 ! Loop through steady state species
 
@@ -131,83 +129,92 @@ DO ix = 1,nsst
   DO jr = 1,nsspt(ix)
     i = nsspi(ix,jr)
     IF (i <= nuni) THEN
-      ssnum(1:kl) = ssnum(1:kl) + rk(1:kl,i)*y(1:kl,nspi(i,1))
+      ssnum(1:kl) = ssnum(1:kl) + s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))
 
       IF ((ix < 5) .AND. (nspi(i,1) == nspo3 ))                                &
         ! add terms to derivative for d(j[O3])/d[O3] = j_o3
-        dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + rk(1:kl,i)
+        dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + s%rk(1:kl,i)
 
       IF ((ix < 5) .AND. (nspi(i,1) == nspno ))                                &
         ! add terms to derivative for d(j[NO])/d[NO] = j_no
-        dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + rk(1:kl,i)
+        dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + s%rk(1:kl,i)
 
     ELSE
-      ssnum(1:kl) = ssnum(1:kl) + rk(1:kl,i)*y(1:kl,nspi(i,1))*y(1:kl,nspi(i,2))
+      ssnum(1:kl) = ssnum(1:kl) + s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))*            &
+                    s%y(1:kl,nspi(i,2))
       IF (ix < 5) THEN
 
         ! add terms for derivative w.r.t. ozone.
         IF (nspi(i,1) == nspo1d)                                               &
           dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) +                              &
-              rk(1:kl,i)*y(1:kl,nspi(i,2))*deriv(1:kl,nss_o1d,n_o3)
+              s%rk(1:kl,i)*s%y(1:kl,nspi(i,2))*s%deriv(1:kl,nss_o1d,n_o3)
 
         IF (nspi(i,2) == nspo1d)                                               &
             dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) +                            &
-              rk(1:kl,i)*y(1:kl,nspi(i,1))*deriv(1:kl,nss_o1d,n_o3)
+              s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))*s%deriv(1:kl,nss_o1d,n_o3)
 
         IF (nspi(i,1) == nspo3p)                                               &
             dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) +                            &
-               rk(1:kl,i)*y(1:kl,nspi(i,2))*deriv(1:kl,nss_o3p,n_o3)
+               s%rk(1:kl,i)*s%y(1:kl,nspi(i,2))*s%deriv(1:kl,nss_o3p,n_o3)
 
         IF (nspi(i,2) == nspo3p)                                               &
             dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) +                            &
-              rk(1:kl,i)*y(1:kl,nspi(i,1))*deriv(1:kl,nss_o3p,n_o3)
+              s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))*s%deriv(1:kl,nss_o3p,n_o3)
 
         IF (nspi(i,1) == nspo3)                                                &
-          dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + rk(1:kl,i)*y(1:kl,nspi(i,2))
+          dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,2))
 
         IF (nspi(i,2) == nspo3)                                                &
-          dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + rk(1:kl,i)*y(1:kl,nspi(i,1))
+          dssnum(1:kl,n_o3) = dssnum(1:kl,n_o3) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,1))
 
         ! add terms for derivative w.r.t OH
         IF (nspi(i,1) == nspo3p)                                               &
           ! add terms to derivates for d(a[A][B])
           dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) +                              &
-            rk(1:kl,i)*y(1:kl,nspi(i,2))*deriv(1:kl,nss_o3p,n_oh)
+            s%rk(1:kl,i)*s%y(1:kl,nspi(i,2))*s%deriv(1:kl,nss_o3p,n_oh)
 
         IF (nspi(i,2) == nspo3p)                                               &
           ! add terms to derivates for d(a[O2][O1D])/d[O3] and b[N2][O1D]
           dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) +                              &
-            rk(1:kl,i)*y(1:kl,nspi(i,1))*deriv(1:kl,nss_o3p,n_oh)
+            s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))*s%deriv(1:kl,nss_o3p,n_oh)
 
         IF (nspi(i,1) == nspoh)                                                &
           ! add terms to derivates for d(a[O2][O1D])/d[O3] and b[N2][O1D]
-          dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) + rk(1:kl,i)*y(1:kl,nspi(i,2))
+          dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,2))
 
         IF (nspi(i,2) == nspoh)                                                &
           ! add terms to derivates for d(a[O2][O1D])/d[O3] and b[N2][O1D]
-          dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) + rk(1:kl,i)*y(1:kl,nspi(i,1))
+          dssnum(1:kl,n_oh) = dssnum(1:kl,n_oh) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,1))
 
         ! add terms for derivative w.r.t HO2
         IF (nspi(i,1) == nspo3p)                                               &
           dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) +                            &
-            rk(1:kl,i)*y(1:kl,nspi(i,2))*deriv(1:kl,nss_o3p,n_ho2)
+            s%rk(1:kl,i)*s%y(1:kl,nspi(i,2))*s%deriv(1:kl,nss_o3p,n_ho2)
 
         IF (nspi(i,2) == nspo3p)                                               &
           dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) +                            &
-            rk(1:kl,i)*y(1:kl,nspi(i,1))*deriv(1:kl,nss_o3p,n_ho2)
+            s%rk(1:kl,i)*s%y(1:kl,nspi(i,1))*s%deriv(1:kl,nss_o3p,n_ho2)
 
         IF (nspi(i,1) == nspho2)                                               &
-          dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) + rk(1:kl,i)*y(1:kl,nspi(i,2))
+          dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) + s%rk(1:kl,i)*              &
+                               s%y(1:kl,nspi(i,2))
 
         IF (nspi(i,2) == nspho2)                                               &
-          dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) + rk(1:kl,i)*y(1:kl,nspi(i,1))
+          dssnum(1:kl,n_ho2) = dssnum(1:kl,n_ho2) + s%rk(1:kl,i)*              &
+                               s%y(1:kl,nspi(i,1))
 
         ! add terms for derivative w.r.t NO
         IF (nspi(i,1) == nspno)                                                &
-          dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + rk(1:kl,i)*y(1:kl,nspi(i,2))
+          dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,2))
 
         IF (nspi(i,2) == nspno)                                                &
-          dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + rk(1:kl,i)*y(1:kl,nspi(i,1))
+          dssnum(1:kl,n_no) = dssnum(1:kl,n_no) + s%rk(1:kl,i)*                &
+                              s%y(1:kl,nspi(i,1))
 
       END IF
     END IF
@@ -218,103 +225,103 @@ DO ix = 1,nsst
     i = nssri(ix,jr)
     j = nssrx(ix,jr)
     IF (i <= nuni) THEN
-      ssden(1:kl) = ssden(1:kl) + rk(1:kl,i)
+      ssden(1:kl) = ssden(1:kl) + s%rk(1:kl,i)
     ELSE
-      ssden(1:kl) = ssden(1:kl) + rk(1:kl,i) * y(1:kl,nspi(i,j))
+      ssden(1:kl) = ssden(1:kl) + s%rk(1:kl,i) * s%y(1:kl,nspi(i,j))
       IF (ix < 5) THEN
         IF (nspi(i,j) == nspo3 )                                               &
-          dssden(1:kl,n_o3 ) = dssden(1:kl,n_o3 ) + rk(1:kl,i)
+          dssden(1:kl,n_o3 ) = dssden(1:kl,n_o3 ) + s%rk(1:kl,i)
         IF (nspi(i,j) == nspoh )                                               &
-          dssden(1:kl,n_oh ) = dssden(1:kl,n_oh ) + rk(1:kl,i)
+          dssden(1:kl,n_oh ) = dssden(1:kl,n_oh ) + s%rk(1:kl,i)
         IF (nspi(i,j) == nspho2)                                               &
-          dssden(1:kl,n_ho2) = dssden(1:kl,n_ho2) + rk(1:kl,i)
+          dssden(1:kl,n_ho2) = dssden(1:kl,n_ho2) + s%rk(1:kl,i)
         IF (nspi(i,j) == nspno )                                               &
-          dssden(1:kl,n_no ) = dssden(1:kl,n_no ) + rk(1:kl,i)
+          dssden(1:kl,n_no ) = dssden(1:kl,n_no ) + s%rk(1:kl,i)
       END IF
     END IF
   END DO ! jr
   !
   ! Steady state and derivatives of steady state
-  y(1:kl,nssi(ix)) = ssnum(1:kl)/ssden(1:kl)
+  s%y(1:kl,nssi(ix)) = ssnum(1:kl)/ssden(1:kl)
   IF (ix < 5) THEN
     DO jr =1,4
-      deriv(1:kl,ix,jr) =                                                      &
+      s%deriv(1:kl,ix,jr) =                                                    &
         (ssden(1:kl)*dssnum(1:kl,jr) - ssnum(1:kl)*dssden(1:kl,jr)) /          &
         (ssden(1:kl)*ssden(1:kl))
     END DO ! jr
   END IF
 END DO ! ix
 
-! rescale deriv to mean [O3]/[O] * d[O]/d[O3], where [O] = [O(1D)] or [O(3P)]
+! rescale s%deriv to mean [O3]/[O] * d[O]/d[O3], where [O] = [O(1D)] or [O(3P)]
 ! for O(1D), and O(3P), N and H when these are SS species
 
-WHERE (y(1:kl,nspo1d) > peps)
-  deriv(1:kl,nss_o1d,n_o3) = deriv(1:kl,nss_o1d,n_o3 )*                        &
-                            y(1:kl,nspo3 )/y(1:kl,nspo1d)
-  deriv(1:kl,nss_o1d,n_oh) = deriv(1:kl,nss_o1d,n_oh )*                        &
-                            y(1:kl,nspoh )/y(1:kl,nspo1d)
-  deriv(1:kl,nss_o1d,n_ho2)= deriv(1:kl,nss_o1d,n_ho2)*                        &
-                            y(1:kl,nspho2)/y(1:kl,nspo1d)
-  deriv(1:kl,nss_o1d,n_no )= deriv(1:kl,nss_o1d,n_no )*                        &
-                            y(1:kl,nspno )/y(1:kl,nspo1d)
+WHERE (s%y(1:kl,nspo1d) > peps)
+  s%deriv(1:kl,nss_o1d,n_o3) = s%deriv(1:kl,nss_o1d,n_o3 )*                    &
+                            s%y(1:kl,nspo3 )/s%y(1:kl,nspo1d)
+  s%deriv(1:kl,nss_o1d,n_oh) = s%deriv(1:kl,nss_o1d,n_oh )*                    &
+                            s%y(1:kl,nspoh )/s%y(1:kl,nspo1d)
+  s%deriv(1:kl,nss_o1d,n_ho2)= s%deriv(1:kl,nss_o1d,n_ho2)*                    &
+                            s%y(1:kl,nspho2)/s%y(1:kl,nspo1d)
+  s%deriv(1:kl,nss_o1d,n_no )= s%deriv(1:kl,nss_o1d,n_no )*                    &
+                            s%y(1:kl,nspno )/s%y(1:kl,nspo1d)
 ELSE WHERE
-  deriv(1:kl,nss_o1d,n_o3)  = 1.0
-  deriv(1:kl,nss_o1d,n_oh)  = 1.0
-  deriv(1:kl,nss_o1d,n_ho2) = 1.0
-  deriv(1:kl,nss_o1d,n_no)  = 1.0
+  s%deriv(1:kl,nss_o1d,n_o3)  = 1.0
+  s%deriv(1:kl,nss_o1d,n_oh)  = 1.0
+  s%deriv(1:kl,nss_o1d,n_ho2) = 1.0
+  s%deriv(1:kl,nss_o1d,n_no)  = 1.0
 END WHERE
 
 IF (o3p_in_ss) THEN
-  WHERE (y(1:kl,nspo3p) > peps)
-    deriv(1:kl,nss_o3p,n_o3 )= deriv(1:kl,nss_o3p,n_o3 )*                      &
-                            y(1:kl,nspo3 )/y(1:kl,nspo3p)
-    deriv(1:kl,nss_o3p,n_oh )= deriv(1:kl,nss_o3p,n_oh )*                      &
-                            y(1:kl,nspoh )/y(1:kl,nspo3p)
-    deriv(1:kl,nss_o3p,n_ho2)= deriv(1:kl,nss_o3p,n_ho2)*                      &
-                            y(1:kl,nspho2)/y(1:kl,nspo3p)
-    deriv(1:kl,nss_o3p,n_no )= deriv(1:kl,nss_o3p,n_no )*                      &
-                            y(1:kl,nspno )/y(1:kl,nspo3p)
+  WHERE (s%y(1:kl,nspo3p) > peps)
+    s%deriv(1:kl,nss_o3p,n_o3 )= s%deriv(1:kl,nss_o3p,n_o3 )*                  &
+                            s%y(1:kl,nspo3 )/s%y(1:kl,nspo3p)
+    s%deriv(1:kl,nss_o3p,n_oh )= s%deriv(1:kl,nss_o3p,n_oh )*                  &
+                            s%y(1:kl,nspoh )/s%y(1:kl,nspo3p)
+    s%deriv(1:kl,nss_o3p,n_ho2)= s%deriv(1:kl,nss_o3p,n_ho2)*                  &
+                            s%y(1:kl,nspho2)/s%y(1:kl,nspo3p)
+    s%deriv(1:kl,nss_o3p,n_no )= s%deriv(1:kl,nss_o3p,n_no )*                  &
+                            s%y(1:kl,nspno )/s%y(1:kl,nspo3p)
   ELSE WHERE
-    deriv(1:kl,nss_o3p,n_o3)  = 1.0
-    deriv(1:kl,nss_o3p,n_oh)  = 1.0
-    deriv(1:kl,nss_o3p,n_ho2) = 1.0
-    deriv(1:kl,nss_o3p,n_no)  = 1.0
+    s%deriv(1:kl,nss_o3p,n_o3)  = 1.0
+    s%deriv(1:kl,nss_o3p,n_oh)  = 1.0
+    s%deriv(1:kl,nss_o3p,n_ho2) = 1.0
+    s%deriv(1:kl,nss_o3p,n_no)  = 1.0
   END WHERE
 END IF
 
 IF (n_in_ss) THEN
-  WHERE (y(1:kl,nspn  ) > peps)
-    deriv(1:kl,nss_n,n_o3) = deriv(1:kl,nss_n,n_o3 )*                          &
-                          y(1:kl,nspo3 )/y(1:kl,nspn)
-    deriv(1:kl,nss_n,n_oh) = deriv(1:kl,nss_n,n_oh )*                          &
-                          y(1:kl,nspoh )/y(1:kl,nspn)
-    deriv(1:kl,nss_n,n_ho2)= deriv(1:kl,nss_n,n_ho2)*                          &
-                          y(1:kl,nspho2)/y(1:kl,nspn)
-    deriv(1:kl,nss_n,n_no )= deriv(1:kl,nss_n,n_no )*                          &
-                          y(1:kl,nspno )/y(1:kl,nspn)
+  WHERE (s%y(1:kl,nspn  ) > peps)
+    s%deriv(1:kl,nss_n,n_o3) = s%deriv(1:kl,nss_n,n_o3 )*                      &
+                          s%y(1:kl,nspo3 )/s%y(1:kl,nspn)
+    s%deriv(1:kl,nss_n,n_oh) = s%deriv(1:kl,nss_n,n_oh )*                      &
+                          s%y(1:kl,nspoh )/s%y(1:kl,nspn)
+    s%deriv(1:kl,nss_n,n_ho2)= s%deriv(1:kl,nss_n,n_ho2)*                      &
+                          s%y(1:kl,nspho2)/s%y(1:kl,nspn)
+    s%deriv(1:kl,nss_n,n_no )= s%deriv(1:kl,nss_n,n_no )*                      &
+                          s%y(1:kl,nspno )/s%y(1:kl,nspn)
   ELSE WHERE
-    deriv(1:kl,nss_n,n_o3)  = 1.0
-    deriv(1:kl,nss_n,n_oh)  = 1.0
-    deriv(1:kl,nss_n,n_ho2) = 1.0
-    deriv(1:kl,nss_n,n_no)  = 1.0
+    s%deriv(1:kl,nss_n,n_o3)  = 1.0
+    s%deriv(1:kl,nss_n,n_oh)  = 1.0
+    s%deriv(1:kl,nss_n,n_ho2) = 1.0
+    s%deriv(1:kl,nss_n,n_no)  = 1.0
   END WHERE
 END IF
 
 IF (h_in_ss) THEN
-  WHERE (y(1:kl,nsph  ) > peps)
-    deriv(1:kl,nss_h,n_o3) = deriv(1:kl,nss_h,n_o3 )*                          &
-                        y(1:kl,nspo3 )/y(1:kl,nsph  )
-    deriv(1:kl,nss_h,n_oh) = deriv(1:kl,nss_h,n_oh )*                          &
-                        y(1:kl,nspoh )/y(1:kl,nsph  )
-    deriv(1:kl,nss_h,n_ho2)= deriv(1:kl,nss_h,n_ho2)*                          &
-                        y(1:kl,nspho2)/y(1:kl,nsph  )
-    deriv(1:kl,nss_h,n_no )= deriv(1:kl,nss_h,n_no )*                          &
-                        y(1:kl,nspno )/y(1:kl,nsph  )
+  WHERE (s%y(1:kl,nsph  ) > peps)
+    s%deriv(1:kl,nss_h,n_o3) = s%deriv(1:kl,nss_h,n_o3 )*                      &
+                        s%y(1:kl,nspo3 )/s%y(1:kl,nsph  )
+    s%deriv(1:kl,nss_h,n_oh) = s%deriv(1:kl,nss_h,n_oh )*                      &
+                        s%y(1:kl,nspoh )/s%y(1:kl,nsph  )
+    s%deriv(1:kl,nss_h,n_ho2)= s%deriv(1:kl,nss_h,n_ho2)*                      &
+                        s%y(1:kl,nspho2)/s%y(1:kl,nsph  )
+    s%deriv(1:kl,nss_h,n_no )= s%deriv(1:kl,nss_h,n_no )*                      &
+                        s%y(1:kl,nspno )/s%y(1:kl,nsph  )
   ELSE WHERE
-    deriv(1:kl,nss_h,n_o3)  = 1.0
-    deriv(1:kl,nss_h,n_oh)  = 1.0
-    deriv(1:kl,nss_h,n_ho2) = 1.0
-    deriv(1:kl,nss_h,n_no)  = 1.0
+    s%deriv(1:kl,nss_h,n_o3)  = 1.0
+    s%deriv(1:kl,nss_h,n_oh)  = 1.0
+    s%deriv(1:kl,nss_h,n_ho2) = 1.0
+    s%deriv(1:kl,nss_h,n_no)  = 1.0
   END WHERE
 END IF
 
