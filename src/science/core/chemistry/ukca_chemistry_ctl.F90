@@ -425,7 +425,8 @@ DO k=1,model_levels
     END IF
   END IF
 
-  CALL asad_cdrive(zftr,                                                       &
+  CALL asad_cdrive(s,                                                          &
+                   zftr,                                                       &
                    pres(kcs:kce),                                              &
                    temp(kcs:kce),                                              &
                    zq,                                                         &

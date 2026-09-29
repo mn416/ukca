@@ -311,9 +311,9 @@ DO k=1,k_be_top
   CALL ukca_be_drydep(k, theta_field_size, nlev_with_ddep2, zdryrt2, zdryrt)
 
   ! Fill the asad arrays for wet and dry deposition diagnostics
-  IF ( ndepw /= 0 ) CALL ukca_wetdep(wetrt(:,k,:), theta_field_size)
+  IF ( ndepw /= 0 ) CALL ukca_wetdep(s, wetrt(:,k,:), theta_field_size)
 
-  IF ( ndepd /= 0 ) CALL ukca_drydep(k, zdryrt2, theta_field_size)
+  IF ( ndepd /= 0 ) CALL ukca_drydep(s, k, zdryrt2, theta_field_size)
 
 
   ! Calculate reaction rate coefficients (rc)
@@ -328,7 +328,7 @@ DO k=1,k_be_top
 
   ! Initialise s%y array, including the offline oxidants
   jit = 0
-  CALL asad_ftoy(ofirst, nitfg, jit, theta_field_size, ix, jy, k)
+  CALL asad_ftoy(s, ofirst, nitfg, jit, theta_field_size, ix, jy, k)
 
   !  Call Backward Euler solver
   !   N.B. Emissions already added, via call to TR_MIX from UKCA_EMISSION_CTL
@@ -468,15 +468,15 @@ s%wp(1:npnts) = zq(1:npnts)
 
 ! Calculate total number density (tnd)
 
-CALL asad_totnud(npnts)
+CALL asad_totnud(s, npnts)
 
 ! Calculate rate coefficients
 
-CALL asad_bimol(npnts)
+CALL asad_bimol(s, npnts)
 
-CALL asad_trimol(npnts)
+CALL asad_trimol(s, npnts)
 
-CALL asad_hetero(npnts, zfcloud, zclw, dummy, H_plus_1d_arr)
+CALL asad_hetero(s, npnts, zfcloud, zclw, dummy, H_plus_1d_arr)
 
 IF (first) THEN
 

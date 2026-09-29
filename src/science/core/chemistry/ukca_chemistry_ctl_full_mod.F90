@@ -469,6 +469,7 @@ DO zi = 1, model_levels, chunk_n_z
       chunk_zftr(:,:,:,:) = full_zftr(xs:xe,ys:ye,zs:ze,:)
 
       CALL asad_cdrive(                                                        &
+        s,                                                                     &
         chunk_zftr,                                                            &
         pres(xs:xe,ys:ye,zs:ze),                                               &
         temp(xs:xe,ys:ye,zs:ze),                                               &

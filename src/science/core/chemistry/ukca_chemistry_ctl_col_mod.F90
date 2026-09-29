@@ -503,7 +503,8 @@ DO i=1,rows
         END IF
 
         ! Call asad_cdrive with segmented arrays
-        CALL asad_cdrive(zftr(kcs:kce,:),                                      &
+        CALL asad_cdrive(s,                                                    &
+                         zftr(kcs:kce,:),                                      &
                          zp(kcs:kce),                                          &
                          zt(kcs:kce),                                          &
                          zq(kcs:kce),                                          &
