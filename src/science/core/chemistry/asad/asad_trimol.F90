@@ -46,9 +46,33 @@ MODULE asad_trimol_mod
 
 IMPLICIT NONE
 
+LOGICAL :: initialised = .FALSE.
+INTEGER :: ih2o              ! Index for h2o in tracer array
+REAL, ALLOCATABLE :: nf(:)   ! component of broadening factor
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_TRIMOL_MOD'
 
 CONTAINS
+
+SUBROUTINE asad_trimol_init()
+USE asad_mod,        ONLY: at, specf, jpcspf, jptk
+IMPLICIT NONE
+INTEGER :: jtr
+
+IF (.NOT. initialised) THEN
+  ! Calculate the N factor to be used in broadening factor
+  ALLOCATE(nf(jptk))
+  nf(:) = 1.0
+  WHERE (at(:,1) > 1e-3) nf(:) = 0.75 - 1.27*LOG10(at(:,1))
+
+  ! Check if H2O is an advected tracer
+  ih2o = 0
+  DO jtr = 1, jpcspf
+    IF ( specf(jtr)  ==  'H2O       ' ) ih2o = jtr
+  END DO
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_trimol_init
 
 SUBROUTINE asad_trimol(s, n_points)
 
@@ -65,7 +89,6 @@ INTEGER, INTENT(IN) :: n_points
 
 !       Local variables
 
-INTEGER, SAVE :: ih2o              ! Index for h2o in tracer array
 INTEGER       :: iho2              ! Index for ho2+ho2 in s%rk array
 INTEGER       :: in2o5             ! Reaction index for N2O5+M
 INTEGER       :: ino2no3           ! Reaction index for NO2+NO3+M
@@ -81,11 +104,7 @@ REAL :: zo                         ! k_0
 REAL :: zi                         ! k_infinity
 REAL :: zfc                        ! F_c
 REAL :: zr                         ! k_0/k_infinity
-REAL, ALLOCATABLE, SAVE :: nf(:)   ! component of broadening factor
 REAL :: nf2                        ! Covers a small change to nf
-
-LOGICAL, SAVE :: first = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -121,27 +140,6 @@ zi = 0.0
 zo = 0.0
 
 CALL oneover_v(n_points, s%t, inv_t)
-
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (asad_trimol_init)
-IF (first_pass) THEN
-  IF (first) THEN
-    ! Calculate the N factor to be used in broadening factor
-    ALLOCATE(nf(jptk))
-    nf(:) = 1.0
-    WHERE (at(:,1) > 1e-3) nf(:) = 0.75 - 1.27*LOG10(at(:,1))
-
-    ! Check if H2O is an advected tracer
-    ih2o = 0
-    DO jtr = 1, jpcspf
-      IF ( specf(jtr)  ==  'H2O       ' ) ih2o = jtr
-    END DO
-    first = .FALSE.
-  END IF
-  first_pass = .FALSE.
-END IF
-!$OMP END CRITICAL (asad_trimol_init)
 
 DO j = 1, jptk
   jr = ntrkx(j)

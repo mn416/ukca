@@ -71,22 +71,220 @@ MODULE asad_bimol_mod
 
 IMPLICIT NONE
 
+LOGICAL :: initialised = .FALSE.
+
+INTEGER :: iohco = 0
+INTEGER :: iohhno3 = 0
+INTEGER :: iho2 = 0
+INTEGER :: iohc3h8a = 0
+INTEGER :: iohc3h8b = 0
+INTEGER :: imeoomeooa = 0
+INTEGER :: imeoomeoob = 0
+INTEGER :: imeooro2a = 0
+INTEGER :: imeooro2b = 0
+INTEGER :: imeoo2a   = 0
+INTEGER :: imeoo2b   = 0
+INTEGER :: imeooho2a = 0
+INTEGER :: imeooho2b = 0
+INTEGER :: idmsoh = 0
+INTEGER :: iso3h2o = 0
+INTEGER :: ics2oh = 0
+INTEGER :: ih2o = 0
+INTEGER :: iho2no = 0
+INTEGER :: in2o5_h2o = 0
+
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_BIMOL_MOD'
 
 CONTAINS
+
+SUBROUTINE asad_bimol_init()
+USE ukca_config_specification_mod, ONLY: ukca_config
+USE asad_findreaction_mod, ONLY: asad_findreaction
+USE asad_mod,        ONLY: specf, spb, nbrkx,                                  &
+                           jpspb, jpcspf, jpbk
+USE ereport_mod, ONLY: ereport
+USE errormessagelength_mod, ONLY: errormessagelength
+IMPLICIT NONE
+CHARACTER(LEN=10) :: r1
+CHARACTER(LEN=10) :: r2
+CHARACTER(LEN=10) :: prods(jpspb)
+INTEGER :: j, jr, jtr
+INTEGER, PARAMETER          :: i_chem_version_117 = 117
+INTEGER, PARAMETER          :: i_chem_version_121 = 121
+! ErrorStatus
+INTEGER                             :: errcode=0   ! Error flag (0 = OK)
+CHARACTER(LEN=errormessagelength)   :: cmessage    ! Error return message
+
+IF (.NOT. initialised) THEN
+  DO jtr = 1, jpcspf
+    IF ( specf(jtr)  ==  'H2O       ' ) ih2o = jtr
+  END DO
+
+  !       Look for the reactions which need special treatment.
+
+  r1 = '          '
+  r2 = r1
+  prods(:) = r1
+  r1 = 'OH        '
+  r2 = 'C3H8      '
+  prods(1) = 'n-PrOO    '
+  prods(2) = 'H2O       '
+  iohc3h8a = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                  &
+                                jpbk+1, jpspb )
+  prods(1) = 'i-PrOO    '
+  prods(2) = 'H2O       '
+  iohc3h8b = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                  &
+                                jpbk+1, jpspb )
+  r1 = 'MeOO      '
+  r2 = 'MeOO      '
+  prods(1) = 'MeOH      '
+  prods(2) = 'HCHO      '
+  imeoomeooa = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                &
+                                  jpbk+1, jpspb )
+
+  prods(1) = 'HO2       '
+  prods(2) = 'HCHO      '
+  prods(3) = 'HO2       '
+  prods(4) = 'HCHO      '
+  imeoomeoob = asad_findreaction( r1, r2, prods, 4, spb, nbrkx,                &
+                                  jpbk+1, jpspb )
+
+  ! Equivalent case for when running with RO2-permutation reactions
+  r1 = 'MeOO      '
+  r2 = 'RO2       '
+  prods(1) = 'MeOH      '
+  prods(2) = 'HCHO      '
+  imeooro2a = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                 &
+                           jpbk+1, jpspb )
+
+  prods(1) = 'HO2       '
+  prods(2) = 'HCHO      '
+  imeooro2b = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                 &
+                           jpbk+1, jpspb )
+
+  IF ((imeoomeooa /= 0 .AND. imeoomeoob /=0) .AND.                             &
+      (imeooro2a /= 0 .AND. imeooro2b /=0)) THEN
+    errcode = 2
+    cmessage = 'ASAD_BIMOL: Cannot have both MeOO+MeOO & MeOO+RO2 reactions'
+    CALL ereport('ASAD_BIMOL',errcode,cmessage)
+  END IF
+
+  ! Save correct index for MeOO+MeOO OR MeOO+RO2 reactions
+  imeoo2a = MAX(imeoomeooa, imeooro2a)
+  imeoo2b = MAX(imeoomeoob, imeooro2b)
+
+  r1 = 'HO2       '
+  r2 = 'MeOO      '
+  prods(1) = 'MeOOH     '
+  imeooho2a = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,                 &
+                                 jpbk+1, jpspb )
+  prods(1) = 'HCHO      '
+  imeooho2b = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,                 &
+                                 jpbk+1, jpspb )
+
+  r1 = 'HO2       '
+  r2 = 'NO        '
+  prods(1) = 'HONO2     '
+  iho2no    = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,                 &
+                                 jpbk+1, jpspb )
+
+  ! Find B85: N2O5 + H2O -> HONO2 + HONO2.
+  r1 = 'N2O5      '
+  r2 = 'H2O       '
+  prods(1) = 'HONO2     '
+  prods(2) = 'HONO2     '
+  in2o5_h2o = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                 &
+                                 jpbk+1, jpspb )
+
+
+  IF (ukca_config%l_ukca_chem_aero) THEN
+    r1 = 'DMS       '
+    r2 = 'OH        '
+    prods(1) = 'SO2       '
+    ! The products of this reaction vary with chemical scheme
+    IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
+       !   DMS + OH => SO2 + DMSO
+      prods(2) = 'DMSO      '
+      idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                &
+                                  jpbk+1, jpspb )
+    ELSE IF (ukca_config%l_ukca_strat) THEN
+       !   DMS + OH => SO2 + MSA
+      prods(2) = 'MSA       '
+      idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                &
+                                  jpbk+1, jpspb )
+    ELSE IF (ukca_config%l_ukca_strattrop .AND.                                &
+         (ukca_config%i_ukca_chem_version < i_chem_version_121)) THEN
+       ! at v121 reaction is considered as 2 termolecular rxns
+      IF (ukca_config%i_ukca_chem_version >= i_chem_version_117) THEN
+         !   DMS + OH => SO2 + DMSO + MeOO
+        prods(2) = 'DMSO      '
+        prods(3) = 'MeOO      '
+        idmsoh = asad_findreaction( r1, r2, prods, 3, spb, nbrkx,              &
+                                    jpbk+1, jpspb )
+      ELSE
+         !   DMS + OH => SO2 + MSA
+        prods(2) = 'MSA       '
+        idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,              &
+                                    jpbk+1, jpspb )
+      END IF
+    ELSE IF (ukca_config%l_ukca_tropisop) THEN
+       !   DMS + OH => SO2 + DMSO + MeOO
+      prods(2) = 'DMSO      '
+      prods(3) = 'MeOO      '
+      idmsoh = asad_findreaction( r1, r2, prods, 3, spb, nbrkx,                &
+                                  jpbk+1, jpspb )
+    ELSE
+      idmsoh = 0
+    END IF
+  ELSE
+    idmsoh = 0
+  END IF
+  ! do not check when chemistry version >=121 as this is covered in
+  ! a termolecular reaction
+  IF (ukca_config%l_ukca_chem_aero .AND.                                       &
+      (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be .OR.      &
+       ukca_config%l_ukca_strat .OR. (ukca_config%l_ukca_strattrop .AND.       &
+       (ukca_config%i_ukca_chem_version < i_chem_version_121)) .OR.            &
+       ukca_config%l_ukca_tropisop) .AND. (idmsoh == 0) ) THEN
+    errcode = 1
+    cmessage = ' Rate coefficient for DMS + OH lacks correction'
+    CALL ereport('ASAD_BIMOL',errcode,cmessage)
+  END IF
+
+  DO j = 1, jpbk
+    jr = nbrkx(j)
+
+    IF ( ( spb(j,1) == 'OH     ' .AND. spb(j,2) == 'CO     ' ) .OR.            &
+       ( spb(j,1) == 'CO     ' .AND. spb(j,2) == 'OH     ' ) )                 &
+      iohco = jr
+    IF ( ( spb(j,1) == 'OH     ' .AND. spb(j,2) == 'HONO2  ' ) .OR.            &
+       (  spb(j,1) == 'HONO2  ' .AND. spb(j,2) == 'OH     ' ) )                &
+      iohhno3 = jr
+    IF ( spb(j,1) == 'HO2    ' .AND. spb(j,2) == 'HO2    ' )                   &
+      iho2 = jr
+
+    ! code for stratospheric sulphur scheme
+    IF ( spb(j,1) == 'SO3      ' .AND. spb(j,2) == 'H2O   ')                   &
+      iso3h2o = jr
+    IF ( spb(j,1) == 'CS2      ' .AND. spb(j,2) == 'OH    ')                   &
+      ics2oh = jr
+
+  END DO  ! end of loop (j) over jpbk
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_bimol_init
+
 
 SUBROUTINE asad_bimol( s, n_points, stratflag_opt )
 
 USE asad_mod,        ONLY: specf, spb, ab, peps, nbrkx,                        &
                            jpspb, jpcspf, jpbk, asad_state_type
-USE asad_findreaction_mod, ONLY: asad_findreaction
 USE ukca_config_specification_mod, ONLY: ukca_config
 
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ukca_um_legacy_mod, ONLY: exp_v, powr_v, oneover_v
-USE errormessagelength_mod, ONLY: errormessagelength
-USE ereport_mod, ONLY: ereport
 
 IMPLICIT NONE
 
@@ -97,51 +295,26 @@ LOGICAL, INTENT(IN), OPTIONAL :: stratflag_opt(n_points)
 
 ! Local variables
 
-INTEGER, SAVE :: iohco = 0
-INTEGER, SAVE :: iohhno3 = 0
-INTEGER, SAVE :: iho2 = 0
-INTEGER, SAVE :: iohc3h8a = 0
-INTEGER, SAVE :: iohc3h8b = 0
-INTEGER, SAVE :: imeoomeooa = 0
-INTEGER, SAVE :: imeoomeoob = 0
-INTEGER, SAVE :: imeooro2a = 0
-INTEGER, SAVE :: imeooro2b = 0
-INTEGER, SAVE :: imeoo2a   = 0
-INTEGER, SAVE :: imeoo2b   = 0
-INTEGER, SAVE :: imeooho2a = 0
-INTEGER, SAVE :: imeooho2b = 0
-INTEGER, SAVE :: idmsoh = 0
-INTEGER, SAVE :: iso3h2o = 0
-INTEGER, SAVE :: ics2oh = 0
-INTEGER, SAVE :: ih2o = 0
-INTEGER, SAVE :: iho2no = 0
-INTEGER, SAVE :: in2o5_h2o = 0
 INTEGER :: jtr
 INTEGER :: j
 INTEGER :: jr
 
-REAL, ALLOCATABLE :: z1(:)                ! Intermediate result
-REAL, ALLOCATABLE :: z3(:)                !          "
-REAL, ALLOCATABLE :: z4(:)                !          "
-REAL, ALLOCATABLE :: z5(:)                !          "
-REAL, ALLOCATABLE :: z6(:)                !          "
-REAL, ALLOCATABLE :: alpha(:)             ! Multiplication factor
-REAL, ALLOCATABLE :: ratioa2b(:)          ! Branching ratio
-REAL, ALLOCATABLE :: ratiob2total(:)      ! Branching ratio
-
-CHARACTER(LEN=10) :: r1
-CHARACTER(LEN=10) :: r2
-CHARACTER(LEN=10) :: prods(jpspb)
-
-LOGICAL, SAVE :: first = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
+! TODO: these used to be ALLOCATABLE, presumably because they are too
+! large for the stack in full domain mode. We should move them to
+! ALLOCATABLE module variables.
+REAL :: z1(n_points)                ! Intermediate result
+REAL :: z3(n_points)                !          "
+REAL :: z4(n_points)                !          "
+REAL :: z5(n_points)                !          "
+REAL :: z6(n_points)                !          "
+REAL :: alpha(n_points)             ! Multiplication factor
+REAL :: ratioa2b(n_points)          ! Branching ratio
+REAL :: ratiob2total(n_points)      ! Branching ratio
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
 
-INTEGER, PARAMETER          :: i_chem_version_117 = 117
-INTEGER, PARAMETER          :: i_chem_version_121 = 121
 CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_BIMOL'
 
 REAL :: tmp(1:n_points)
@@ -153,19 +326,7 @@ REAL :: inv_t(1:n_points)
 ! default to False unless changed by stratflag_opt
 LOGICAL :: stratflag(n_points)
 
-! ErrorStatus
-INTEGER                             :: errcode=0   ! Error flag (0 = OK)
-CHARACTER(LEN=errormessagelength)   :: cmessage    ! Error return message
-
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-
-ALLOCATE(z1(1:n_points))
-ALLOCATE(z3(1:n_points))
-ALLOCATE(z4(1:n_points))
-ALLOCATE(z5(1:n_points))
-ALLOCATE(z6(1:n_points))
-ALLOCATE(ratioa2b(1:n_points))
-ALLOCATE(ratiob2total(1:n_points))
 
 z1(:) = 0.0
 z3(:) = 0.0
@@ -190,171 +351,6 @@ s%t300(1:n_points) = s%t(1:n_points) / 300.0
 CALL oneover_v(n_points, s%t, inv_t)
 
 !       Check if H2O is an advected tracer
-
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (asad_bimol_init)
-IF (first_pass) THEN
-  IF (first) THEN
-    first = .FALSE.
-    DO jtr = 1, jpcspf
-      IF ( specf(jtr)  ==  'H2O       ' ) ih2o = jtr
-    END DO
-
-    !       Look for the reactions which need special treatment.
-
-    r1 = '          '
-    r2 = r1
-    prods(:) = r1
-    r1 = 'OH        '
-    r2 = 'C3H8      '
-    prods(1) = 'n-PrOO    '
-    prods(2) = 'H2O       '
-    iohc3h8a = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                &
-                                  jpbk+1, jpspb )
-    prods(1) = 'i-PrOO    '
-    prods(2) = 'H2O       '
-    iohc3h8b = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,                &
-                                  jpbk+1, jpspb )
-    r1 = 'MeOO      '
-    r2 = 'MeOO      '
-    prods(1) = 'MeOH      '
-    prods(2) = 'HCHO      '
-    imeoomeooa = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,              &
-                                    jpbk+1, jpspb )
-
-    prods(1) = 'HO2       '
-    prods(2) = 'HCHO      '
-    prods(3) = 'HO2       '
-    prods(4) = 'HCHO      '
-    imeoomeoob = asad_findreaction( r1, r2, prods, 4, spb, nbrkx,              &
-                                    jpbk+1, jpspb )
-
-    ! Equivalent case for when running with RO2-permutation reactions
-    r1 = 'MeOO      '
-    r2 = 'RO2       '
-    prods(1) = 'MeOH      '
-    prods(2) = 'HCHO      '
-    imeooro2a = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,               &
-                             jpbk+1, jpspb )
-
-    prods(1) = 'HO2       '
-    prods(2) = 'HCHO      '
-    imeooro2b = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,               &
-                             jpbk+1, jpspb )
-
-    IF ((imeoomeooa /= 0 .AND. imeoomeoob /=0) .AND.                           &
-        (imeooro2a /= 0 .AND. imeooro2b /=0)) THEN
-      errcode = 2
-      cmessage = 'ASAD_BIMOL: Cannot have both MeOO+MeOO & MeOO+RO2 reactions'
-      CALL ereport('ASAD_BIMOL',errcode,cmessage)
-    END IF
-
-    ! Save correct index for MeOO+MeOO OR MeOO+RO2 reactions
-    imeoo2a = MAX(imeoomeooa, imeooro2a)
-    imeoo2b = MAX(imeoomeoob, imeooro2b)
-
-    r1 = 'HO2       '
-    r2 = 'MeOO      '
-    prods(1) = 'MeOOH     '
-    imeooho2a = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,               &
-                                   jpbk+1, jpspb )
-    prods(1) = 'HCHO      '
-    imeooho2b = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,               &
-                                   jpbk+1, jpspb )
-
-    r1 = 'HO2       '
-    r2 = 'NO        '
-    prods(1) = 'HONO2     '
-    iho2no    = asad_findreaction( r1, r2, prods, 1, spb, nbrkx,               &
-                                   jpbk+1, jpspb )
-
-    ! Find B85: N2O5 + H2O -> HONO2 + HONO2.
-    r1 = 'N2O5      '
-    r2 = 'H2O       '
-    prods(1) = 'HONO2     '
-    prods(2) = 'HONO2     '
-    in2o5_h2o = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,               &
-                                   jpbk+1, jpspb )
-
-
-    IF (ukca_config%l_ukca_chem_aero) THEN
-      r1 = 'DMS       '
-      r2 = 'OH        '
-      prods(1) = 'SO2       '
-      ! The products of this reaction vary with chemical scheme
-      IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
-         !   DMS + OH => SO2 + DMSO
-        prods(2) = 'DMSO      '
-        idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,              &
-                                    jpbk+1, jpspb )
-      ELSE IF (ukca_config%l_ukca_strat) THEN
-         !   DMS + OH => SO2 + MSA
-        prods(2) = 'MSA       '
-        idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,              &
-                                    jpbk+1, jpspb )
-      ELSE IF (ukca_config%l_ukca_strattrop .AND.                              &
-           (ukca_config%i_ukca_chem_version < i_chem_version_121)) THEN
-         ! at v121 reaction is considered as 2 termolecular rxns
-        IF (ukca_config%i_ukca_chem_version >= i_chem_version_117) THEN
-           !   DMS + OH => SO2 + DMSO + MeOO
-          prods(2) = 'DMSO      '
-          prods(3) = 'MeOO      '
-          idmsoh = asad_findreaction( r1, r2, prods, 3, spb, nbrkx,            &
-                                      jpbk+1, jpspb )
-        ELSE
-           !   DMS + OH => SO2 + MSA
-          prods(2) = 'MSA       '
-          idmsoh = asad_findreaction( r1, r2, prods, 2, spb, nbrkx,            &
-                                      jpbk+1, jpspb )
-        END IF
-      ELSE IF (ukca_config%l_ukca_tropisop) THEN
-         !   DMS + OH => SO2 + DMSO + MeOO
-        prods(2) = 'DMSO      '
-        prods(3) = 'MeOO      '
-        idmsoh = asad_findreaction( r1, r2, prods, 3, spb, nbrkx,              &
-                                    jpbk+1, jpspb )
-      ELSE
-        idmsoh = 0
-      END IF
-    ELSE
-      idmsoh = 0
-    END IF
-    ! do not check when chemistry version >=121 as this is covered in
-    ! a termolecular reaction
-    IF (ukca_config%l_ukca_chem_aero .AND.                                     &
-        (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be .OR.    &
-         ukca_config%l_ukca_strat .OR. (ukca_config%l_ukca_strattrop .AND.     &
-         (ukca_config%i_ukca_chem_version < i_chem_version_121)) .OR.          &
-         ukca_config%l_ukca_tropisop) .AND. (idmsoh == 0) ) THEN
-      errcode = 1
-      cmessage = ' Rate coefficient for DMS + OH lacks correction'
-      CALL ereport('ASAD_BIMOL',errcode,cmessage)
-    END IF
-
-    DO j = 1, jpbk
-      jr = nbrkx(j)
-
-      IF ( ( spb(j,1) == 'OH     ' .AND. spb(j,2) == 'CO     ' ) .OR.          &
-         ( spb(j,1) == 'CO     ' .AND. spb(j,2) == 'OH     ' ) )               &
-        iohco = jr
-      IF ( ( spb(j,1) == 'OH     ' .AND. spb(j,2) == 'HONO2  ' ) .OR.          &
-         (  spb(j,1) == 'HONO2  ' .AND. spb(j,2) == 'OH     ' ) )              &
-        iohhno3 = jr
-      IF ( spb(j,1) == 'HO2    ' .AND. spb(j,2) == 'HO2    ' )                 &
-        iho2 = jr
-
-      ! code for stratospheric sulphur scheme
-      IF ( spb(j,1) == 'SO3      ' .AND. spb(j,2) == 'H2O   ')                 &
-        iso3h2o = jr
-      IF ( spb(j,1) == 'CS2      ' .AND. spb(j,2) == 'OH    ')                 &
-        ics2oh = jr
-
-    END DO  ! end of loop (j) over jpbk
-  END IF    ! first
-  first_pass = .FALSE.
-END IF      ! first_pass
-!$OMP END CRITICAL (asad_bimol_init)
 
 !       1.2  Compute rates
 
@@ -460,7 +456,6 @@ END IF
 
 ! DMS + OH: Multiply by factor alpha/(1 + alpha) from Pham et al. (1995)
 IF ( idmsoh /= 0) THEN
-  ALLOCATE(alpha(1:n_points))
   tmp(1:n_points) = 7460.0*inv_t(1:n_points)
   CALL exp_v(n_points,tmp,tmp_out)
   alpha(:) = 1.106e-31*tmp_out(1:n_points)* s%tnd(1:n_points)
@@ -520,15 +515,6 @@ IF ( imeooho2a /= 0 .AND. imeooho2b /= 0 ) THEN
   s%rk(1:n_points,imeooho2b) = s%rk(1:n_points,imeooho2b)*                     &
                                (ratiob2total(1:n_points))
 END IF
-
-IF (ALLOCATED(z1)) DEALLOCATE(z1)
-IF (ALLOCATED(z3)) DEALLOCATE(z3)
-IF (ALLOCATED(z4)) DEALLOCATE(z4)
-IF (ALLOCATED(z5)) DEALLOCATE(z5)
-IF (ALLOCATED(z6)) DEALLOCATE(z6)
-IF (ALLOCATED(ratioa2b)) DEALLOCATE(ratioa2b)
-IF (ALLOCATED(ratiob2total)) DEALLOCATE(ratiob2total)
-IF (ALLOCATED(alpha)) DEALLOCATE(alpha)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

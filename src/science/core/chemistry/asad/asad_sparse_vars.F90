@@ -75,7 +75,7 @@ CONTAINS
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SUBROUTINE setup_spfuljac(s)
+SUBROUTINE setup_spfuljac()
 !
 ! This routine is divided into 4 parts.
 !
@@ -122,7 +122,7 @@ USE ukca_um_legacy_mod, ONLY: mype
 
 IMPLICIT NONE
 
-TYPE(asad_state_type), INTENT(INOUT) :: s
+INTEGER, ALLOCATABLE :: modified_map(:,:)
 
 ! Local variables
 
@@ -306,27 +306,29 @@ IF (ALLOCATED(map))     DEALLOCATE(map)
 
 ! Calculate the number of nonzero matrix elements in the LU factorization of the
 ! array PAP' and check that it is less than spfjsize_max.
+ALLOCATE(modified_map(jpcspf,jpcspf))
 total1 = total
-s%modified_map(:,:) = nonzero_map_unordered(:,:)
+modified_map(:,:) = nonzero_map_unordered(:,:)
 DO kr = 1, jpcspf
   DO i = kr+1, jpcspf
-    ikr = s%modified_map(i,kr)
+    ikr = modified_map(i,kr)
     IF (ikr > 0) THEN
       DO j = kr+1, jpcspf
-        krj = s%modified_map(kr,j)
+        krj = modified_map(kr,j)
         IF (krj > 0) THEN
-          ij = s%modified_map(i,j)
+          ij = modified_map(i,j)
           ! Distinguish whether matrix element is zero or not. If not, proceed
           ! as in dense case. If it is, create new matrix element.
           IF (ij <= 0) THEN
             total1 = total1 + 1
-            s%modified_map(i,j) = total1
+            modified_map(i,j) = total1
           END IF
         END IF
       END DO
     END IF
   END DO
 END DO
+DEALLOCATE(modified_map)
 
 ! Perform error check outside of the loop to better suit GPU runs
 IF (total1 > spfjsize_max) THEN

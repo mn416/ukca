@@ -55,9 +55,55 @@ MODULE asad_fyinit_mod
 
 IMPLICIT NONE
 
+LOGICAL :: initialised = .FALSE.
+INTEGER :: iss, ict, iftr, icf
+
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYINIT_MOD'
 
 CONTAINS
+
+SUBROUTINE asad_fyinit_init()
+USE asad_mod,             ONLY: ctype, ilss, ilct, ilcf, jpspec, jpna,         &
+                                jpco, jpcf, jpif, jpsp, jpoo, jsro2,           &
+                                speci, ilftr
+IMPLICIT NONE
+INTEGER :: js
+
+IF (.NOT. initialised) THEN
+  ! Build lists for this routine. This lot should really be a
+  ! common variable - next version!
+  iss = 0
+  ict = 0
+  icf = 0
+  iftr = 0
+  DO js = 1, jpspec
+    IF ( ctype(js) == jpna ) THEN
+      iss       = iss + 1
+      ilss(iss) = js
+    END IF
+    IF ( ctype(js) == jpco ) THEN
+      ict       = ict + 1
+      ilct(ict) = js
+    END IF
+    IF ( ctype(js) == jpcf ) THEN
+      icf       = icf + 1
+      ilcf(icf) = js
+      ! Save index of RO2
+      IF ( speci(js) == 'RO2       ') jsro2 = js
+    END IF
+    ! Family members, normal tracers and RO2-type species mapped
+    ! between s%f and s%y arrays
+    IF (ctype(js) == jpif .OR.                                                 &
+        ctype(js) == jpsp .OR.                                                 &
+        ctype(js) == jpoo ) THEN
+      iftr        = iftr + 1
+      ilftr(iftr) = js
+    END IF
+  END DO
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_fyinit_init
 
 SUBROUTINE asad_fyinit(s, ofirst, n_points, ix, jy, nlev)
 
@@ -92,11 +138,6 @@ LOGICAL, INTENT(IN) :: ofirst     ! True on first call
 
 !       Local variables
 
-INTEGER, SAVE :: iss
-INTEGER, SAVE :: ict
-INTEGER, SAVE :: iftr
-INTEGER, SAVE :: icf
-
 INTEGER       :: j           ! Loop variable
 INTEGER       :: jl          ! Loop variable
 INTEGER       :: js          ! Index
@@ -120,8 +161,6 @@ REAL, PARAMETER :: fn2_default  = 0.78084
 REAL, PARAMETER :: fo2_default  = 0.20945
 REAL, PARAMETER :: fch4_default = 1.76e-6
 
-LOGICAL, SAVE :: gonce = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
 CHARACTER(LEN=errormessagelength) :: cmessage
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -135,49 +174,6 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_FYINIT'
 !           ------- ----------- ---- -- ----- -- --------- -----
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (asad_fyinit_init)
-IF ( first_pass ) THEN
-  IF ( gonce ) THEN
-
-    !         Build lists for this routine. This lot should really be a
-    !         common variable - next version!
-
-    gonce = .FALSE.
-    iss = 0
-    ict = 0
-    icf = 0
-    iftr = 0
-    DO js = 1, jpspec
-      IF ( ctype(js) == jpna ) THEN
-        iss       = iss + 1
-        ilss(iss) = js
-      END IF
-      IF ( ctype(js) == jpco ) THEN
-        ict       = ict + 1
-        ilct(ict) = js
-      END IF
-      IF ( ctype(js) == jpcf ) THEN
-        icf       = icf + 1
-        ilcf(icf) = js
-        ! Save index of RO2
-        IF ( speci(js) == 'RO2       ') jsro2 = js
-      END IF
-      ! Family members, normal tracers and RO2-type species mapped
-      ! between s%f and s%y arrays
-      IF (ctype(js) == jpif .OR.                                               &
-          ctype(js) == jpsp .OR.                                               &
-          ctype(js) == jpoo ) THEN
-        iftr        = iftr + 1
-        ilftr(iftr) = js
-      END IF
-    END DO
-
-  END IF
-  first_pass = .FALSE.
-END IF           ! End of IF (gonce) statement
-!$OMP END CRITICAL (asad_fyinit_init)
 
 IF ( ofirst ) THEN
   peps10 = 10.0 * peps

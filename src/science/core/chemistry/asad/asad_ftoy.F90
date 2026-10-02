@@ -102,7 +102,6 @@
 !    itr            Index of model tracer to which species
 !                   corresponds.
 !    gconv          .true. if convergence has been achieved.
-!    gonce          .true. for only the first call to this routine.
 !    zthresh        Threshold value of loss rate to determine
 !                   whether in/out species are in or out of family.
 !    zy             Value of y on previous iteration.
@@ -128,10 +127,66 @@
 MODULE asad_ftoy_mod
 
 IMPLICIT NONE
-
+LOGICAL :: initialised = .FALSE.
+INTEGER :: istmin
+INTEGER :: ift
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FTOY_MOD'
 
 CONTAINS
+
+SUBROUTINE asad_ftoy_init()
+USE asad_mod,            ONLY: nstst, jpfm, jpif, jpna,                        &
+                               moffam, majors, ilstmin, ilft,                  &
+                               nlstst, ctype, jpspec
+USE ereport_mod, ONLY: ereport
+USE umPrintMgr, ONLY: umPrint
+IMPLICIT NONE
+INTEGER :: ifam, imaj, j, js
+INTEGER :: errcode          ! Variable passed to ereport
+INTEGER :: errcodes(nstst)  ! Array for recording error codes
+
+IF (.NOT. initialised) THEN
+  errcodes(:) = 0
+  istmin = 0
+  ift    = 0
+  DO j = 1, jpspec
+    ilstmin(j) = 0
+    ilft(j) = 0
+  END DO
+
+  DO j = 1, nstst
+    js = nlstst(j)
+    IF ( ctype(js) == jpfm ) THEN
+      ifam = moffam(js)
+      imaj = majors(ifam)
+      IF ( imaj /= js ) THEN
+        istmin          = istmin + 1
+        ilstmin(istmin) = js
+      END IF
+    ELSE IF ( ctype(js) == jpif ) THEN
+      istmin          = istmin + 1
+      ilstmin(istmin) = js
+      ift             = ift + 1
+      ilft(ift)       = js
+    ELSE IF ( ctype(js) == jpna ) THEN
+      istmin          = istmin + 1
+      ilstmin(istmin) = js
+    ELSE
+      errcodes(j) = js
+    END IF
+  END DO
+
+  ! Perform error check outside of the loop to better suit GPU runs
+  IF (ANY(errcodes(:) /= 0)) THEN
+    errcode = MINVAL(errcodes,mask=(errcodes(:) /= 0))
+    CALL umPrint( '**** ASAD ERROR in ASAD_FTOY!! ',src='asad_ftoy')
+    CALL umPrint( 'ASAD_FTOY found an unexpected species type',src='asad_ftoy')
+    CALL umPrint( 'in the species list nlstst ',src='asad_ftoy')
+    CALL ereport('ASAD_FTOY',errcode,'Found unexpected species type')
+  END IF
+END IF
+
+END SUBROUTINE asad_ftoy_init
 
 SUBROUTINE asad_ftoy(s, ofirst,iter, num_iter, n_points, ix, jy, nlev)
 
@@ -187,12 +242,8 @@ INTEGER       :: itr
 INTEGER       :: icode       ! Error code
 INTEGER       :: iro2        ! Counter for RO2 species
 
-INTEGER, SAVE :: istmin
-INTEGER, SAVE :: ift
-
 CHARACTER (LEN=errormessagelength) :: cmessage     ! Error message
 INTEGER :: errcode          ! Variable passed to ereport
-INTEGER :: errcodes(nstst)  ! Array for recording error codes
 
 REAL          :: zthresh
 REAL          :: sl
@@ -202,9 +253,7 @@ REAL          :: zc(n_points)
 REAL          :: zd(n_points)
 
 LOGICAL       :: gconv
-LOGICAL, SAVE :: gonce  = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
-LOGICAL, SAVE :: gdepem = .FALSE.
+LOGICAL       :: gdepem = .FALSE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -232,56 +281,6 @@ zy = 0.0
 zb = 0.0
 zc = 0.0
 zd = 0.0
-
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (asad_ftoy_init)
-errcodes(:) = 0
-IF ( first_pass ) THEN
-  IF ( gonce ) THEN
-    gonce  = .FALSE.
-    istmin = 0
-    ift    = 0
-    DO j = 1, jpspec
-      ilstmin(j) = 0
-      ilft(j) = 0
-    END DO
-
-    DO j = 1, nstst
-      js = nlstst(j)
-      IF ( ctype(js) == jpfm ) THEN
-        ifam = moffam(js)
-        imaj = majors(ifam)
-        IF ( imaj /= js ) THEN
-          istmin          = istmin + 1
-          ilstmin(istmin) = js
-        END IF
-      ELSE IF ( ctype(js) == jpif ) THEN
-        istmin          = istmin + 1
-        ilstmin(istmin) = js
-        ift             = ift + 1
-        ilft(ift)       = js
-      ELSE IF ( ctype(js) == jpna ) THEN
-        istmin          = istmin + 1
-        ilstmin(istmin) = js
-      ELSE
-        errcodes(j) = js
-      END IF
-    END DO
-
-  END IF   ! End of IF (gonce) statement
-  first_pass = .FALSE.
-END IF     ! End of IF (first_pass) statement
-!$OMP END CRITICAL (asad_ftoy_init)
-
-! Perform error check outside of the loop to better suit GPU runs
-IF (ANY(errcodes(:) /= 0)) THEN
-  errcode = MINVAL(errcodes,mask=(errcodes(:) /= 0))
-  CALL umPrint( '**** ASAD ERROR in ASAD_FTOY!! ',src='asad_ftoy')
-  CALL umPrint( 'ASAD_FTOY found an unexpected species type',src='asad_ftoy')
-  CALL umPrint( 'in the species list nlstst ',src='asad_ftoy')
-  CALL ereport('ASAD_FTOY',errcode,'Found unexpected species type')
-END IF
 
 !       1.1 Set concentrations/initialise species
 

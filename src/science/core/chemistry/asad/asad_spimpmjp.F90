@@ -116,12 +116,27 @@
 MODULE asad_spimpmjp_mod
 
 IMPLICIT NONE
+LOGICAL :: initialised = .FALSE.
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_SPIMPMJP_MOD'
 
 CONTAINS
 
 ! *********************************************************************
+
+SUBROUTINE asad_spimpmjp_init()
+USE asad_sparse_vars,   ONLY: setup_spfuljac
+IMPLICIT NONE
+
+IF (.NOT. initialised) THEN
+  ! Determine number and positions of nonzero elements in sparse
+  ! full Jacobian
+  CALL setup_spfuljac()
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_spimpmjp_init
+
 
 SUBROUTINE forward_euler(s, n_points, f, f_initial, f_min, nonzero_map, spfj)
 
@@ -259,7 +274,7 @@ SUBROUTINE asad_spimpmjp(s, exit_code, ix, jy, nlev, n_points, location,       &
 
 USE asad_mod,           ONLY: ptol, peps, nitnr, nstst, nonzero_map,           &
                               jpcspf, nonzero_map_unordered, asad_state_type
-USE asad_sparse_vars,   ONLY: setup_spfuljac, spfuljac, spresolv2, splinslv2
+USE asad_sparse_vars,   ONLY: spfuljac, spresolv2, splinslv2
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE yomhook,            ONLY: lhook, dr_hook
 USE parkind1,           ONLY: jprb, jpim
@@ -337,10 +352,6 @@ CHARACTER(LEN=*),   PARAMETER :: RoutineName='ASAD_SPIMPMJP'
 CHARACTER(LEN=errormessagelength) :: cmessage1 = "(1x,i2,20(1x,1pG12.4))"
 CHARACTER(LEN=errormessagelength) :: cmessage2 = "(1x,a3,20(1x,1pG12.4))"
 
-LOGICAL, SAVE :: first = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
-
-
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 f_min = SQRT(peps) ! Minimum species concentration
@@ -363,20 +374,6 @@ WHERE (s%f<f_min) s%f = f_min
 
 ! Call ASAD_STEADY at start of step to initialise deriv properly
 IF (nstst /= 0)  CALL asad_steady( s, n_points )
-
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (setup_jacobian_init)
-IF (first_pass) THEN
-  IF (first) THEN
-    ! Determine number and positions of nonzero elements in sparse
-    ! full Jacobian
-    CALL setup_spfuljac(s)
-    first = .FALSE.
-  END IF
-  first_pass = .FALSE.
-END IF
-!$OMP END CRITICAL (setup_jacobian_init)
 
 CALL spfuljac(s, n_points,s%cdt,f_min,nonzero_map,s%spfj)
 

@@ -40,13 +40,160 @@ MODULE asad_hetero_mod
 
 IMPLICIT NONE
 
+LOGICAL :: initialised = .FALSE.
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_HETERO_MOD'
 
 CONTAINS
 
+SUBROUTINE asad_hetero_init()
+USE asad_findreaction_mod, ONLY: asad_findreaction
+USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
+                           iho2_h, in2o5_h, iso3_o3, ihso3_o3, ih2o2_oh,       &
+                           ihno3_oh, spb, sph, nbrkx, nhrkx,                   &
+                           jpspb, jpsph, jpeq, ih_o3_const, jpbk,              &
+                           jphk, jpdw
+USE ukca_config_specification_mod, ONLY: ukca_config
+USE ereport_mod,     ONLY: ereport
+USE umPrintMgr,      ONLY: umPrint, umMessage
+USE errormessagelength_mod, ONLY: errormessagelength
+IMPLICIT NONE
+INTEGER :: icode = 0 ! Error code
+CHARACTER (LEN=errormessagelength) :: cmessage  ! Error message
+CHARACTER(LEN=10)  :: prods(2)          ! Products
+
+IF (.NOT. initialised) THEN
+  IF (ukca_config%l_ukca_achem) THEN
+    ! Check that the indicies of the aqueous arrays are identified
+    IF (ih_o3 == 0 .OR. ih_h2o2 == 0 .OR. ih_so2 == 0 .OR.                     &
+        ih_hno3 == 0 ) THEN
+      cmessage=' Indicies for Aqueous chemistry uninitialised'//               &
+               ' - O3, H2O2, SO2, and HNO3 must be made '//                    &
+               ' soluble species in chch_defs array'
+      WRITE(umMessage,'(A9,I5)') 'ih_o3:   ',ih_o3
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A9,I5)') 'ih_h2o2: ',ih_h2o2
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A9,I5)') 'ih_hno3: ',ih_hno3
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A9,I5)') 'ih_so2:  ',ih_so2
+      CALL umPrint(umMessage,src='asad_hetero')
+      icode=1
+      CALL ereport('ASAD_HETERO',icode,cmessage)
+    END IF
+  END IF
+
+  IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
+    ! Check that the indices of the aqueous arrays are identified
+    IF (ih_h2o2 == 0 .OR. ih_so2 == 0 ) THEN
+      cmessage=' Indices for Aqueous chemistry uninitialised'//                &
+               ' - H2O2, and SO2, must be made '//                             &
+               ' soluble species in chch_defs array'
+      icode=1
+    END IF
+
+    IF (icode /= 0) THEN
+      WRITE(umMessage,'(A10,I5)') 'ih_h2o2: ',ih_h2o2
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A10,I5)') 'ih_so2:  ',ih_so2
+      CALL umPrint(umMessage,src='asad_hetero')
+      CALL ereport('ASAD_HETERO',icode,cmessage)
+    END IF
+  END IF
+
+  IF (ukca_config%l_ukca_trophet .AND. .NOT. ukca_config%l_ukca_mode) THEN
+    cmessage=' Tropospheric heterogeneous chemistry is flagged'//              &
+           ' but MODE aerosol scheme is not in use'
+    icode=1
+    CALL ereport('ASAD_HETERO',icode,cmessage)
+  END IF
+
+  ! Find reaction locations
+  ihso3_h2o2 = 0
+  iso3_o3    = 0
+  ihso3_o3   = 0
+  ih2o2_oh   = 0
+  ihno3_oh   = 0
+  in2o5_h    = 0
+  iho2_h     = 0
+
+
+  IF (ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_offline_be) THEN
+
+    prods = ['NULL0     ','          ']
+    ihso3_h2o2 = asad_findreaction( 'SO2       ', 'H2O2      ',                &
+                             prods, 2, sph, nhrkx, jphk+1, jpsph )
+    prods = ['NULL1     ','          ']   ! Identifies HSO3- + O3(aq)
+    ihso3_o3 = asad_findreaction( 'SO2       ', 'O3        ',                  &
+                             prods, 2, sph, nhrkx, jphk+1, jpsph )
+    prods = ['NULL2     ','          ']   ! Identifies SO3-- + O3(aq)
+    iso3_o3 = asad_findreaction( 'SO2       ', 'O3        ',                   &
+                             prods, 2, sph, nhrkx, jphk+1, jpsph )
+
+    IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
+      prods = ['H2O       ','          ']
+    ELSE
+      prods = ['H2O       ','HO2       ']
+    END IF
+    ih2o2_oh = asad_findreaction( 'H2O2      ', 'OH        ',                  &
+                             prods, 2, spb, nbrkx, jpbk+1, jpspb )
+    prods = ['H2O       ','NO3       ']
+    ihno3_oh = asad_findreaction( 'HONO2     ', 'OH        ',                  &
+                             prods, 2, spb, nbrkx, jpbk+1, jpspb )
+
+    icode = 0
+    IF (ihso3_h2o2 == 0 .OR. iso3_o3 == 0 .OR. ih2o2_oh == 0 .OR.              &
+        ihso3_o3 == 0 ) THEN
+      WRITE(umMessage,'(A12,I5)') 'ihso3_h2o2: ',ihso3_h2o2
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A12,I5)') 'ihso3_o3: ',ihso3_o3
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A12,I5)') 'iso3_o3: ',iso3_o3
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A12,I5)') 'ih2o2_oh: ',ih2o2_oh
+      CALL umPrint(umMessage,src='asad_hetero')
+      icode = 1
+    END IF
+    IF (ukca_config%l_ukca_achem .AND. ihno3_oh == 0) THEN
+      icode = 1
+      WRITE(umMessage,'(A12,I5)') 'ihno3_oh: ',ihno3_oh
+      CALL umPrint(umMessage,src='asad_hetero')
+    END IF
+    IF (icode > 0) THEN
+      cmessage=' Heterogeneous chemistry called, but eqns'//                   &
+                ' not found - see output'
+      CALL ereport('ASAD_HETERO',icode,cmessage)
+    END IF
+  END IF   ! l_ukca_achem.....
+
+  ! Search for tropospheric heterogeneous reactions
+  IF (ukca_config%l_ukca_trophet) THEN
+    prods = ['HONO2     ','          ']
+    in2o5_h = asad_findreaction( 'N2O5      ', '          ',                   &
+                             prods, 2, sph, nhrkx, jphk+1, jpsph )
+    prods = ['H2O2      ','          ']
+    iho2_h = asad_findreaction( 'HO2       ', '          ',                    &
+                             prods, 2, sph, nhrkx, jphk+1, jpsph )
+
+    IF (iho2_h == 0 .OR. in2o5_h == 0) THEN
+      WRITE(umMessage,'(A9,I5)') 'in2o5_h: ',in2o5_h
+      CALL umPrint(umMessage,src='asad_hetero')
+      WRITE(umMessage,'(A9,I5)') 'iho2_h: ',iho2_h
+      CALL umPrint(umMessage,src='asad_hetero')
+      cmessage=' Tropospheric heterogeneous chemistry is flagged,'//           &
+               ' but equations not found - see output'
+      icode = 1
+      CALL ereport('ASAD_HETERO',icode,cmessage)
+    END IF   ! iho3_h=0 etc
+
+  END IF
+
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_hetero_init
+
 SUBROUTINE asad_hetero(s, n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
 
-USE asad_findreaction_mod, ONLY: asad_findreaction
 USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
                            iho2_h, in2o5_h, iso3_o3, ihso3_o3, ih2o2_oh,       &
                            ihno3_oh, spb, sph, nbrkx, nhrkx,                   &
@@ -59,12 +206,7 @@ USE ukca_config_constants_mod,  ONLY: rho_water, avogadro
 USE ukca_constants,  ONLY: m_air, H_plus
 USE parkind1,        ONLY: jprb, jpim
 USE yomhook,         ONLY: lhook, dr_hook
-USE ereport_mod,     ONLY: ereport
-USE umPrintMgr, ONLY:                                                          &
-    umPrint,                                                                   &
-    umMessage
 
-USE errormessagelength_mod, ONLY: errormessagelength
 
 USE ukca_fdiss_mod, ONLY: ukca_fdiss
 IMPLICIT NONE
@@ -88,16 +230,14 @@ REAL               :: fdiss(n_points, jpdw, jpeq+1)
                                         ! final index: 1) dissolved
                                         !              2) 1st dissociation
                                         !              3) 2nd dissociation
-REAL, ALLOCATABLE  :: fdiss_constant(:,:,:)
+
+! TODO: this used to be ALLOCATABLE, presumably because it is too
+! large for the stack in full domain mode. We should move them to
+! ALLOCATABLE module variables.
+REAL :: fdiss_constant(n_points, nwet_constant, jpeq+1)
                                     ! As fdiss, but for constant species
 REAL               :: fdiss_o3(n_points) ! fractional dissociation for O3
 
-INTEGER            :: icode = 0         ! Error code
-CHARACTER (LEN=errormessagelength) :: cmessage          ! Error message
-CHARACTER(LEN=10)  :: prods(2)          ! Products
-LOGICAL, SAVE      :: first = .TRUE.    ! Identifies first call
-LOGICAL, SAVE      :: first_pass = .TRUE.    ! Identifies if thread has
-                                             ! been through CRITICAL region
 LOGICAL            :: todo(n_points)    ! T where cloud frac above threshold
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -111,142 +251,6 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 !       1. Identify equations and calculate fractional dissociation
 !          --------------------------------------------------------
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (asad_hetero_init)
-IF (first_pass) THEN
-  IF (first) THEN
-
-    IF (ukca_config%l_ukca_achem) THEN
-      ! Check that the indicies of the aqueous arrays are identified
-      IF (ih_o3 == 0 .OR. ih_h2o2 == 0 .OR. ih_so2 == 0 .OR.                   &
-          ih_hno3 == 0 ) THEN
-        cmessage=' Indicies for Aqueous chemistry uninitialised'//             &
-                 ' - O3, H2O2, SO2, and HNO3 must be made '//                  &
-                 ' soluble species in chch_defs array'
-        WRITE(umMessage,'(A9,I5)') 'ih_o3:   ',ih_o3
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A9,I5)') 'ih_h2o2: ',ih_h2o2
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A9,I5)') 'ih_hno3: ',ih_hno3
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A9,I5)') 'ih_so2:  ',ih_so2
-        CALL umPrint(umMessage,src='asad_hetero')
-        icode=1
-        CALL ereport('ASAD_HETERO',icode,cmessage)
-      END IF
-    END IF
-
-    IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
-      ! Check that the indices of the aqueous arrays are identified
-      IF (ih_h2o2 == 0 .OR. ih_so2 == 0 ) THEN
-        cmessage=' Indices for Aqueous chemistry uninitialised'//              &
-                 ' - H2O2, and SO2, must be made '//                           &
-                 ' soluble species in chch_defs array'
-        icode=1
-      END IF
-
-      IF (icode /= 0) THEN
-        WRITE(umMessage,'(A10,I5)') 'ih_h2o2: ',ih_h2o2
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A10,I5)') 'ih_so2:  ',ih_so2
-        CALL umPrint(umMessage,src='asad_hetero')
-        CALL ereport('ASAD_HETERO',icode,cmessage)
-      END IF
-    END IF
-
-    IF (ukca_config%l_ukca_trophet .AND. .NOT. ukca_config%l_ukca_mode) THEN
-      cmessage=' Tropospheric heterogeneous chemistry is flagged'//            &
-             ' but MODE aerosol scheme is not in use'
-      icode=1
-      CALL ereport('ASAD_HETERO',icode,cmessage)
-    END IF
-
-    ! Find reaction locations
-    ihso3_h2o2 = 0
-    iso3_o3    = 0
-    ihso3_o3   = 0
-    ih2o2_oh   = 0
-    ihno3_oh   = 0
-    in2o5_h    = 0
-    iho2_h     = 0
-
-
-    IF (ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_offline_be) THEN
-
-      prods = ['NULL0     ','          ']
-      ihso3_h2o2 = asad_findreaction( 'SO2       ', 'H2O2      ',              &
-                               prods, 2, sph, nhrkx, jphk+1, jpsph )
-      prods = ['NULL1     ','          ']   ! Identifies HSO3- + O3(aq)
-      ihso3_o3 = asad_findreaction( 'SO2       ', 'O3        ',                &
-                               prods, 2, sph, nhrkx, jphk+1, jpsph )
-      prods = ['NULL2     ','          ']   ! Identifies SO3-- + O3(aq)
-      iso3_o3 = asad_findreaction( 'SO2       ', 'O3        ',                 &
-                               prods, 2, sph, nhrkx, jphk+1, jpsph )
-
-      IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
-        prods = ['H2O       ','          ']
-      ELSE
-        prods = ['H2O       ','HO2       ']
-      END IF
-      ih2o2_oh = asad_findreaction( 'H2O2      ', 'OH        ',                &
-                               prods, 2, spb, nbrkx, jpbk+1, jpspb )
-      prods = ['H2O       ','NO3       ']
-      ihno3_oh = asad_findreaction( 'HONO2     ', 'OH        ',                &
-                               prods, 2, spb, nbrkx, jpbk+1, jpspb )
-
-      icode = 0
-      IF (ihso3_h2o2 == 0 .OR. iso3_o3 == 0 .OR. ih2o2_oh == 0 .OR.            &
-          ihso3_o3 == 0 ) THEN
-        WRITE(umMessage,'(A12,I5)') 'ihso3_h2o2: ',ihso3_h2o2
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A12,I5)') 'ihso3_o3: ',ihso3_o3
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A12,I5)') 'iso3_o3: ',iso3_o3
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A12,I5)') 'ih2o2_oh: ',ih2o2_oh
-        CALL umPrint(umMessage,src='asad_hetero')
-        icode = 1
-      END IF
-      IF (ukca_config%l_ukca_achem .AND. ihno3_oh == 0) THEN
-        icode = 1
-        WRITE(umMessage,'(A12,I5)') 'ihno3_oh: ',ihno3_oh
-        CALL umPrint(umMessage,src='asad_hetero')
-      END IF
-      IF (icode > 0) THEN
-        cmessage=' Heterogeneous chemistry called, but eqns'//                 &
-                  ' not found - see output'
-        CALL ereport('ASAD_HETERO',icode,cmessage)
-      END IF
-    END IF   ! l_ukca_achem.....
-
-    ! Search for tropospheric heterogeneous reactions
-    IF (ukca_config%l_ukca_trophet) THEN
-      prods = ['HONO2     ','          ']
-      in2o5_h = asad_findreaction( 'N2O5      ', '          ',                 &
-                               prods, 2, sph, nhrkx, jphk+1, jpsph )
-      prods = ['H2O2      ','          ']
-      iho2_h = asad_findreaction( 'HO2       ', '          ',                  &
-                               prods, 2, sph, nhrkx, jphk+1, jpsph )
-
-      IF (iho2_h == 0 .OR. in2o5_h == 0) THEN
-        WRITE(umMessage,'(A9,I5)') 'in2o5_h: ',in2o5_h
-        CALL umPrint(umMessage,src='asad_hetero')
-        WRITE(umMessage,'(A9,I5)') 'iho2_h: ',iho2_h
-        CALL umPrint(umMessage,src='asad_hetero')
-        cmessage=' Tropospheric heterogeneous chemistry is flagged,'//         &
-                 ' but equations not found - see output'
-        icode = 1
-        CALL ereport('ASAD_HETERO',icode,cmessage)
-      END IF   ! iho3_h=0 etc
-
-    END IF      ! l_ukca_trophet
-
-    first = .FALSE.
-
-  END IF      ! first
-END IF        ! first_pass
-!$OMP END CRITICAL (asad_hetero_init)
 
 ! calculate fraction of dissolved species for online NR and offline BE
 IF ((ukca_config%l_ukca_nr_aqchem .OR. ukca_config%l_ukca_offline_be) .AND.    &
@@ -263,12 +267,10 @@ END IF
 IF (ANY(cld_l > qcl_min)) THEN
   IF ((ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) .AND.    &
       nwet_constant > 0 ) THEN
-    ALLOCATE(fdiss_constant(n_points, nwet_constant, jpeq+1))
     ! send H_plus array to calculate fraction dissolved in offline oxidants
     CALL ukca_fdiss_constant(n_points, qcl_min, s%t, s%p, cld_l,               &
                            fdiss_constant, H_plus_1d_arr)
     fdiss_o3(:) = fdiss_constant(:,ih_o3_const,1)
-    DEALLOCATE(fdiss_constant)
   ELSE
     fdiss_o3(:) = fdiss(:,ih_o3,1)
   END IF
