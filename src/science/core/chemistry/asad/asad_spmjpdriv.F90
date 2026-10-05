@@ -190,6 +190,7 @@ DO WHILE (iter <= iredo)
     s%f(1:n_points,:)=f_initial(1:n_points,:)
 
     IF (exit_code == 4) THEN
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
       ! Debug slow convergence systems - switch this on in 'spimpmjp'
       IF (s%ltrig) THEN
         errcode=1
@@ -201,7 +202,7 @@ DO WHILE (iter <= iredo)
         END DO
         CALL ereport('ASAD_SPMJPDRIV',errcode,cmessage)
       END IF
-
+#endif
       s%ltrig=.TRUE.
     ELSE
 
@@ -210,6 +211,7 @@ DO WHILE (iter <= iredo)
       s%cdt = s%cdt/2.0
       iredo = iredo*2
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
       IF (ukca_config%l_ukca_debug_asad) THEN
         ! Added extra print statements here for verbosity
         WRITE(umMessage,"('ASAD: failed to converge at location  = ',I0)")     &
@@ -226,9 +228,11 @@ DO WHILE (iter <= iredo)
         cmessage=' Time step now too short'
         CALL ereport('ASAD_SPMJPDRIV',errcode,cmessage)
       END IF
+#endif
 
       ! Drop out if too many successive halvings fail
       IF (iredo >= max_redo) THEN
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
         IF (printstatus >= prstatus_oper) THEN
           WRITE(umMessage,"(' Resetting array after',i4,' iterations')") iredo
           CALL umPrint(umMessage,src='asad_spmjpdriv')
@@ -236,6 +240,7 @@ DO WHILE (iter <= iredo)
               location,mype
           CALL umPrint(umMessage,src='asad_spmjpdriv')
         END IF
+#endif
         EXIT
       END IF
 
@@ -250,6 +255,7 @@ DO WHILE (iter <= iredo)
   END IF
 END DO
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
 IF (iredo > 2) THEN
   WRITE(umMessage,"('   No. iterations =',i2)") iredo
   CALL umPrint(umMessage,src='asad_spmjpdriv')
@@ -269,6 +275,7 @@ IF (ukca_config%l_ukca_debug_asad) THEN
   END IF
   CALL umPrint(umMessage,src='asad_spmjpdriv')
 END IF
+#endif
 
 s%ncsteps = ncsteps_initial
 s%cdt = cdt_initial

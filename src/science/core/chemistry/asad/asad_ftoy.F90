@@ -199,8 +199,6 @@ USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
 
-USE umPrintMgr, ONLY: umPrint
-
 USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_fyfixr_mod, ONLY: asad_fyfixr
@@ -335,9 +333,11 @@ END IF
 
 IF (ofirst .AND. iter < 5) THEN
   iter = 5
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
   icode = -1
   cmessage = 'iter too low on first call, resetting to 5'
   CALL ereport('ASAD_FTOY',icode,cmessage)
+#endif
 END IF
 
 !       2.  Calculate self-reacting terms

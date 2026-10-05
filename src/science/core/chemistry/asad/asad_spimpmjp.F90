@@ -391,6 +391,7 @@ DO iter=1,ukca_config%nrsteps
 
   IF (nstst /= 0 .AND. ifi ==0) CALL asad_steady( s, n_points )
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
   IF (s%ltrig .AND. printstatus >= prstatus_oper) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
@@ -407,6 +408,7 @@ DO iter=1,ukca_config%nrsteps
       CALL umPrint(umMessage,src='asad_spimpmjp')
     END DO
   END IF
+#endif
 
   CALL asad_diffun( s, n_points ) ! calculates s%fdot
 
@@ -449,6 +451,7 @@ DO iter=1,ukca_config%nrsteps
 
   CALL spfuljac(s,n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     WRITE(umMessage,"('Iteration ',i4)") iter
     CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -468,10 +471,12 @@ DO iter=1,ukca_config%nrsteps
       END DO
     END DO
   END IF
+#endif
 
   CALL splinslv2(n_points,G_f,f_incr,f_min,f_max,nonzero_map_unordered,        &
                     s%modified_map,s%spfj)
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
@@ -505,6 +510,7 @@ DO iter=1,ukca_config%nrsteps
       CALL umPrint(umMessage,src='asad_spimpmjp')
     END DO
   END IF
+#endif
 
   ! Damp increment on first Newton-Raphson iteration
   IF (iter == 1) f_incr = damp1*f_incr
@@ -583,6 +589,7 @@ IF (exit_code /= 0) THEN
   s%f = f_initial
   solver_iter = iter
 
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
   IF (count_negatives > maxneg) THEN
     WRITE(umMessage,"('Negatives - exceeds maxneg')")
     CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -592,13 +599,16 @@ IF (exit_code /= 0) THEN
       maxneg,iter, location, mype
     CALL umPrint(umMessage,src='asad_spimpmjp')
   END IF
+#endif
 
   IF (iter >= ltrig_iter) THEN
     exit_code = 4 ! exit with debug option for use in asad_spmjpdriv
+#if !defined(__AMDGCN__) && !defined(__NVPTX__)
     WRITE(umMessage,                                                           &
 "('Convergence problems (',i3,1x,'iter) at location=',i3,' pe=',i3)")          &
     iter, location, mype
     CALL umPrint(umMessage,src='asad_spimpmjp')
+#endif
   END IF
 END IF
 
