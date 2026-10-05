@@ -84,10 +84,32 @@
 MODULE asad_cdrive_mod
 
 IMPLICIT NONE
-
+LOGICAL :: initialised = .FALSE.
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_CDRIVE_MOD'
 
 CONTAINS
+
+SUBROUTINE asad_cdrive_init()
+USE asad_trimol_mod,      ONLY: asad_trimol_init
+USE asad_bimol_mod,       ONLY: asad_bimol_init
+USE asad_ftoy_mod,        ONLY: asad_ftoy_init
+USE asad_fyinit_mod,      ONLY: asad_fyinit_init
+USE asad_hetero_mod,      ONLY: asad_hetero_init
+USE asad_spimpmjp_mod,    ONLY: asad_spimpmjp_init
+
+IMPLICIT NONE
+
+IF (.NOT. initialised) THEN
+  CALL asad_bimol_init()
+  CALL asad_trimol_init()
+  CALL asad_ftoy_init()
+  CALL asad_fyinit_init()
+  CALL asad_hetero_init()
+  CALL asad_spimpmjp_init()
+  initialised = .TRUE.
+END IF
+
+END SUBROUTINE asad_cdrive_init
 
 SUBROUTINE asad_cdrive(s, ftr, pp, pt, pq, co2_1d, cld_f, cld_l,               &
                        ix, jy, nlev, dryrt, wetrt, rc_het, prt,                &

@@ -78,7 +78,7 @@ USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_wetdep,                             &
                                 asad_psc_diagnostic,                           &
                                 asad_chemical_diagnostics
-USE asad_cdrive_mod,      ONLY: asad_cdrive
+USE asad_cdrive_mod,      ONLY: asad_cdrive, asad_cdrive_init
 USE ukca_cspecies,        ONLY: c_species, c_na_species, n_cf2cl2, n_cfcl3,    &
                                 n_ch4, n_co, n_h2, n_h2so4, n_mebr, n_n2o,     &
                                 nn_h2o2, nn_h2so4, nn_o1d, nn_o3, nn_o3p,      &
@@ -240,6 +240,9 @@ DO l = 1, dim_ntp
     ntp_data(:,l) = RESHAPE(all_ntp(l)%data_3d(:,:,:),[tot_n_pnts])
   END IF
 END DO
+
+! Initialise asad_cdrive()
+CALL asad_cdrive_init()
 
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
 !$OMP PRIVATE(ddmask, errcode, ierr, jna, jro2, js, jspf, jtr, k, kcs, kce, l, &

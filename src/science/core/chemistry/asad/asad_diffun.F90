@@ -95,7 +95,7 @@ INTEGER :: js                  ! Index
 
 LOGICAL :: gfam
 LOGICAL :: gtr
-LOGICAL, SAVE :: gdepem = .TRUE.
+LOGICAL :: gdepem = .TRUE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1

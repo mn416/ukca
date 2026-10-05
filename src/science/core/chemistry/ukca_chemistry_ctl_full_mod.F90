@@ -71,7 +71,7 @@ USE asad_mod,             ONLY: advt, ctype, ihso3_h2o2, ihso3_o3, ih2so4_hv,  &
                                 jpdw, jpnr, jppj, jpro2, jpspec,               &
                                 nadvt, nlnaro2, nprkx, o1d_in_ss, o3p_in_ss,   &
                                 specf, speci, spro2, s=>asad_state
-USE asad_cdrive_mod,      ONLY: asad_cdrive
+USE asad_cdrive_mod,      ONLY: asad_cdrive, asad_cdrive_init
 USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_drydep,                             &
                                 l_asad_use_flux_rxns,                          &
@@ -80,12 +80,6 @@ USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_wetdep,                             &
                                 asad_psc_diagnostic,                           &
                                 asad_chemical_diagnostics
-USE asad_trimol_mod,      ONLY: asad_trimol_init
-USE asad_bimol_mod,       ONLY: asad_bimol_init
-USE asad_ftoy_mod,        ONLY: asad_ftoy_init
-USE asad_fyinit_mod,      ONLY: asad_fyinit_init
-USE asad_hetero_mod,      ONLY: asad_hetero_init
-USE asad_spimpmjp_mod,    ONLY: asad_spimpmjp_init
 USE ukca_cspecies,        ONLY: c_species, c_na_species, n_cf2cl2, n_cfcl3,    &
                                 n_ch4, n_co, n_h2, n_h2so4, n_mebr, n_n2o,     &
                                 nn_h2o2, nn_h2so4, nn_o1d, nn_o3, nn_o3p,      &
@@ -428,13 +422,8 @@ IF (uph2so4inaer == 1) THEN
   END IF
 END IF
 
-! Initialise ASAD modules
-CALL asad_bimol_init()
-CALL asad_trimol_init()
-CALL asad_ftoy_init()
-CALL asad_fyinit_init()
-CALL asad_hetero_init()
-CALL asad_spimpmjp_init()
+! Initialise asad_cdrive()
+CALL asad_cdrive_init()
 
 ! This next section of code calls ASAD routines to do chemistry integration
 ! with 3D chunking.  Unlike column-mode chunking, the chunk size is

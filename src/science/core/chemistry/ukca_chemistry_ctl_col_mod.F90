@@ -98,7 +98,7 @@ USE ukca_missing_data_mod, ONLY: rmdi
 
 USE errormessagelength_mod, ONLY: errormessagelength
 
-USE asad_cdrive_mod, ONLY: asad_cdrive
+USE asad_cdrive_mod, ONLY: asad_cdrive, asad_cdrive_init
 
 !!!! Note: LFRIC-specific pre-processor directives used in this module are
 !!!! inappropriate in UKCA and should be removed but must be retained while
@@ -278,6 +278,9 @@ IF (l_autotune_segments) THEN
   CALL autotune_start_region(autotune_state, row_length*rows)
 END IF
 #endif
+
+! Initialise asad_cdrive()
+CALL asad_cdrive_init()
 
 ! Model levels loop
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
