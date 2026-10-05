@@ -47,10 +47,152 @@ REAL, PARAMETER, PRIVATE  :: rho2=0.928    ! Density of type 2 PSCs (g/cm3)
 REAL, PARAMETER, PRIVATE  :: rad1=1.0e-4   ! Radius of type 1 PSCs (cm)
 REAL, PARAMETER, PRIVATE  :: rad2=10.0e-4  ! Radius of type 2 PSCs (cm)
 REAL, PARAMETER, PRIVATE  :: radsa=1.0e-5  ! aerosol radius(cm)
+LOGICAL :: hetero_initialised = .FALSE.
+LOGICAL :: solidphase_initialised = .FALSE.
+LOGICAL :: gpsa, gphocl, gppsc, gpsimp
+
+! Tracer names
+INTEGER :: ih2o=0
+INTEGER :: ihno3=0
+INTEGER :: ihcl=0
+INTEGER :: iclono2=0
+INTEGER :: ihocl=0
+INTEGER :: in2o5=0
+INTEGER :: ihbr=0
+INTEGER :: ibrono2=0
+INTEGER :: ihobr=0
+
+! Reaction names
+INTEGER :: n_clono2_hcl=0
+INTEGER :: n_clono2_h2o=0
+INTEGER :: n_n2o5_h2o=0
+INTEGER :: n_n2o5_hcl=0
+INTEGER :: n_hocl_hcl=0
+INTEGER :: n_brono2_hcl=0
+INTEGER :: n_brono2_h2o=0
+INTEGER :: n_hobr_hcl=0
+INTEGER :: n_hobr_hbr=0
+INTEGER :: n_hocl_hbr=0
+INTEGER :: n_clono2_hbr=0
+INTEGER :: n_brono2_hbr=0
+INTEGER :: n_n2o5_hbr=0
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='UKCA_HETERO_MOD'
 
 CONTAINS
+
+SUBROUTINE ukca_hetero_init()
+USE asad_mod,        ONLY: specf, jpcspf, jphk, nhrkx, sph
+IMPLICIT NONE
+INTEGER :: js, jh
+LOGICAL :: L_ukca_sulphur
+LOGICAL :: L_ukca_presaer
+
+IF (.NOT. hetero_initialised) THEN
+  DO js = 1, jpcspf
+    SELECT CASE (specf(js))
+    CASE ('H2O       ','H2OS      ')
+      ih2o = js
+    CASE ('HONO2     ')
+      ihno3 = js
+    CASE ('HCl       ')
+      ihcl = js
+    CASE ('ClONO2    ')
+      iclono2 = js
+    CASE ('N2O5      ')
+      in2o5 = js
+    CASE ('HOCl      ')
+      ihocl = js
+    CASE ('HBr       ')
+      ihbr = js
+    CASE ('BrONO2    ')
+      ibrono2 = js
+    CASE ('HOBr      ')
+      ihobr = js
+    END SELECT
+  END DO
+
+  DO jh = 1, jphk
+    SELECT CASE (sph(jh,1))
+    CASE ('H2O       ','H2OS      ')
+      IF (sph(jh,2) == 'ClONO2    ') n_clono2_h2o = nhrkx(jh)
+      IF (sph(jh,2) == 'N2O5      ') n_n2o5_h2o   = nhrkx(jh)
+      IF (sph(jh,2) == 'BrONO2    ') n_brono2_h2o = nhrkx(jh)
+    CASE ('ClONO2    ')
+      IF (sph(jh,2) == 'HCl       ') n_clono2_hcl = nhrkx(jh)
+      IF (sph(jh,2) == 'H2O       ') n_clono2_h2o = nhrkx(jh)
+      IF (sph(jh,2) == 'H2OS      ') n_clono2_h2o = nhrkx(jh)
+      IF (sph(jh,2) == 'HBr       ') n_clono2_hbr = nhrkx(jh)
+    CASE ('HCl       ')
+      IF (sph(jh,2) == 'ClONO2    ') n_clono2_hcl = nhrkx(jh)
+      IF (sph(jh,2) == 'N2O5      ') n_n2o5_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'HOCl      ') n_hocl_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'HOBr      ') n_hobr_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'BrONO2    ') n_brono2_hcl = nhrkx(jh)
+    CASE ('BrONO2    ')
+      IF (sph(jh,2) == 'HCl       ') n_brono2_hcl = nhrkx(jh)
+      IF (sph(jh,2) == 'H2O       ') n_brono2_h2o = nhrkx(jh)
+      IF (sph(jh,2) == 'H2OS      ') n_brono2_h2o = nhrkx(jh)
+      IF (sph(jh,2) == 'HBr       ') n_brono2_hbr = nhrkx(jh)
+    CASE ('HOBr      ')
+      IF (sph(jh,2) == 'HCl       ') n_hobr_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'HBr       ') n_hobr_hbr   = nhrkx(jh)
+    CASE ('N2O5      ')
+      IF (sph(jh,2) == 'H2O       ') n_n2o5_h2o   = nhrkx(jh)
+      IF (sph(jh,2) == 'H2OS      ') n_n2o5_h2o   = nhrkx(jh)
+      IF (sph(jh,2) == 'HCl       ') n_n2o5_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'HBr       ') n_n2o5_hbr   = nhrkx(jh)
+    CASE ('HOCl      ')
+      IF (sph(jh,2) == 'HCl       ') n_hocl_hcl   = nhrkx(jh)
+      IF (sph(jh,2) == 'HBr       ') n_hocl_hbr   = nhrkx(jh)
+    CASE ('HBr       ')
+      IF (sph(jh,2) == 'ClONO2    ') n_clono2_hbr = nhrkx(jh)
+      IF (sph(jh,2) == 'BrONO2    ') n_brono2_hbr = nhrkx(jh)
+      IF (sph(jh,2) == 'HOBr      ') n_hobr_hbr   = nhrkx(jh)
+      IF (sph(jh,2) == 'HOCl      ') n_hocl_hbr   = nhrkx(jh)
+      IF (sph(jh,2) == 'N2O5      ') n_n2o5_hbr   = nhrkx(jh)
+    END SELECT
+  END DO
+
+  l_ukca_sulphur=.FALSE.
+  L_ukca_presaer=.TRUE.
+
+  ! activate sulphur chemistry
+  gpsa = L_ukca_sulphur .OR. L_ukca_presaer
+  ! DO include HCl + HOCl reaction on SA aerosols
+  gphocl = .TRUE.
+  ! Use heterogeneous chemistry on NAT and ice PSCs
+  gppsc  = .TRUE.
+  ! Use full not simplified scheme for PSCs.
+  gpsimp = .FALSE.
+  hetero_initialised = .TRUE.
+END IF
+
+END SUBROUTINE ukca_hetero_init
+
+SUBROUTINE ukca_solidphase_init()
+USE asad_mod,               ONLY: specf, jpcspf
+USE ereport_mod,            ONLY: ereport
+USE errormessagelength_mod, ONLY: errormessagelength
+IMPLICIT NONE
+INTEGER :: js
+INTEGER :: errcode                ! Variable passed to ereport
+CHARACTER(LEN=errormessagelength) :: cmessage
+
+IF (.NOT. solidphase_initialised) THEN
+  DO js = 1, jpcspf
+    IF (specf(js) == 'HONO2     ')  ihno3 = js
+  END DO
+  IF (ihno3 == 0) THEN
+    errcode=1
+    cmessage='Select HONO2 as advected tracer.'
+    CALL ereport('SOLIDPHASE',errcode,cmessage)
+  END IF
+  solidphase_initialised = .TRUE.
+END IF
+
+END SUBROUTINE ukca_solidphase_init
+
 
 SUBROUTINE ukca_hetero(s, n_points, have_nat, stratflag)
 ! Description:
@@ -106,47 +248,11 @@ LOGICAL, INTENT(IN) :: stratflag(n_points)
 
 ! Local variables
 
-LOGICAL, SAVE :: gpsa
-LOGICAL, SAVE :: gphocl
-LOGICAL, SAVE :: gppsc
-LOGICAL, SAVE :: gpsimp
-LOGICAL :: L_ukca_sulphur
-LOGICAL :: L_ukca_presaer
-
 INTEGER :: js
 INTEGER :: jh
 INTEGER :: jl
 
 INTEGER :: n_hk
-
-! Tracer names
-INTEGER, SAVE :: ih2o=0
-INTEGER, SAVE :: ihno3=0
-INTEGER, SAVE :: ihcl=0
-INTEGER, SAVE :: iclono2=0
-INTEGER, SAVE :: ihocl=0
-INTEGER, SAVE :: in2o5=0
-INTEGER, SAVE :: ihbr=0
-INTEGER, SAVE :: ibrono2=0
-INTEGER, SAVE :: ihobr=0
-
-! reaction names
-INTEGER, SAVE :: n_clono2_hcl=0
-INTEGER, SAVE :: n_clono2_h2o=0
-INTEGER, SAVE :: n_n2o5_h2o=0
-INTEGER, SAVE :: n_n2o5_hcl=0
-INTEGER, SAVE :: n_hocl_hcl=0
-INTEGER, SAVE :: n_brono2_hcl=0
-INTEGER, SAVE :: n_brono2_h2o=0
-INTEGER, SAVE :: n_hobr_hcl=0
-INTEGER, SAVE :: n_hobr_hbr=0
-INTEGER, SAVE :: n_hocl_hbr=0
-INTEGER, SAVE :: n_clono2_hbr=0
-INTEGER, SAVE :: n_brono2_hbr=0
-INTEGER, SAVE :: n_n2o5_hbr=0
-
-LOGICAL, SAVE :: first = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
 
 REAL :: zp(n_points)  ! pressure (hPa)
 REAL :: zt(n_points)  ! temperature (K)
@@ -282,93 +388,6 @@ mm_arr = [m_clono2,                                                            &
            m_clono2,                                                           &
            m_brono2,                                                           &
            m_n2o5]
-
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (ukca_hetero_init)
-IF (first_pass) THEN
-  IF (first) THEN
-    DO js = 1, jpcspf
-      SELECT CASE (specf(js))
-      CASE ('H2O       ','H2OS      ')
-        ih2o = js
-      CASE ('HONO2     ')
-        ihno3 = js
-      CASE ('HCl       ')
-        ihcl = js
-      CASE ('ClONO2    ')
-        iclono2 = js
-      CASE ('N2O5      ')
-        in2o5 = js
-      CASE ('HOCl      ')
-        ihocl = js
-      CASE ('HBr       ')
-        ihbr = js
-      CASE ('BrONO2    ')
-        ibrono2 = js
-      CASE ('HOBr      ')
-        ihobr = js
-      END SELECT
-    END DO
-
-    DO jh = 1, jphk
-      SELECT CASE (sph(jh,1))
-      CASE ('H2O       ','H2OS      ')
-        IF (sph(jh,2) == 'ClONO2    ') n_clono2_h2o = nhrkx(jh)
-        IF (sph(jh,2) == 'N2O5      ') n_n2o5_h2o   = nhrkx(jh)
-        IF (sph(jh,2) == 'BrONO2    ') n_brono2_h2o = nhrkx(jh)
-      CASE ('ClONO2    ')
-        IF (sph(jh,2) == 'HCl       ') n_clono2_hcl = nhrkx(jh)
-        IF (sph(jh,2) == 'H2O       ') n_clono2_h2o = nhrkx(jh)
-        IF (sph(jh,2) == 'H2OS      ') n_clono2_h2o = nhrkx(jh)
-        IF (sph(jh,2) == 'HBr       ') n_clono2_hbr = nhrkx(jh)
-      CASE ('HCl       ')
-        IF (sph(jh,2) == 'ClONO2    ') n_clono2_hcl = nhrkx(jh)
-        IF (sph(jh,2) == 'N2O5      ') n_n2o5_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'HOCl      ') n_hocl_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'HOBr      ') n_hobr_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'BrONO2    ') n_brono2_hcl = nhrkx(jh)
-      CASE ('BrONO2    ')
-        IF (sph(jh,2) == 'HCl       ') n_brono2_hcl = nhrkx(jh)
-        IF (sph(jh,2) == 'H2O       ') n_brono2_h2o = nhrkx(jh)
-        IF (sph(jh,2) == 'H2OS      ') n_brono2_h2o = nhrkx(jh)
-        IF (sph(jh,2) == 'HBr       ') n_brono2_hbr = nhrkx(jh)
-      CASE ('HOBr      ')
-        IF (sph(jh,2) == 'HCl       ') n_hobr_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'HBr       ') n_hobr_hbr   = nhrkx(jh)
-      CASE ('N2O5      ')
-        IF (sph(jh,2) == 'H2O       ') n_n2o5_h2o   = nhrkx(jh)
-        IF (sph(jh,2) == 'H2OS      ') n_n2o5_h2o   = nhrkx(jh)
-        IF (sph(jh,2) == 'HCl       ') n_n2o5_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'HBr       ') n_n2o5_hbr   = nhrkx(jh)
-      CASE ('HOCl      ')
-        IF (sph(jh,2) == 'HCl       ') n_hocl_hcl   = nhrkx(jh)
-        IF (sph(jh,2) == 'HBr       ') n_hocl_hbr   = nhrkx(jh)
-      CASE ('HBr       ')
-        IF (sph(jh,2) == 'ClONO2    ') n_clono2_hbr = nhrkx(jh)
-        IF (sph(jh,2) == 'BrONO2    ') n_brono2_hbr = nhrkx(jh)
-        IF (sph(jh,2) == 'HOBr      ') n_hobr_hbr   = nhrkx(jh)
-        IF (sph(jh,2) == 'HOCl      ') n_hocl_hbr   = nhrkx(jh)
-        IF (sph(jh,2) == 'N2O5      ') n_n2o5_hbr   = nhrkx(jh)
-      END SELECT
-    END DO
-
-    first = .FALSE.
-    l_ukca_sulphur=.FALSE.
-    L_ukca_presaer=.TRUE.
-
-    ! activate sulphur chemistry
-    gpsa = L_ukca_sulphur .OR. L_ukca_presaer
-    ! DO include HCl + HOCl reaction on SA aerosols
-    gphocl = .TRUE.
-    ! Use heterogeneous chemistry on NAT and ice PSCs
-    gppsc  = .TRUE.
-    ! Use full not simplified scheme for PSCs.
-    gpsimp = .FALSE.
-  END IF
-  first_pass = .FALSE.
-END IF
-!$OMP END CRITICAL (ukca_hetero_init)
 
 ! pressure in hPa here.
 zp(1:n_points)       = s%p(1:n_points) / 100.0
@@ -1151,10 +1170,8 @@ SUBROUTINE ukca_solidphase(s, n_points)
 !
 
 USE asad_mod,    ONLY: specf, jpcspf, asad_state_type
-USE ereport_mod, ONLY: ereport
 
 
-USE errormessagelength_mod, ONLY: errormessagelength
 IMPLICIT NONE
 
 ! Subroutine interface
@@ -1162,12 +1179,7 @@ TYPE(asad_state_type), INTENT(INOUT) :: s
 INTEGER, INTENT(IN) :: n_points
 
 ! local variables
-CHARACTER(LEN=errormessagelength) :: cmessage
-INTEGER :: errcode                ! Variable passed to ereport
 INTEGER :: js
-INTEGER, SAVE :: ihno3=0
-LOGICAL, SAVE :: firstcall = .TRUE.
-LOGICAL, SAVE :: first_pass = .TRUE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -1181,24 +1193,6 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_SOLIDPHASE'
 !               --- ------ -- ----- ---- -- ---- ---- -------
 !
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-! OMP CRITICAL will only allow one thread through this code at a time,
-! while the other threads are held until completion.
-!$OMP CRITICAL (ukca_solidphase_init)
-IF (first_pass) THEN
-  IF (firstcall) THEN
-    DO js = 1, jpcspf
-      IF (specf(js) == 'HONO2     ')  ihno3 = js
-    END DO
-    IF (ihno3 == 0) THEN
-      errcode=1
-      cmessage='Select HONO2 as advected tracer.'
-      CALL ereport('SOLIDPHASE',errcode,cmessage)
-    END IF
-    firstcall = .FALSE.
-  END IF
-  first_pass = .FALSE.
-END IF
-!$OMP END CRITICAL (ukca_solidphase_init)
 
 s%f(1:n_points,ihno3) = s%f(1:n_points,ihno3) +                                &
                  s%sphno3(1:n_points)

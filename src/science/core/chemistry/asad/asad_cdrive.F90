@@ -96,6 +96,7 @@ USE asad_ftoy_mod,        ONLY: asad_ftoy_init
 USE asad_fyinit_mod,      ONLY: asad_fyinit_init
 USE asad_hetero_mod,      ONLY: asad_hetero_init
 USE asad_spimpmjp_mod,    ONLY: asad_spimpmjp_init
+USE ukca_hetero_mod,      ONLY: ukca_hetero_init, ukca_solidphase_init
 
 IMPLICIT NONE
 
@@ -106,6 +107,8 @@ IF (.NOT. initialised) THEN
   CALL asad_fyinit_init()
   CALL asad_hetero_init()
   CALL asad_spimpmjp_init()
+  CALL ukca_hetero_init()
+  CALL ukca_solidphase_init()
   initialised = .TRUE.
 END IF
 
