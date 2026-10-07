@@ -580,10 +580,10 @@ DO jit=1,besteps
         IF (ldepd(in2o5)) l1 = l1 + s%dpd(:,in2o5)
         IF (ldepw(in2o5)) l1 = l1 + s%dpw(:,in2o5)
 
-        ! L2 = 1 + s%cdt * L
+        ! L2 = 1 + cdt * L
         l2 = 1.0 + s%cdt * l
 
-        ! L3 = 1 + s%cdt * L1
+        ! L3 = 1 + cdt * L1
         l3 = 1.0 + s%cdt * l1
 
         ! New value for NO3

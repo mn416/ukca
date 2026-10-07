@@ -101,7 +101,7 @@ TYPE :: asad_state_type
   REAL, ALLOCATABLE :: prk(:,:)
 
   ! Production rate for each species (molecule /cc /s)
-  REAL, POINTER     :: prod(:,:)
+  REAL, POINTER     :: prod(:,:) => NULL()
 
   REAL, ALLOCATABLE :: qa(:,:)
   REAL, ALLOCATABLE :: ratio(:,:)
@@ -114,7 +114,7 @@ TYPE :: asad_state_type
   REAL, ALLOCATABLE :: shno3(:)
 
   ! Loss rate for each species (molecule /cc /s)
-  REAL, POINTER     :: slos(:,:)
+  REAL, POINTER     :: slos(:,:) => NULL()
 
   ! Sparse full Jacobian
   REAL, ALLOCATABLE :: spfj(:,:)
@@ -145,11 +145,17 @@ TYPE :: asad_state_type
 
   ! Aerosol surface area
   REAL, ALLOCATABLE :: za(:)
-
-  LOGICAL :: firstcall = .TRUE.
 END TYPE
 
-TYPE(asad_state_type), TARGET :: asad_state
+! Per-thread/team state
+TYPE(asad_state_type), ALLOCATABLE, TARGET :: asad_state(:)
+
+REAL :: init_cdt       ! Initial chemistry timestep
+REAL :: init_cdt_diag  ! Initial chem. timestep for writing diagnostics
+! Initial interval in timesteps between calls to chemistry
+INTEGER :: init_interval = imdi 
+INTEGER :: init_ncsteps  ! Initial number of chemical steps
+INTEGER :: init_ncsteps_factor ! Initial factor for ncsteps halvings
 
 INTEGER :: jpctr = 0                 ! No. of transported chemical tracers
 INTEGER :: jpspec = 0                ! No. of chemical species
@@ -419,9 +425,6 @@ LOGICAL :: ljacx
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='ASAD_MOD'
 
-! Variables which should be stored separately on each thread
-!$OMP THREADPRIVATE(asad_state)
-
 CONTAINS
 
 ! ######################################################################
@@ -468,10 +471,13 @@ SUBROUTINE asad_mod_init(n_points)
 
 ! To allocate and initialise ASAD arrays and variables
 
+!$ USE omp_lib
+
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: n_points
 
+INTEGER :: n_parallel, i
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -479,16 +485,6 @@ REAL(KIND=jprb)               :: zhook_handle
 CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_MOD_INIT'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
-! nullify prod and slos on firstcall to give DISSASSOCIATED attribute
-IF (asad_state%firstcall) THEN
-  NULLIFY(asad_state%prod)
-  NULLIFY(asad_state%slos)
-  asad_state%firstcall = .FALSE.
-END IF
-
-! variables and shared arrays should only be set and allocated on
-! one thread
-!$OMP SINGLE
 
 ! Fractional product parameters - set total number allowed to be
 ! total number of reactions * 2 as each fractional product has 4 potentials!!
@@ -573,11 +569,6 @@ IF (.NOT. ALLOCATED(njcoss)) ALLOCATE(njcoss(jpnr,jpmsp))
 IF (.NOT. ALLOCATED(nmsjac)) ALLOCATE(nmsjac(jpcspf))
 IF (.NOT. ALLOCATED(nsjac1)) ALLOCATE(nsjac1(jpnr,jpcspf))
 
-IF (.NOT. ALLOCATED(asad_state%shno3)) ALLOCATE(asad_state%shno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%sh2o)) ALLOCATE(asad_state%sh2o(n_points))
-IF (.NOT. ALLOCATED(asad_state%fpsc1)) ALLOCATE(asad_state%fpsc1(n_points))
-IF (.NOT. ALLOCATED(asad_state%fpsc2)) ALLOCATE(asad_state%fpsc2(n_points))
-
 ! the following had save attribs.
 IF (.NOT. ALLOCATED(ilcf)) ALLOCATE(ilcf(jpspec))
 IF (.NOT. ALLOCATED(ilss)) ALLOCATE(ilss(jpspec))
@@ -600,8 +591,6 @@ njcoth(:,:) = 0
 IF (method == int_method_NR) THEN
   IF (.NOT. ALLOCATED(nonzero_map_unordered))                                  &
     ALLOCATE(nonzero_map_unordered(jpcspf, jpcspf))
-  IF (.NOT. ALLOCATED(asad_state%modified_map))                                &
-    ALLOCATE(asad_state%modified_map(jpcspf, jpcspf))
   IF (.NOT. ALLOCATED(nonzero_map))  ALLOCATE(nonzero_map(jpcspf, jpcspf))
   IF (.NOT. ALLOCATED(reorder))  ALLOCATE(reorder(jpcspf))
 
@@ -631,68 +620,100 @@ IF (method == int_method_NR) THEN
   IF (.NOT. ALLOCATED(ffrac))       ALLOCATE(ffrac(spfjsize_max, maxfterms))
 END IF
 
-!$OMP END SINGLE
+n_parallel = 1
+!$ n_parallel = omp_get_max_threads()
+
+IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_parallel))
 
 ! The arrays which have copies on all threads
+DO i = 1, n_parallel
+  
+  ! pd is a TARGET
+  IF (.NOT. ALLOCATED(asad_state(i)%pd))                                       &
+    ALLOCATE(asad_state(i)%pd(n_points,2*jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%co3)) ALLOCATE(asad_state(i)%co3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%deriv))                                    &
+    ALLOCATE(asad_state(i)%deriv(n_points,4,4))
+  IF (.NOT. ALLOCATED(asad_state(i)%dpd))                                      &
+    ALLOCATE(asad_state(i)%dpd(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%dpw))                                      &
+    ALLOCATE(asad_state(i)%dpw(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ej))                                       &
+    ALLOCATE(asad_state(i)%ej(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%emr))                                      &
+    ALLOCATE(asad_state(i)%emr(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%f))                                        &
+    ALLOCATE(asad_state(i)%f(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fdot))                                     &
+    ALLOCATE(asad_state(i)%fdot(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fj))                                       &
+    ALLOCATE(asad_state(i)%fj(n_points,jpcspf,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fpsc1))                                    &
+    ALLOCATE(asad_state(i)%fpsc1(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%fpsc2))                                    &
+    ALLOCATE(asad_state(i)%fpsc2(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%ftilde))                                   &
+    ALLOCATE(asad_state(i)%ftilde(n_points, jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%ipa))                                      &
+    ALLOCATE(asad_state(i)%ipa(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%lati))                                     &
+    ALLOCATE(asad_state(i)%lati(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%linfam))                                   &
+    ALLOCATE(asad_state(i)%linfam(n_points,0:jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%p))                                        &
+    ALLOCATE(asad_state(i)%p(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%pmintnd))                                  &
+    ALLOCATE(asad_state(i)%pmintnd(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%prk))                                      &
+    ALLOCATE(asad_state(i)%prk(n_points,jpnr))
+  IF (.NOT. ALLOCATED(asad_state(i)%qa))                                       &
+    ALLOCATE(asad_state(i)%qa(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ratio))                                    &
+    ALLOCATE(asad_state(i)%ratio(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%rk))                                       &
+    ALLOCATE(asad_state(i)%rk(n_points,jpnr))
+  IF (.NOT. ALLOCATED(asad_state(i)%sh2o))                                     &
+    ALLOCATE(asad_state(i)%sh2o(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%shno3))                                    &
+    ALLOCATE(asad_state(i)%shno3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%sph2o))                                    &
+    ALLOCATE(asad_state(i)%sph2o(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%sphno3))                                   &
+    ALLOCATE(asad_state(i)%sphno3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%t)) ALLOCATE(asad_state(i)%t(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%t300))                                     &
+    ALLOCATE(asad_state(i)%t300(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%tnd)) ALLOCATE(asad_state(i)%tnd(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%wp)) ALLOCATE(asad_state(i)%wp(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%co2)) ALLOCATE(asad_state(i)%co2(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%y))                                        &
+    ALLOCATE(asad_state(i)%y(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ydot))                                     &
+    ALLOCATE(asad_state(i)%ydot(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%za)) ALLOCATE(asad_state(i)%za(n_points))
+  
+  IF (method == int_method_NR) THEN
+    IF (.NOT. ALLOCATED(asad_state(i)%modified_map))                           &
+      ALLOCATE(asad_state(i)%modified_map(jpcspf, jpcspf))
+    IF (.NOT. ALLOCATED(asad_state(i)%spfj))                                   &
+      ALLOCATE(asad_state(i)%spfj(n_points,spfjsize_max))
+  END IF
+  
+  asad_state(i)%prod => asad_state(i)%pd(:,1:jpspec)
+  asad_state(i)%slos => asad_state(i)%pd(:,jpspec+1:2*jpspec)
+  
+  ! Initialise arrays
+  asad_state(i)%deriv(:,:,:) = 1.0   ! Temp fix for deriv being uninitialised
+                                     ! in first solver iteration
 
-! pd is a TARGET
-IF (.NOT. ALLOCATED(asad_state%pd)) ALLOCATE(asad_state%pd(n_points,2*jpspec))
-IF (.NOT. ALLOCATED(asad_state%co3)) ALLOCATE(asad_state%co3(n_points))
-IF (.NOT. ALLOCATED(asad_state%deriv))                                         &
-  ALLOCATE(asad_state%deriv(n_points,4,4))
-IF (.NOT. ALLOCATED(asad_state%dpd))                                           &
-  ALLOCATE(asad_state%dpd(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%dpw))                                           &
-  ALLOCATE(asad_state%dpw(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ej))                                            &
-  ALLOCATE(asad_state%ej(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%emr))                                           &
-  ALLOCATE(asad_state%emr(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%f)) ALLOCATE(asad_state%f(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fdot)) ALLOCATE(asad_state%fdot(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fj))                                            &
-  ALLOCATE(asad_state%fj(n_points,jpcspf,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fpsc1)) ALLOCATE(asad_state%fpsc1(n_points))
-IF (.NOT. ALLOCATED(asad_state%fpsc2)) ALLOCATE(asad_state%fpsc2(n_points))
-IF (.NOT. ALLOCATED(asad_state%ftilde))                                        &
-  ALLOCATE(asad_state%ftilde(n_points, jpcspf))
-IF (.NOT. ALLOCATED(asad_state%ipa)) ALLOCATE(asad_state%ipa(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%lati)) ALLOCATE(asad_state%lati(n_points))
-IF (.NOT. ALLOCATED(asad_state%linfam))                                        &
-  ALLOCATE(asad_state%linfam(n_points,0:jpcspf))
-IF (.NOT. ALLOCATED(asad_state%p)) ALLOCATE(asad_state%p(n_points))
-IF (.NOT. ALLOCATED(asad_state%pmintnd)) ALLOCATE(asad_state%pmintnd(n_points))
-IF (.NOT. ALLOCATED(asad_state%prk)) ALLOCATE(asad_state%prk(n_points,jpnr))
-IF (.NOT. ALLOCATED(asad_state%qa)) ALLOCATE(asad_state%qa(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ratio))                                         &
-  ALLOCATE(asad_state%ratio(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%rk)) ALLOCATE(asad_state%rk(n_points,jpnr))
-IF (.NOT. ALLOCATED(asad_state%sh2o)) ALLOCATE(asad_state%sh2o(n_points))
-IF (.NOT. ALLOCATED(asad_state%shno3)) ALLOCATE(asad_state%shno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%sph2o)) ALLOCATE(asad_state%sph2o(n_points))
-IF (.NOT. ALLOCATED(asad_state%sphno3)) ALLOCATE(asad_state%sphno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%t)) ALLOCATE(asad_state%t(n_points))
-IF (.NOT. ALLOCATED(asad_state%t300)) ALLOCATE(asad_state%t300(n_points))
-IF (.NOT. ALLOCATED(asad_state%tnd)) ALLOCATE(asad_state%tnd(n_points))
-IF (.NOT. ALLOCATED(asad_state%wp)) ALLOCATE(asad_state%wp(n_points))
-IF (.NOT. ALLOCATED(asad_state%co2)) ALLOCATE(asad_state%co2(n_points))
-IF (.NOT. ALLOCATED(asad_state%y)) ALLOCATE(asad_state%y(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ydot)) ALLOCATE(asad_state%ydot(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%za)) ALLOCATE(asad_state%za(n_points))
-
-IF (method == int_method_NR) THEN
-  IF (.NOT. ALLOCATED(asad_state%modified_map))                                &
-    ALLOCATE(asad_state%modified_map(jpcspf, jpcspf))
-  IF (.NOT. ALLOCATED(asad_state%spfj))                                        &
-    ALLOCATE(asad_state%spfj(n_points,spfjsize_max))
-END IF
-
-asad_state%prod => asad_state%pd(:,1:jpspec)
-asad_state%slos => asad_state%pd(:,jpspec+1:2*jpspec)
-
-! Initialise arrays
-asad_state%deriv(:,:,:) = 1.0      ! Temp fix for deriv being uninitialised
-                                   ! in first solver iteration
+  ! Initialise chemistry timestep info
+  asad_state(i)%cdt = init_cdt
+  asad_state(i)%cdt_diag = init_cdt_diag
+  asad_state(i)%interval = init_interval
+  asad_state(i)%ncsteps = init_ncsteps
+  asad_state(i)%ncsteps_factor = init_ncsteps_factor
+  
+END DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -705,10 +726,13 @@ SUBROUTINE asad_mod_init_spatial_vars(n_points)
 ! To allocate and initialise 2D/3D ASAD arrays and variables
 ! Called every chemistry timestep
 
+!$ USE omp_lib
+
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: n_points
 
+INTEGER :: n_parallel, i
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -717,110 +741,135 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_MOD_INIT_SPATIAL_VARS'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
+n_parallel = 1
+!$ n_parallel = omp_get_max_threads()
+
 ! Set integration method (1 = IMPACT; 3 = N-R solver; 5 = Backward-Euler)
 method = ukca_config%ukca_int_method
 
-! prod and slos are pointers
-IF (ASSOCIATED(asad_state%prod))       NULLIFY(asad_state%prod)
-IF (ASSOCIATED(asad_state%slos))       NULLIFY(asad_state%slos)
+IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_parallel))
 
-! pd is a TARGET
-IF (.NOT. ALLOCATED(asad_state%pd)) ALLOCATE(asad_state%pd(n_points,2*jpspec))
-IF (.NOT. ALLOCATED(asad_state%co3)) ALLOCATE(asad_state%co3(n_points))
-IF (.NOT. ALLOCATED(asad_state%deriv)) &
-  ALLOCATE(asad_state%deriv(n_points,4,4))
-IF (.NOT. ALLOCATED(asad_state%dpd)) &
-  ALLOCATE(asad_state%dpd(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%dpw)) &
-  ALLOCATE(asad_state%dpw(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ej)) &
-  ALLOCATE(asad_state%ej(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%emr)) &
-  ALLOCATE(asad_state%emr(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%f)) ALLOCATE(asad_state%f(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fdot)) ALLOCATE(asad_state%fdot(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fj))                                            &
-  ALLOCATE(asad_state%fj(n_points,jpcspf,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%fpsc1)) ALLOCATE(asad_state%fpsc1(n_points))
-IF (.NOT. ALLOCATED(asad_state%fpsc2)) ALLOCATE(asad_state%fpsc2(n_points))
-IF (.NOT. ALLOCATED(asad_state%ftilde))                                        &
-  ALLOCATE(asad_state%ftilde(n_points, jpcspf))
-IF (.NOT. ALLOCATED(asad_state%ipa)) ALLOCATE(asad_state%ipa(n_points,jpcspf))
-IF (.NOT. ALLOCATED(asad_state%lati)) ALLOCATE(asad_state%lati(n_points))
-IF (.NOT. ALLOCATED(asad_state%linfam))                                        &
-  ALLOCATE(asad_state%linfam(n_points,0:jpcspf))
-IF (.NOT. ALLOCATED(asad_state%p)) ALLOCATE(asad_state%p(n_points))
-IF (.NOT. ALLOCATED(asad_state%pmintnd)) ALLOCATE(asad_state%pmintnd(n_points))
-IF (.NOT. ALLOCATED(asad_state%prk)) ALLOCATE(asad_state%prk(n_points,jpnr))
-IF (.NOT. ALLOCATED(asad_state%qa)) ALLOCATE(asad_state%qa(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ratio))                                         &
-  ALLOCATE(asad_state%ratio(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%rk)) ALLOCATE(asad_state%rk(n_points,jpnr))
-IF (.NOT. ALLOCATED(asad_state%sh2o)) ALLOCATE(asad_state%sh2o(n_points))
-IF (.NOT. ALLOCATED(asad_state%shno3)) ALLOCATE(asad_state%shno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%sph2o)) ALLOCATE(asad_state%sph2o(n_points))
-IF (.NOT. ALLOCATED(asad_state%sphno3)) ALLOCATE(asad_state%sphno3(n_points))
-IF (.NOT. ALLOCATED(asad_state%t)) ALLOCATE(asad_state%t(n_points))
-IF (.NOT. ALLOCATED(asad_state%t300)) ALLOCATE(asad_state%t300(n_points))
-IF (.NOT. ALLOCATED(asad_state%tnd)) ALLOCATE(asad_state%tnd(n_points))
-IF (.NOT. ALLOCATED(asad_state%wp)) ALLOCATE(asad_state%wp(n_points))
-IF (.NOT. ALLOCATED(asad_state%co2)) ALLOCATE(asad_state%co2(n_points))
-IF (.NOT. ALLOCATED(asad_state%y)) ALLOCATE(asad_state%y(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%ydot)) ALLOCATE(asad_state%ydot(n_points,jpspec))
-IF (.NOT. ALLOCATED(asad_state%za)) ALLOCATE(asad_state%za(n_points))
-
-IF (method == int_method_NR) THEN
-  IF (.NOT. ALLOCATED(asad_state%spfj))                                        &
-    ALLOCATE(asad_state%spfj(n_points,spfjsize_max))
-  asad_state%spfj(:,:) = 0.0
-END IF
-
-asad_state%prod => asad_state%pd(:,1:jpspec)
-asad_state%slos => asad_state%pd(:,jpspec+1:2*jpspec)
-
-! (re-)initialise DERIV array to 1.0 before each call to ASAD_CDRIVE
-! to ensure bit-comparability when changing domain decomposition
-asad_state%deriv(:,:,:) = 1.0
-
-!     Clear the species arrays
-asad_state%linfam(:,:) = .FALSE.
-
-asad_state%co2(:)      = 0.0
-asad_state%co3(:)      = 0.0
-asad_state%dpd(:,:)    = 0.0
-asad_state%dpw(:,:)    = 0.0
-asad_state%ej(:,:)     = 0.0
-asad_state%emr(:,:)    = 0.0
-asad_state%f(:,:)      = 0.0
-asad_state%fdot(:,:)   = 0.0
-asad_state%fj(:,:,:)   = 0.0
-asad_state%fpsc1(:)    = 0.0
-asad_state%fpsc2(:)    = 0.0
-asad_state%ftilde(:,:) = 0.0
-asad_state%ipa(:,:)    = 0
-asad_state%lati(:)     = 0.0
-asad_state%p(:)        = 0.0
-asad_state%pd(:,:)     = 0.0
-asad_state%pmintnd(:)  = 0.0
-asad_state%prod(:,:)   = 0.0
-asad_state%qa(:,:)     = 0.0
-asad_state%ratio(:,:)  = 0.0
-asad_state%sh2o(:)     = 0.0
-asad_state%shno3(:)    = 0.0
-asad_state%slos(:,:)   = 0.0
-asad_state%sph2o(:)    = 0.0
-asad_state%sphno3(:)   = 0.0
-asad_state%t(:)        = 0.0
-asad_state%t300(:)     = 0.0
-asad_state%tnd(:)      = 0.0
-asad_state%wp(:)       = 0.0
-asad_state%y(:,:)      = 0.0
-asad_state%ydot(:,:)   = 0.0
-asad_state%za(:)       = 0.0
-
-!     Clear the rates and index arrays
-asad_state%rk(:,:)     = 0.0
-asad_state%prk(:,:)    = 0.0
+DO i = 1, n_parallel
+  ! prod and slos are pointers
+  IF (ASSOCIATED(asad_state(i)%prod))       NULLIFY(asad_state(i)%prod)
+  IF (ASSOCIATED(asad_state(i)%slos))       NULLIFY(asad_state(i)%slos)
+  
+  ! pd is a TARGET
+  IF (.NOT. ALLOCATED(asad_state(i)%pd))                                      &
+    ALLOCATE(asad_state(i)%pd(n_points,2*jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%co3)) ALLOCATE(asad_state(i)%co3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%deriv)) &
+    ALLOCATE(asad_state(i)%deriv(n_points,4,4))
+  IF (.NOT. ALLOCATED(asad_state(i)%dpd)) &
+    ALLOCATE(asad_state(i)%dpd(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%dpw)) &
+    ALLOCATE(asad_state(i)%dpw(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ej)) &
+    ALLOCATE(asad_state(i)%ej(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%emr)) &
+    ALLOCATE(asad_state(i)%emr(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%f))                                        &
+    ALLOCATE(asad_state(i)%f(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fdot))                                     &
+    ALLOCATE(asad_state(i)%fdot(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fj))                                       &
+    ALLOCATE(asad_state(i)%fj(n_points,jpcspf,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%fpsc1))                                    &
+    ALLOCATE(asad_state(i)%fpsc1(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%fpsc2))                                    &
+    ALLOCATE(asad_state(i)%fpsc2(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%ftilde))                                   &
+    ALLOCATE(asad_state(i)%ftilde(n_points, jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%ipa))                                      &
+    ALLOCATE(asad_state(i)%ipa(n_points,jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%lati))                                     &
+    ALLOCATE(asad_state(i)%lati(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%linfam))                                   &
+    ALLOCATE(asad_state(i)%linfam(n_points,0:jpcspf))
+  IF (.NOT. ALLOCATED(asad_state(i)%p)) ALLOCATE(asad_state(i)%p(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%pmintnd))                                  &
+    ALLOCATE(asad_state(i)%pmintnd(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%prk))                                      &
+    ALLOCATE(asad_state(i)%prk(n_points,jpnr))
+  IF (.NOT. ALLOCATED(asad_state(i)%qa))                                       &
+    ALLOCATE(asad_state(i)%qa(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ratio))                                    &
+    ALLOCATE(asad_state(i)%ratio(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%rk))                                       &
+    ALLOCATE(asad_state(i)%rk(n_points,jpnr))
+  IF (.NOT. ALLOCATED(asad_state(i)%sh2o))                                     &
+    ALLOCATE(asad_state(i)%sh2o(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%shno3))                                    &
+    ALLOCATE(asad_state(i)%shno3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%sph2o))                                    &
+    ALLOCATE(asad_state(i)%sph2o(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%sphno3))                                   &
+    ALLOCATE(asad_state(i)%sphno3(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%t)) ALLOCATE(asad_state(i)%t(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%t300)) ALLOCATE(asad_state(i)%t300(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%tnd)) ALLOCATE(asad_state(i)%tnd(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%wp)) ALLOCATE(asad_state(i)%wp(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%co2)) ALLOCATE(asad_state(i)%co2(n_points))
+  IF (.NOT. ALLOCATED(asad_state(i)%y))                                        &
+    ALLOCATE(asad_state(i)%y(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%ydot))                                     &
+    ALLOCATE(asad_state(i)%ydot(n_points,jpspec))
+  IF (.NOT. ALLOCATED(asad_state(i)%za))                                       &
+    ALLOCATE(asad_state(i)%za(n_points))
+  
+  IF (method == int_method_NR) THEN
+    IF (.NOT. ALLOCATED(asad_state(i)%spfj))                                   &
+      ALLOCATE(asad_state(i)%spfj(n_points,spfjsize_max))
+    asad_state(i)%spfj(:,:) = 0.0
+  END IF
+  
+  asad_state(i)%prod => asad_state(i)%pd(:,1:jpspec)
+  asad_state(i)%slos => asad_state(i)%pd(:,jpspec+1:2*jpspec)
+  
+  ! (re-)initialise DERIV array to 1.0 before each call to ASAD_CDRIVE
+  ! to ensure bit-comparability when changing domain decomposition
+  asad_state(i)%deriv(:,:,:) = 1.0
+  
+  !     Clear the species arrays
+  asad_state(i)%linfam(:,:) = .FALSE.
+  
+  asad_state(i)%co2(:)      = 0.0
+  asad_state(i)%co3(:)      = 0.0
+  asad_state(i)%dpd(:,:)    = 0.0
+  asad_state(i)%dpw(:,:)    = 0.0
+  asad_state(i)%ej(:,:)     = 0.0
+  asad_state(i)%emr(:,:)    = 0.0
+  asad_state(i)%f(:,:)      = 0.0
+  asad_state(i)%fdot(:,:)   = 0.0
+  asad_state(i)%fj(:,:,:)   = 0.0
+  asad_state(i)%fpsc1(:)    = 0.0
+  asad_state(i)%fpsc2(:)    = 0.0
+  asad_state(i)%ftilde(:,:) = 0.0
+  asad_state(i)%ipa(:,:)    = 0
+  asad_state(i)%lati(:)     = 0.0
+  asad_state(i)%p(:)        = 0.0
+  asad_state(i)%pd(:,:)     = 0.0
+  asad_state(i)%pmintnd(:)  = 0.0
+  asad_state(i)%prod(:,:)   = 0.0
+  asad_state(i)%qa(:,:)     = 0.0
+  asad_state(i)%ratio(:,:)  = 0.0
+  asad_state(i)%sh2o(:)     = 0.0
+  asad_state(i)%shno3(:)    = 0.0
+  asad_state(i)%slos(:,:)   = 0.0
+  asad_state(i)%sph2o(:)    = 0.0
+  asad_state(i)%sphno3(:)   = 0.0
+  asad_state(i)%t(:)        = 0.0
+  asad_state(i)%t300(:)     = 0.0
+  asad_state(i)%tnd(:)      = 0.0
+  asad_state(i)%wp(:)       = 0.0
+  asad_state(i)%y(:,:)      = 0.0
+  asad_state(i)%ydot(:,:)   = 0.0
+  asad_state(i)%za(:)       = 0.0
+  
+  !     Clear the rates and index arrays
+  asad_state(i)%rk(:,:)     = 0.0
+  asad_state(i)%prk(:,:)    = 0.0
+END DO
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -841,54 +890,58 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName = 'ASAD_MOD_DEALLOC_SPATIAL_VARS'
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb) :: zhook_handle
+INTEGER :: i
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+IF (.NOT. ALLOCATED(asad_state)) RETURN
 
 ! Set integration method (1 = IMPACT; 3 = N-R solver; 5 = Backward-Euler)
 method = ukca_config%ukca_int_method
 
 ! Deallocate asad mod variables (in reverse order
 ! to which they are initially allocated in ukca_mod.F90)...
-
-IF (method == int_method_NR) THEN ! sparse_vars
-  IF (ALLOCATED(asad_state%spfj)) DEALLOCATE(asad_state%spfj)
-END IF
-
-IF (ALLOCATED(asad_state%za)) DEALLOCATE(asad_state%za)
-IF (ALLOCATED(asad_state%ydot)) DEALLOCATE(asad_state%ydot)
-IF (ALLOCATED(asad_state%y)) DEALLOCATE(asad_state%y)
-IF (ALLOCATED(asad_state%co2)) DEALLOCATE(asad_state%co2)
-IF (ALLOCATED(asad_state%wp)) DEALLOCATE(asad_state%wp)
-IF (ALLOCATED(asad_state%tnd)) DEALLOCATE(asad_state%tnd)
-IF (ALLOCATED(asad_state%t300)) DEALLOCATE(asad_state%t300)
-IF (ALLOCATED(asad_state%t)) DEALLOCATE(asad_state%t)
-IF (ALLOCATED(asad_state%sphno3)) DEALLOCATE(asad_state%sphno3)
-IF (ALLOCATED(asad_state%sph2o)) DEALLOCATE(asad_state%sph2o)
-IF (ALLOCATED(asad_state%shno3)) DEALLOCATE(asad_state%shno3)
-IF (ALLOCATED(asad_state%sh2o)) DEALLOCATE(asad_state%sh2o)
-IF (ALLOCATED(asad_state%rk)) DEALLOCATE(asad_state%rk)
-IF (ALLOCATED(asad_state%ratio)) DEALLOCATE(asad_state%ratio)
-IF (ALLOCATED(asad_state%qa)) DEALLOCATE(asad_state%qa)
-IF (ALLOCATED(asad_state%prk)) DEALLOCATE(asad_state%prk)
-IF (ALLOCATED(asad_state%pmintnd)) DEALLOCATE(asad_state%pmintnd)
-IF (ALLOCATED(asad_state%p)) DEALLOCATE(asad_state%p)
-IF (ALLOCATED(asad_state%linfam)) DEALLOCATE(asad_state%linfam)
-IF (ALLOCATED(asad_state%lati)) DEALLOCATE(asad_state%lati)
-IF (ALLOCATED(asad_state%ipa)) DEALLOCATE(asad_state%ipa)
-IF (ALLOCATED(asad_state%ftilde)) DEALLOCATE(asad_state%ftilde)
-IF (ALLOCATED(asad_state%fpsc2)) DEALLOCATE(asad_state%fpsc2)
-IF (ALLOCATED(asad_state%fpsc1))  DEALLOCATE(asad_state%fpsc1)
-IF (ALLOCATED(asad_state%fj)) DEALLOCATE(asad_state%fj)
-IF (ALLOCATED(asad_state%fdot)) DEALLOCATE(asad_state%fdot)
-IF (ALLOCATED(asad_state%f)) DEALLOCATE(asad_state%f)
-IF (ALLOCATED(asad_state%emr)) DEALLOCATE(asad_state%emr)
-IF (ALLOCATED(asad_state%ej)) DEALLOCATE(asad_state%ej)
-IF (ALLOCATED(asad_state%dpw)) DEALLOCATE(asad_state%dpw)
-IF (ALLOCATED(asad_state%dpd)) DEALLOCATE(asad_state%dpd)
-IF (ALLOCATED(asad_state%deriv)) DEALLOCATE(asad_state%deriv)
-IF (ALLOCATED(asad_state%co3)) DEALLOCATE(asad_state%co3)
-IF (ALLOCATED(asad_state%pd)) DEALLOCATE(asad_state%pd)
-
+DO i = 1, SIZE(asad_state)
+  IF (method == int_method_NR) THEN ! sparse_vars
+    IF (ALLOCATED(asad_state(i)%spfj)) DEALLOCATE(asad_state(i)%spfj)
+  END IF
+  
+  IF (ALLOCATED(asad_state(i)%za)) DEALLOCATE(asad_state(i)%za)
+  IF (ALLOCATED(asad_state(i)%ydot)) DEALLOCATE(asad_state(i)%ydot)
+  IF (ALLOCATED(asad_state(i)%y)) DEALLOCATE(asad_state(i)%y)
+  IF (ALLOCATED(asad_state(i)%co2)) DEALLOCATE(asad_state(i)%co2)
+  IF (ALLOCATED(asad_state(i)%wp)) DEALLOCATE(asad_state(i)%wp)
+  IF (ALLOCATED(asad_state(i)%tnd)) DEALLOCATE(asad_state(i)%tnd)
+  IF (ALLOCATED(asad_state(i)%t300)) DEALLOCATE(asad_state(i)%t300)
+  IF (ALLOCATED(asad_state(i)%t)) DEALLOCATE(asad_state(i)%t)
+  IF (ALLOCATED(asad_state(i)%sphno3)) DEALLOCATE(asad_state(i)%sphno3)
+  IF (ALLOCATED(asad_state(i)%sph2o)) DEALLOCATE(asad_state(i)%sph2o)
+  IF (ALLOCATED(asad_state(i)%shno3)) DEALLOCATE(asad_state(i)%shno3)
+  IF (ALLOCATED(asad_state(i)%sh2o)) DEALLOCATE(asad_state(i)%sh2o)
+  IF (ALLOCATED(asad_state(i)%rk)) DEALLOCATE(asad_state(i)%rk)
+  IF (ALLOCATED(asad_state(i)%ratio)) DEALLOCATE(asad_state(i)%ratio)
+  IF (ALLOCATED(asad_state(i)%qa)) DEALLOCATE(asad_state(i)%qa)
+  IF (ALLOCATED(asad_state(i)%prk)) DEALLOCATE(asad_state(i)%prk)
+  IF (ALLOCATED(asad_state(i)%pmintnd)) DEALLOCATE(asad_state(i)%pmintnd)
+  IF (ALLOCATED(asad_state(i)%p)) DEALLOCATE(asad_state(i)%p)
+  IF (ALLOCATED(asad_state(i)%linfam)) DEALLOCATE(asad_state(i)%linfam)
+  IF (ALLOCATED(asad_state(i)%lati)) DEALLOCATE(asad_state(i)%lati)
+  IF (ALLOCATED(asad_state(i)%ipa)) DEALLOCATE(asad_state(i)%ipa)
+  IF (ALLOCATED(asad_state(i)%ftilde)) DEALLOCATE(asad_state(i)%ftilde)
+  IF (ALLOCATED(asad_state(i)%fpsc2)) DEALLOCATE(asad_state(i)%fpsc2)
+  IF (ALLOCATED(asad_state(i)%fpsc1))  DEALLOCATE(asad_state(i)%fpsc1)
+  IF (ALLOCATED(asad_state(i)%fj)) DEALLOCATE(asad_state(i)%fj)
+  IF (ALLOCATED(asad_state(i)%fdot)) DEALLOCATE(asad_state(i)%fdot)
+  IF (ALLOCATED(asad_state(i)%f)) DEALLOCATE(asad_state(i)%f)
+  IF (ALLOCATED(asad_state(i)%emr)) DEALLOCATE(asad_state(i)%emr)
+  IF (ALLOCATED(asad_state(i)%ej)) DEALLOCATE(asad_state(i)%ej)
+  IF (ALLOCATED(asad_state(i)%dpw)) DEALLOCATE(asad_state(i)%dpw)
+  IF (ALLOCATED(asad_state(i)%dpd)) DEALLOCATE(asad_state(i)%dpd)
+  IF (ALLOCATED(asad_state(i)%deriv)) DEALLOCATE(asad_state(i)%deriv)
+  IF (ALLOCATED(asad_state(i)%co3)) DEALLOCATE(asad_state(i)%co3)
+  IF (ALLOCATED(asad_state(i)%pd)) DEALLOCATE(asad_state(i)%pd)
+END DO
+DEALLOCATE(asad_state)
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE asad_mod_dealloc_spatial_vars

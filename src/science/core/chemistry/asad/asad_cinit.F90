@@ -90,7 +90,7 @@ IMPLICIT NONE
 
 !       Local variables
 
-INTEGER :: j                      ! Loop variable
+INTEGER :: i, j                   ! Loop variables
 INTEGER :: jc                     ! Loop variable
 INTEGER :: jp                     ! Loop variable
 INTEGER :: js                     ! Loop variable
@@ -161,14 +161,14 @@ IF (kfphot < 0 .AND. ABS(kfphot) > INT(ukca_config%timestep)) THEN
   ' BE CALLED ONCE.'
   CALL umPrint(umMessage,src=RoutineName)
   nfphot = 0
-ELSE IF ( kfphot > 0 .AND. kfphot > s%ncsteps ) THEN
+ELSE IF ( kfphot > 0 .AND. kfphot > s(1)%ncsteps ) THEN
   WRITE(umMessage,'(A,I0,A,A)') '**CINIT WARNING: FREQUENCY KFPHOT ',kfphot,   &
    ' EXCEEDS THE TOTAL NUMBER OF CHEMICAL SUBSTEPS. ROUTINE ',                 &
    ' PHOTOL WILL BE CALLED ONCE ONLY.'
   CALL umPrint(umMessage,src=RoutineName)
   nfphot = 0
 ELSE IF (kfphot < 0) THEN
-  nfphot = INT( ABS(kfphot)/s%cdt )
+  nfphot = INT( ABS(kfphot)/s(1)%cdt )
 ELSE
   nfphot = kfphot
 END IF
@@ -182,30 +182,28 @@ peps  = 1.0e19 * sfmin
 !       3.  Set fixed vmrs (Now done in UKCA_MAIN1)
 
 ! The arrays below are stored on each thread
-!$OMP PARALLEL
 
 !       4.  Clear the species arrays
+DO i = 1, SIZE(s)
+  s(i)%f      = 0.0
+  s(i)%fdot   = 0.0
+  s(i)%ej     = 0.0
+  s(i)%linfam = .FALSE.
 
-s%f      = 0.0
-s%fdot   = 0.0
-s%ej     = 0.0
-s%linfam = .FALSE.
+  s(i)%y    = 0.0
+  s(i)%ydot = 0.0
+  s(i)%prod = 0.0
+  s(i)%slos = 0.0
+  s(i)%dpd  = 0.0
+  s(i)%dpw  = 0.0
+  s(i)%emr  = 0.0
 
-s%y    = 0.0
-s%ydot = 0.0
-s%prod = 0.0
-s%slos = 0.0
-s%dpd  = 0.0
-s%dpw  = 0.0
-s%emr  = 0.0
+  !       5.   Clear the rates and index arrays.
+  !            ----- --- ----- --- ----- -------
 
-!       5.   Clear the rates and index arrays.
-!            ----- --- ----- --- ----- -------
-
-
-s%rk   = 0.0
-s%prk  = 0.0
-!$OMP END PARALLEL
+  s(i)%rk   = 0.0
+  s(i)%prk  = 0.0
+END DO
 
 nspi = 0
 

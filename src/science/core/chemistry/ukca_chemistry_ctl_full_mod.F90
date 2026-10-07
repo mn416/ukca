@@ -98,6 +98,8 @@ USE ukca_missing_data_mod, ONLY: rmdi
 
 USE errormessagelength_mod, ONLY: errormessagelength
 
+!$ USE omp_lib
+
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: row_length        ! size of UKCA x dimension
@@ -245,6 +247,9 @@ INTEGER :: ys, ye, yi, yo
 INTEGER :: zs, ze, zi, zo
 INTEGER :: chunk_n_pnts
 LOGICAL :: chunking_enabled
+
+INTEGER :: t ! Thread/team id
+INTEGER :: cdt_diag
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_CHEMISTRY_CTL_FULL'
 
@@ -418,7 +423,8 @@ IF (uph2so4inaer == 1) THEN
     ystore(:,:,:) = full_zftr(:,:,:,istore_h2so4)
   ELSE IF (.NOT. chunking_enabled) THEN
     ! Preserve non-fixed behaviour when chunking is disabled
-    ystore(:,:,:) = RESHAPE(s%y(:,nn_h2so4), [row_length,rows,model_levels])
+    !!! XXX: this looks wrong as s%y accessed outside parallel region
+    !ystore(:,:,:) = RESHAPE(s%y(:,nn_h2so4), [row_length,rows,model_levels])
   END IF
 END IF
 
@@ -441,16 +447,19 @@ CALL asad_cdrive_init()
 !$OMP PARALLEL DO DEFAULT(NONE) SCHEDULE(DYNAMIC) COLLAPSE(3)                  &
 !$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
 !$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
-!$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk)           &
+!$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
 !$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
 !$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
 !$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
 !$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
 !$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!$OMP        zftr, full_zftr, ix, jy, k)
+!$OMP        zftr, full_zftr, ix, jy, k, s)
 DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
     DO xi = 1, row_length, chunk_n_x
+      t = 1
+      !$ t = omp_get_thread_num()+1
+
       ! Chunk start, end, and offset in Z dimension
       ze = MIN(model_levels, zi + (chunk_n_z - 1))
       zs = ze - chunk_n_z + 1
@@ -467,12 +476,12 @@ DO zi = 1, model_levels, chunk_n_z
       xo = xi - xs + 1
 
       ! Copy from full-domain arrays to ASAD module variables
-      s%sph2o(:) = RESHAPE(full_sph2o(xs:xe,ys:ye,zs:ze), SHAPE(s%sph2o))
-      s%za(:) = RESHAPE(full_za(xs:xe,ys:ye,zs:ze), SHAPE(s%za))
+      s(t)%sph2o(:) = RESHAPE(full_sph2o(xs:xe,ys:ye,zs:ze), SHAPE(s(t)%sph2o))
+      s(t)%za(:) = RESHAPE(full_za(xs:xe,ys:ye,zs:ze), SHAPE(s(t)%za))
       chunk_zftr(:,:,:,:) = full_zftr(xs:xe,ys:ye,zs:ze,:)
 
       CALL asad_cdrive(                                                        &
-        s,                                                                     &
+        s(t),                                                                  &
         chunk_zftr,                                                            &
         pres(xs:xe,ys:ye,zs:ze),                                               &
         temp(xs:xe,ys:ye,zs:ze),                                               &
@@ -495,31 +504,31 @@ DO zi = 1, model_levels, chunk_n_z
       ! Copy from ASAD module variables to full-domain arrays
       zftr(xi:xe,yi:ye,zi:ze,:) = chunk_zftr(xo:,yo:,zo:,:)
 
-      chunk_dpd(:,:,:,:) = RESHAPE(s%dpd, SHAPE(chunk_dpd))
+      chunk_dpd(:,:,:,:) = RESHAPE(s(t)%dpd, SHAPE(chunk_dpd))
       full_dpd(xi:xe,yi:ye,zi:ze,:) = chunk_dpd(xo:,yo:,zo:,:)
 
-      chunk_dpw(:,:,:,:) = RESHAPE(s%dpw, SHAPE(chunk_dpw))
+      chunk_dpw(:,:,:,:) = RESHAPE(s(t)%dpw, SHAPE(chunk_dpw))
       full_dpw(xi:xe,yi:ye,zi:ze,:) = chunk_dpw(xo:,yo:,zo:,:)
 
-      chunk_fpsc1(:,:,:) = RESHAPE(s%fpsc1, SHAPE(chunk_fpsc1))
+      chunk_fpsc1(:,:,:) = RESHAPE(s(t)%fpsc1, SHAPE(chunk_fpsc1))
       full_fpsc1(xi:xe,yi:ye,zi:ze) = chunk_fpsc1(xo:,yo:,zo:)
 
-      chunk_fpsc2(:,:,:) = RESHAPE(s%fpsc2, SHAPE(chunk_fpsc2))
+      chunk_fpsc2(:,:,:) = RESHAPE(s(t)%fpsc2, SHAPE(chunk_fpsc2))
       full_fpsc2(xi:xe,yi:ye,zi:ze) = chunk_fpsc2(xo:,yo:,zo:)
 
-      chunk_prk(:,:,:,:) = RESHAPE(s%prk, SHAPE(chunk_prk))
+      chunk_prk(:,:,:,:) = RESHAPE(s(t)%prk, SHAPE(chunk_prk))
       full_prk(xi:xe,yi:ye,zi:ze,:) = chunk_prk(xo:,yo:,zo:,:)
 
-      chunk_y(:,:,:,:) = RESHAPE(s%y, SHAPE(chunk_y))
+      chunk_y(:,:,:,:) = RESHAPE(s(t)%y, SHAPE(chunk_y))
       full_y(xi:xe,yi:ye,zi:ze,:) = chunk_y(xo:,yo:,zo:,:)
 
-      chunk_sphno3(:,:,:) = RESHAPE(s%sphno3, SHAPE(chunk_sphno3))
+      chunk_sphno3(:,:,:) = RESHAPE(s(t)%sphno3, SHAPE(chunk_sphno3))
       full_sphno3(xi:xe,yi:ye,zi:ze) = chunk_sphno3(xo:,yo:,zo:)
 
-      chunk_tnd(:,:,:) = RESHAPE(s%tnd, SHAPE(chunk_tnd))
+      chunk_tnd(:,:,:) = RESHAPE(s(t)%tnd, SHAPE(chunk_tnd))
       full_tnd(xi:xe,yi:ye,zi:ze) = chunk_tnd(xo:,yo:,zo:)
 
-      chunk_rk(:,:,:,:) = RESHAPE(s%rk, SHAPE(chunk_rk))
+      chunk_rk(:,:,:,:) = RESHAPE(s(t)%rk, SHAPE(chunk_rk))
       full_rk(xi:xe,yi:ye,zi:ze,:) = chunk_rk(xo:,yo:,zo:,:)
     END DO
   END DO
@@ -528,7 +537,7 @@ END DO
 
 IF (ukca_config%l_ukca_het_psc) THEN
   ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
-  ! Note that s%sphno3 is NAT in number density of HNO3.
+  ! Note that sphno3 is NAT in number density of HNO3.
   IF (ANY(full_sphno3(:,:,:) > 0.0)) THEN
     shno3(:,:,:) = full_sphno3(:,:,:)/full_tnd(:,:,:)*c_hono2
   ELSE
@@ -536,22 +545,24 @@ IF (ukca_config%l_ukca_het_psc) THEN
   END IF
 END IF
 
+cdt_diag = s(1)%cdt_diag ! XXX: cdt_diag does not need to be per team/thread
+
 IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
   ! Calculate chemical fluxes for MODE
   IF (ihso3_h2o2 > 0) THEN
     delSO2_wet_H2O2(:,:,:) = delSO2_wet_H2O2(:,:,:) +                          &
       full_rk(:,:,:,ihso3_h2o2) * full_y(:,:,:,nn_so2) *                       &
-      full_y(:,:,:,nn_h2o2) * s%cdt_diag
+      full_y(:,:,:,nn_h2o2) * cdt_diag
   END IF
   IF (ihso3_o3 > 0) THEN
     delSO2_wet_O3(:,:,:) = delSO2_wet_O3(:,:,:) +                              &
       full_rk(:,:,:,ihso3_o3)*full_y(:,:,:,nn_so2)*                            &
-      full_y(:,:,:,nn_o3)*s%cdt_diag
+      full_y(:,:,:,nn_o3)*cdt_diag
   END IF
   IF (iso3_o3 > 0) THEN
     delSO2_wet_O3(:,:,:) = delSO2_wet_O3(:,:,:) +                              &
       full_rk(:,:,:,iso3_o3)*full_y(:,:,:,nn_so2)*                             &
-      full_y(:,:,:,nn_o3)*s%cdt_diag
+      full_y(:,:,:,nn_o3)*cdt_diag
   END IF
   ! net H2SO4 production - note that this is affected by
   ! l_fix_ukca_h2so4_ystore above. Y value is concentration
@@ -559,10 +570,10 @@ IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
   IF (iso2_oh > 0 .AND. ih2so4_hv > 0) THEN
     delh2so4_chem(:,:,:) = delh2so4_chem(:,:,:) +                              &
       (full_rk(:,:,:,iso2_oh) * full_y(:,:,:,nn_so2) * full_y(:,:,:,nn_oh) -   &
-       full_rk(:,:,:,ih2so4_hv) * full_y(:,:,:,nn_h2so4)) * s%cdt_diag
+       full_rk(:,:,:,ih2so4_hv) * full_y(:,:,:,nn_h2so4)) * cdt_diag
   ELSE IF (iso2_oh > 0) THEN
     delh2so4_chem(:,:,:) = delh2so4_chem(:,:,:) + full_rk(:,:,:,iso2_oh) *     &
-      full_y(:,:,:,nn_so2) * full_y(:,:,:,nn_oh) * s%cdt_diag
+      full_y(:,:,:,nn_so2) * full_y(:,:,:,nn_oh) * cdt_diag
   END IF
 
   IF (uph2so4inaer == 1) THEN
@@ -573,7 +584,7 @@ IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
       ! zftr is already in VMR, so divide by diagnostic chemistry timestep to
       ! give as vmr/s
       delh2so4_chem(:,:,:) = (zftr(:,:,:,istore_h2so4) - ystore(:,:,:)) /      &
-                               s%cdt_diag
+                               cdt_diag
       ! primary array passed is zftr, so copy back to this, NOT s%y
       zftr(:,:,:,istore_h2so4) = ystore(:,:,:)
     ELSE
@@ -725,11 +736,12 @@ END DO
 !$OMP END DO
 !$OMP END PARALLEL
 
+! XXX: this looks wrong as s%y accessed outside parallel region
 ! Preserve non-fixed behaviour when chunking is disabled
-IF (.NOT. ukca_config%l_fix_ukca_h2so4_ystore .AND.                            &
-    .NOT. chunking_enabled) THEN
-  s%y(:,:) = RESHAPE(full_y, [tot_n_pnts,jpspec])
-END IF
+!IF (.NOT. ukca_config%l_fix_ukca_h2so4_ystore .AND.                            &
+!    .NOT. chunking_enabled) THEN
+!  s%y(:,:) = RESHAPE(full_y, [tot_n_pnts,jpspec])
+!END IF
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

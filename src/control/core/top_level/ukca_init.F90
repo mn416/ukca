@@ -34,7 +34,9 @@ CONTAINS
 SUBROUTINE ukca_init
 
 USE ukca_constants,        ONLY: isec_per_day, isec_per_hour
-USE asad_mod,              ONLY: tslimit, s=>asad_state
+USE asad_mod,              ONLY: tslimit, init_cdt, init_cdt_diag,             &
+                                 init_interval, init_ncsteps,                  &
+                                 init_ncsteps_factor
 
 USE ukca_config_specification_mod, ONLY:                                       &
                                  ukca_config, glomap_config,                   &
@@ -101,6 +103,7 @@ INTEGER                       :: n_reqd_tracers ! no. of required tracers
 INTEGER                       :: errcode=0     ! Error code: ereport
 INTEGER                       :: timestep      ! Dynamical timestep
 INTEGER, PARAMETER            :: ichem_ver132 = 132  ! To identify chemical vn
+INTEGER                       :: i 
 CHARACTER(LEN=errormessagelength)     :: cmessage=' '  ! Error message
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
@@ -135,60 +138,59 @@ ukca_config%timesteps_per_hour = isec_per_hour / timestep
 ! Do not check for solver type and timestep if none of the chemistry
 ! schemes is selected e.g. for an Age-of-air-only configuration.
 ! In that case, set values to default in case they are used elsewhere
-!$OMP PARALLEL
 IF ( ukca_config%i_ukca_chem == i_ukca_chem_off ) THEN
 
   IF (ukca_config%l_ukca_mode) THEN
     ! No UKCA chemistry - dust only
-    s%interval = ukca_config%chem_timestep/timestep
-    s%cdt = REAL(ukca_config%chem_timestep)
+    init_interval = ukca_config%chem_timestep/timestep
+    init_cdt = REAL(ukca_config%chem_timestep)
   ELSE
     ! No UKCA chemistry
-    s%interval = 1
-    s%cdt = REAL(timestep)
+    init_interval = 1
+    init_cdt = REAL(timestep)
   END IF
-  s%cdt_diag = s%cdt
-  s%ncsteps = 1
-  s%ncsteps_factor = 1
+  init_cdt_diag = init_cdt
+  init_ncsteps = 1
+  init_ncsteps_factor = 1
 
 ELSE IF (ukca_config%ukca_int_method == int_method_nr) THEN
 
   ! Newton-Raphson solver
-  s%interval = ukca_config%chem_timestep/timestep
+  init_interval = ukca_config%chem_timestep/timestep
   ! Half the ASAD chemistry timestep as many times as are requested by the
   ! i_chem_timestep_halvings parameter
-  s%ncsteps_factor = 2 ** ukca_config%i_chem_timestep_halvings
-  s%ncsteps = s%ncsteps_factor
-  s%cdt_diag = REAL(ukca_config%chem_timestep)
-  s%cdt = s%cdt_diag / REAL(s%ncsteps_factor)
+  init_ncsteps_factor = 2 ** ukca_config%i_chem_timestep_halvings
+  init_ncsteps = init_ncsteps_factor
+  init_cdt_diag = REAL(ukca_config%chem_timestep)
+  init_cdt = init_cdt_diag / REAL(init_ncsteps_factor)
 
 ELSE IF (ukca_config%ukca_int_method == int_method_impact) THEN
 
   ! IMPACT solver use about 15 or 10 minutes, depending on dynamical timestep
   IF (timestep < tslimit) THEN
-    s%ncsteps_factor = 1
+    init_ncsteps_factor = 1
   ELSE
-    s%ncsteps_factor = 2
+    init_ncsteps_factor = 2
   END IF
-  s%interval = 1
-  s%ncsteps = s%ncsteps_factor
-  s%cdt = REAL(timestep) / REAL(s%ncsteps_factor)
-  s%cdt_diag = s%cdt
+  init_interval = 1
+  init_ncsteps = init_ncsteps_factor
+  init_cdt = REAL(timestep) / REAL(init_ncsteps_factor)
+  init_cdt_diag = init_cdt
 
 ELSE IF (ukca_config%ukca_int_method == int_method_be_explicit) THEN
 
   ! Explicit Backward-Euler solver
-  ! solver s%interval derived from namelist value of chemical timestep
-  s%interval = ukca_config%chem_timestep/timestep
-  s%cdt = REAL(ukca_config%chem_timestep)
-  s%cdt_diag = s%cdt
-  s%ncsteps = 1
-  s%ncsteps_factor = 1
+  ! solver interval derived from namelist value of chemical timestep
+  init_interval = ukca_config%chem_timestep/timestep
+  init_cdt = REAL(ukca_config%chem_timestep)
+  init_cdt_diag = init_cdt
+  init_ncsteps = 1
+  init_ncsteps_factor = 1
 
 ELSE
 
   ! Unknown solver type
-  WRITE(cmessage, '(A,I0,A)') 'Type of solver (ukca_int_method = ',            &
+  WRITE(cmessage, '(A,I0,A)') 'Type of solver (ukca_int_method = ',          &
     ukca_config%ukca_int_method,') not recognised.'
   errcode = 2
   CALL ereport('UKCA_INIT',errcode,cmessage)
@@ -196,29 +198,28 @@ ELSE
 END IF
 
 IF (printstatus >= prstatus_oper) THEN
-  WRITE(umMessage,'(A40,I6)') 'Interval for chemical solver set to: ',         &
-                              s%interval
+  WRITE(umMessage,'(A40,I6)') 'Interval for chemical solver set to: ',       &
+                              init_interval
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A40,E12.4)') 'Timestep for chemical solver set to: ', s%cdt
+  WRITE(umMessage,'(A40,E12.4)') 'Timestep for chemical solver set to: ',    &
+                                 init_cdt
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A40,I6)') 'No. steps for chemical solver set to: ',        &
-                              s%ncsteps
+  WRITE(umMessage,'(A40,I6)') 'No. steps for chemical solver set to: ',      &
+                              init_ncsteps
   CALL umPrint(umMessage,src='ukca_init')
 END IF
 
-! Verify that the s%interval and timestep values have been set correctly
-IF (ABS(s%cdt*s%ncsteps - REAL(timestep*s%interval)) > 1e-4) THEN
+! Verify that the interval and timestep values have been set correctly
+IF (ABS(init_cdt*init_ncsteps - REAL(timestep*init_interval)) > 1e-4) THEN
   cmessage=' chemical timestep does not fit dynamical timestep'
   WRITE(umMessage,'(A)') cmessage
   CALL umPrint(umMessage,src='ukca_init')
-  WRITE(umMessage,'(A,I6,A,I6)') ' timestep: ',timestep,' s%interval: ',       &
-                                 s%interval
+  WRITE(umMessage,'(A,I6,A,I6)') ' timestep: ',timestep,' interval: ',  &
+                                 init_interval
   CALL umPrint(umMessage,src='ukca_init')
   errcode = ukca_config%chem_timestep
   CALL ereport('UKCA_INIT',errcode,cmessage)
 END IF
-
-!$OMP END PARALLEL
 
 IF (ukca_config%l_ukca_mode) THEN
   ! Call appropriate MODE setup routine
@@ -370,7 +371,7 @@ USE ukca_config_specification_mod, ONLY:                                       &
                                  i_du_2mode,                                   &
                                  bl_tracer_mix
 
-USE asad_mod,              ONLY: nrsteps_max
+USE asad_mod,              ONLY: nrsteps_max, s=>asad_state
 
 USE umPrintMgr,            ONLY: PrStatus_Normal,PrintStatus,newline,          &
                                  umPrint

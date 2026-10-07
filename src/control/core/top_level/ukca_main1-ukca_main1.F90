@@ -948,14 +948,14 @@ IF (l_first_call) THEN
     IF (ukca_config%ukca_int_method == int_method_nr .OR.                      &
         ukca_config%ukca_int_method == int_method_be_explicit) THEN
       ! s%interval can be greater than 1 for BE explicit and N-R solvers
-      IF (s%interval == imdi) icode = 101
+      IF (s(1)%interval == imdi) icode = 101
     ELSE
-      ! only allowed to use s%interval = 1 for other solvers
-      IF (s%interval == imdi .OR. s%interval /= 1) icode = 102
+      ! only allowed to use s(1)%interval = 1 for other solvers
+      IF (s(1)%interval == imdi .OR. s(1)%interval /= 1) icode = 102
     END IF
     IF (icode > 0) THEN
-      cmessage = 'Error for solver s%interval'
-      WRITE(umMessage,'(A40,A12,I6)') cmessage,' Interval: ',s%interval
+      cmessage = 'Error for solver s(1)%interval'
+      WRITE(umMessage,'(A40,A12,I6)') cmessage,' Interval: ',s(1)%interval
       CALL umPrint(umMessage,src=RoutineName)
       CALL ereport(RoutineName, icode, cmessage)
     END IF
@@ -970,11 +970,11 @@ END IF
 
 ! decide whether to do chemistry and/or aerosol
 IF ( ukca_config%l_ukca_chem ) THEN
-  do_chemistry = (MOD(timestep_number, s%interval) == 0)
+  do_chemistry = (MOD(timestep_number, s(1)%interval) == 0)
   do_aerosol = (do_chemistry .AND. ukca_config%l_ukca_mode)
 ELSE
   do_chemistry = .FALSE.
-  do_aerosol = ((MOD(timestep_number, s%interval) == 0) .AND.                  &
+  do_aerosol = ((MOD(timestep_number, s(1)%interval) == 0) .AND.                  &
                  ukca_config%l_ukca_mode)
 END IF
 

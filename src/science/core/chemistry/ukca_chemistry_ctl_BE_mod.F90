@@ -294,7 +294,7 @@ DO k=1,k_be_top
     zfcloud(:) = 0.0
   END IF
 
-  ! Convert mmr into vmr for tracers and set s%f array
+  ! Convert mmr into vmr for tracers and set s(1)%f array
   DO js=1,jpctr
     zftr(:,js) = tracer(kcs:kce,js)/c_species(js)
   END DO
@@ -311,9 +311,9 @@ DO k=1,k_be_top
   CALL ukca_be_drydep(k, theta_field_size, nlev_with_ddep2, zdryrt2, zdryrt)
 
   ! Fill the asad arrays for wet and dry deposition diagnostics
-  IF ( ndepw /= 0 ) CALL ukca_wetdep(s, wetrt(:,k,:), theta_field_size)
+  IF ( ndepw /= 0 ) CALL ukca_wetdep(s(1), wetrt(:,k,:), theta_field_size)
 
-  IF ( ndepd /= 0 ) CALL ukca_drydep(s, k, zdryrt2, theta_field_size)
+  IF ( ndepd /= 0 ) CALL ukca_drydep(s(1), k, zdryrt2, theta_field_size)
 
 
   ! Calculate reaction rate coefficients (rc)
@@ -323,12 +323,12 @@ DO k=1,k_be_top
 
   ! Convert tracers to concentration
   DO js=1,jpctr
-    s%f(:,js) = zftr(:,js) * s%tnd(:)
+    s(1)%f(:,js) = zftr(:,js) * s(1)%tnd(:)
   END DO
 
-  ! Initialise s%y array, including the offline oxidants
+  ! Initialise s(1)%y array, including the offline oxidants
   jit = 0
-  CALL asad_ftoy(s, ofirst, nitfg, jit, theta_field_size, ix, jy, k)
+  CALL asad_ftoy(s(1), ofirst, nitfg, jit, theta_field_size, ix, jy, k)
 
   !  Call Backward Euler solver
   !   N.B. Emissions already added, via call to TR_MIX from UKCA_EMISSION_CTL
@@ -338,20 +338,20 @@ DO k=1,k_be_top
            l_asad_use_wetdep .OR. l_asad_use_drydep))
 
   ! Store H2SO4 tracer if it will be updated in MODE using delh2so4_chem
-  IF (uph2so4inaer == 1) ystore(:) = s%y(:,nn_h2so4)
+  IF (uph2so4inaer == 1) ystore(:) = s(1)%y(:,nn_h2so4)
 
-  CALL ukca_deriv_offline(nr, n_be_calls, theta_field_size, dts, s%y, zdryrt,  &
+  CALL ukca_deriv_offline(nr, n_be_calls, theta_field_size, dts, s(1)%y, zdryrt,  &
                           zwetrt, so2_wetox_h2o2, so2_wetox_o3, so2_dryox_oh,  &
                           lflux, dflux)
 
   ! Restore H2SO4 tracer as it will be updated in MODE using delh2so4_chem
-  IF (uph2so4inaer == 1) s%y(:,nn_h2so4) = ystore(:)
+  IF (uph2so4inaer == 1) s(1)%y(:,nn_h2so4) = ystore(:)
 
   ! Retrieve tracer concentrations
   DO j = 1,jpctr
     DO i = 1,jpspec
       IF (advt(j) == speci(i)) THEN
-        tracer(kcs:kce,j) = s%y(:,i)/s%tnd(:)*c_species(j)
+        tracer(kcs:kce,j) = s(1)%y(:,i)/s(1)%tnd(:)*c_species(j)
         EXIT
       END IF
     END DO
@@ -361,23 +361,23 @@ DO k=1,k_be_top
   delso2_wet_h2o2(kcs:kce) = so2_wetox_h2o2(:)
   delso2_wet_o3(kcs:kce)   = so2_wetox_o3(:)
   delh2so4_chem(kcs:kce)   = so2_dryox_oh(:)
-  delso2_drydep(kcs:kce)   = zdryrt(:,nn_so2)*s%y(:,nn_so2)*dts
-  delso2_wetdep(kcs:kce)   = zwetrt(:,nn_so2)*s%y(:,nn_so2)*dts
+  delso2_drydep(kcs:kce)   = zdryrt(:,nn_so2)*s(1)%y(:,nn_so2)*dts
+  delso2_wetdep(kcs:kce)   = zwetrt(:,nn_so2)*s(1)%y(:,nn_so2)*dts
 
-  ! Fill the s%prk array from the flux array
+  ! Fill the s(1)%prk array from the flux array
   IF (lflux) THEN
     DO i = 1,jpbk
-      s%prk(:,ibimol(i)) = dflux(:,i)
+      s(1)%prk(:,ibimol(i)) = dflux(:,i)
     END DO
 
     j = jpbk
     DO i = 1,jptk
-      s%prk(:,itrimol(i)) = dflux(:,i+j)
+      s(1)%prk(:,itrimol(i)) = dflux(:,i+j)
     END DO
 
     j = jpbk + jptk
     DO i = 1,jphk
-      s%prk(:,ihetero(i)) = dflux(:,i+j)
+      s(1)%prk(:,ihetero(i)) = dflux(:,i+j)
     END DO
 
     ! 3D flux diagnostics
@@ -462,21 +462,21 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 ! Copy pressure, temperature and water vapour into module variables
 npnts = theta_field_size
 
-s%p(1:npnts) = zp(1:npnts)
-s%t(1:npnts) = zt(1:npnts)
-s%wp(1:npnts) = zq(1:npnts)
+s(1)%p(1:npnts) = zp(1:npnts)
+s(1)%t(1:npnts) = zt(1:npnts)
+s(1)%wp(1:npnts) = zq(1:npnts)
 
 ! Calculate total number density (tnd)
 
-CALL asad_totnud(s, npnts)
+CALL asad_totnud(s(1), npnts)
 
 ! Calculate rate coefficients
 
-CALL asad_bimol(s, npnts)
+CALL asad_bimol(s(1), npnts)
 
-CALL asad_trimol(s, npnts)
+CALL asad_trimol(s(1), npnts)
 
-CALL asad_hetero(s, npnts, zfcloud, zclw, dummy, H_plus_1d_arr)
+CALL asad_hetero(s(1), npnts, zfcloud, zclw, dummy, H_plus_1d_arr)
 
 IF (first) THEN
 
@@ -578,21 +578,21 @@ IF (first) THEN
 
 END IF     ! first
 
-! Fill the backward-Euler rate coefficient array from s%rk, using the
+! Fill the backward-Euler rate coefficient array from s(1)%rk, using the
 !  addressing arrays
 
 DO i = 1,jpbk
-  rc(:,i) = s%rk(:,ibimol(i))
+  rc(:,i) = s(1)%rk(:,ibimol(i))
 END DO
 
 j = jpbk
 DO i = 1,jptk
-  rc(:,i+j) = s%rk(:,itrimol(i))
+  rc(:,i+j) = s(1)%rk(:,itrimol(i))
 END DO
 
 j = jpbk + jptk
 DO i = 1,jphk
-  rc(:,i+j) = s%rk(:,ihetero(i))
+  rc(:,i+j) = s(1)%rk(:,ihetero(i))
 END DO
 
 IF (first .AND. ANY(ABS(rc - rmdi) < EPSILON(0.0))) THEN

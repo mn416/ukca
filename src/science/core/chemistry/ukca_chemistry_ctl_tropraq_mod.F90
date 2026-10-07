@@ -108,6 +108,7 @@ USE ukca_deriv_mod,       ONLY: ukca_deriv
 USE ukca_deriv_aero_mod,  ONLY: ukca_deriv_aero
 USE ukca_deriv_raq_mod,   ONLY: ukca_deriv_raq
 USE ukca_fracdiss_mod,    ONLY: ukca_fracdiss
+!$ USE omp_lib
 
 IMPLICIT NONE
 
@@ -257,6 +258,8 @@ REAL :: ntp_data(tot_n_pnts,dim_ntp)
 ! 1-D masks for troposphere and NAT height limitation
 LOGICAL :: stratflag(theta_field_size)
 
+INTEGER :: t ! Team/thread id
+
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -319,7 +322,7 @@ END DO
 !$OMP         errcode, jna, jro2, jspf, k, kcs, kce, k_dms, l,                 &
 !$OMP         SO2_dryox_OH, SO2_wetox_H2O2, SO2_wetox_O3,                      &
 !$OMP         stratflag, ystore,                                               &
-!$OMP         zfnatr, zftr)                                                    &
+!$OMP         zfnatr, zftr, t)                                                 &
 !$OMP SHARED(advt, avogadro, biogenic, boltzmann, c_species, c_na_species,     &
 !$OMP        cloud_frac, delh2so4_chem, delSO2_drydep, delSO2_wet_H2O2,        &
 !$OMP        delSO2_wet_O3, delSO2_wetdep, dry_dep_3d, dts, speci,             &
@@ -335,10 +338,13 @@ END DO
 !$OMP        so4_aitken, soot_aged, soot_fresh, strat_ch4_mol, strat_ch4loss,  &
 !$OMP        temp, theta_field_size, tracer, trop_ch4_mol,                     &
 !$OMP        trop_o3_mol, trop_oh_mol, uph2so4inaer, volume, wet_dep_3d,       &
-!$OMP        zdryrt, zfrdiss, zwetrt, H_plus, cmessage)
+!$OMP        zdryrt, zfrdiss, zwetrt, H_plus, cmessage, s)
 
 IF (.NOT. ALLOCATED(ystore) .AND. uph2so4inaer == 1)                           &
                              ALLOCATE(ystore(theta_field_size))
+
+t = 1
+!$ t = omp_get_thread_num()+1
 
 !$OMP DO SCHEDULE(DYNAMIC)
 DO k=1,model_levels
@@ -351,9 +357,9 @@ DO k=1,model_levels
   ! Copy water vapour and ice field into 1-D arrays
   IF (ukca_config%l_ukca_het_psc) THEN
     IF (k <= model_levels) THEN
-      s%sph2o(:) = qcf(kcs:kce)/c_h2o
+      s(t)%sph2o(:) = qcf(kcs:kce)/c_h2o
     ELSE
-      s%sph2o(:) = 0.0
+      s(t)%sph2o(:) = 0.0
     END IF
   END IF
 

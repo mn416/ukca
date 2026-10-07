@@ -1466,6 +1466,7 @@ SUBROUTINE asad_chemical_diagnostics(row_length, rows, model_levels,           &
 
 USE ukca_config_constants_mod, ONLY: avogadro
 USE ukca_config_specification_mod, ONLY: ukca_config
+!$ USE omp_lib
 
 IMPLICIT NONE
 
@@ -1497,6 +1498,7 @@ REAL(KIND=jprb)               :: zhook_handle
 
 CHARACTER(LEN=errormessagelength) :: cmessage
 INTEGER                           :: errcode
+INTEGER                           :: t ! Team/thread id
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_CHEMICAL_DIAGNOSTICS'
 
@@ -1637,13 +1639,15 @@ ELSE IF (ukca_config%l_ukca_asad_columns) THEN
 ELSE
   ! Go through and pick up fluxes from ASAD arrays
   ! prk is in units of molecules.cm^-3.s^-1
+  t = 1
+  !$ t = omp_get_thread_num()+1
   DO l=1,n_chemdiags
     ! in this case ASAD is being called horizontally so we need
     ! to fill %throughput by iterating over Z
     SELECT CASE (asad_chemdiags(l)%diag_type)
     CASE (cdrxn)
       asad_chemdiags(l)%throughput(:,:,klevel) =                               &
-           RESHAPE(s%prk(:,asad_chemdiags(l)%location),                        &
+           RESHAPE(s(t)%prk(:,asad_chemdiags(l)%location),                     &
            [row_length,rows])*volume(:,:,klevel)*convfac
       IF (asad_chemdiags(l)%tropospheric_mask) THEN
         WHERE (L_stratosphere(:,:,klevel))
@@ -1657,9 +1661,9 @@ ELSE
              SIZE(asad_chemdiags(l)%throughput(:,:,:),DIM=3)) THEN
            ! if 2D then only take lowest level, otherwise will be 3D
           asad_chemdiags(l)%throughput(:,:,klevel)=                            &
-               RESHAPE(s%dpd(:,asad_chemdiags(l)%location),                    &
+               RESHAPE(s(t)%dpd(:,asad_chemdiags(l)%location),                 &
                        [row_length,rows])*                                     &
-               RESHAPE(s%y(:,asad_chemdiags(l)%location),                      &
+               RESHAPE(s(t)%y(:,asad_chemdiags(l)%location),                   &
                        [row_length,rows])*                                     &
                volume(:,:,klevel)*convfac
           IF (asad_chemdiags(l)%tropospheric_mask) THEN
@@ -1671,9 +1675,9 @@ ELSE
         ! Not needed (?)
       CASE (cdwet) ! WET DEP
         asad_chemdiags(l)%throughput(:,:,klevel)=                              &
-             RESHAPE(s%dpw(:,asad_chemdiags(l)%location),                      &
+             RESHAPE(s(t)%dpw(:,asad_chemdiags(l)%location),                   &
                      [row_length,rows])*                                       &
-             RESHAPE(s%y(:,asad_chemdiags(l)%location),                        &
+             RESHAPE(s(t)%y(:,asad_chemdiags(l)%location),                     &
                      [row_length,rows])*                                       &
              volume(:,:,klevel)*convfac
         ! Not needed (?)
@@ -2135,6 +2139,7 @@ SUBROUTINE asad_psc_diagnostic(row_length, rows, model_levels, chunk_size,     &
                                fpsc1_full, fpsc2_full, ix, jy, klevel, ierr)
 
 USE ukca_config_specification_mod, ONLY: ukca_config
+!$ USE omp_lib
 IMPLICIT NONE
 
 
@@ -2157,6 +2162,7 @@ REAL(KIND=jprb)               :: zhook_handle
 
 CHARACTER(LEN=errormessagelength) :: cmessage
 INTEGER                           :: errcode
+INTEGER :: t
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_PSC_DIAGNOSTIC'
 
@@ -2234,6 +2240,8 @@ ELSE IF (ukca_config%l_ukca_asad_columns) THEN
     END SELECT
   END DO
 ELSE
+  t = 1
+  !$ t = omp_get_thread_num()+1
   DO l=1,n_chemdiags
     ! in this case ASAD is being called horizontally so we need
     ! to fill %throughput by iterating over Z
@@ -2242,7 +2250,7 @@ ELSE
       SELECT CASE (asad_chemdiags(l)%rxn_type)
       CASE (cdpsc_typ1)
         asad_chemdiags(l)%throughput(:,:,klevel) =                             &
-             RESHAPE(s%fpsc1(:),[row_length,rows])
+             RESHAPE(s(t)%fpsc1(:),[row_length,rows])
         IF (asad_chemdiags(l)%tropospheric_mask) THEN
           WHERE (L_stratosphere(:,:,klevel))
             asad_chemdiags(l)%throughput(:,:,klevel) = 0.0
@@ -2250,7 +2258,7 @@ ELSE
         END IF
       CASE (cdpsc_typ2)
         asad_chemdiags(l)%throughput(:,:,klevel) =                             &
-             RESHAPE(s%fpsc2(:),[row_length,rows])
+             RESHAPE(s(t)%fpsc2(:),[row_length,rows])
         IF (asad_chemdiags(l)%tropospheric_mask) THEN
           WHERE (L_stratosphere(:,:,klevel))
             asad_chemdiags(l)%throughput(:,:,klevel) = 0.0

@@ -94,6 +94,7 @@ USE ereport_mod,          ONLY: ereport
 USE umPrintMgr,           ONLY: umMessage, umPrint
 USE ukca_missing_data_mod, ONLY: rmdi
 USE errormessagelength_mod, ONLY: errormessagelength
+!$ USE omp_lib
 
 IMPLICIT NONE
 
@@ -209,6 +210,8 @@ REAL :: rc_het(theta_field_size,2)      ! heterog rates for trop chem
 ! Full ntp array
 REAL :: ntp_data(tot_n_pnts,dim_ntp)
 
+INTEGER :: t ! Thread/team id
+
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -246,7 +249,7 @@ CALL asad_cdrive_init()
 
 !$OMP PARALLEL DEFAULT(NONE)                                                   &
 !$OMP PRIVATE(ddmask, errcode, ierr, jna, jro2, js, jspf, jtr, k, kcs, kce, l, &
-!$OMP         rc_het, ystore, zdryrt2, zftr, zprt1d, zq, co2_1d)               &
+!$OMP         rc_het, ystore, zdryrt2, zftr, zprt1d, zq, co2_1d, t)            &
 !$OMP SHARED(advt, atm_cf2cl2_mol, atm_cfcl3_mol, atm_ch4_mol,                 &
 !$OMP        atm_co_mol, atm_h2_mol, atm_mebr_mol, atm_n2o_mol, avogadro,      &
 !$OMP        c_species, c_na_species, cloud_frac, cmessage,                    &
@@ -269,7 +272,10 @@ CALL asad_cdrive_init()
 !$OMP        shno3_3d, so4_sa,                                                 &
 !$OMP        temp, theta_field_size, tracer,                                   &
 !$OMP        uph2so4inaer, volume,                                             &
-!$OMP        zdryrt, zwetrt)
+!$OMP        zdryrt, zwetrt, s)
+
+t = 1
+!$ t = omp_get_thread_num()+1
 
 IF (.NOT. ALLOCATED(ystore) .AND. uph2so4inaer == 1)                           &
                              ALLOCATE(ystore(theta_field_size))
@@ -285,9 +291,9 @@ DO k=1,model_levels
   ! Copy water vapour and ice field into 1-D arrays
   IF (ukca_config%l_ukca_het_psc) THEN
     IF (k <= model_levels) THEN
-      s%sph2o(:) = qcf(kcs:kce)/c_h2o
+      s(t)%sph2o(:) = qcf(kcs:kce)/c_h2o
     ELSE
-      s%sph2o(:) = 0.0
+      s(t)%sph2o(:) = 0.0
     END IF
   END IF
 
@@ -416,7 +422,7 @@ DO k=1,model_levels
     rc_het(:,:) = 0.0
   END IF
 
-  s%za(:) = so4_sa(kcs:kce)
+  s(t)%za(:) = so4_sa(kcs:kce)
 
   IF (uph2so4inaer == 1) THEN
     ! H2SO4 will be updated in MODE, so store old value here
@@ -424,11 +430,11 @@ DO k=1,model_levels
        ! primary array passed is zftr, so save this, NOT s%y
       ystore(:) = zftr(:,istore_h2so4)
     ELSE
-      ystore(:) = s%y(:,nn_h2so4)
+      ystore(:) = s(t)%y(:,nn_h2so4)
     END IF
   END IF
 
-  CALL asad_cdrive(s,                                                          &
+  CALL asad_cdrive(s(t),                                                       &
                    zftr,                                                       &
                    pres(kcs:kce),                                              &
                    temp(kcs:kce),                                              &
@@ -448,9 +454,9 @@ DO k=1,model_levels
 
   IF (ukca_config%l_ukca_het_psc) THEN
     ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
-    ! Note that s%sphno3 is NAT in number density of HNO3.
-    IF (ANY(s%sphno3(1:theta_field_size) > 0.0)) THEN
-      shno3_3d(kcs:kce) = s%sphno3(:)/s%tnd(:)*c_hono2
+    ! Note that s(t)%sphno3 is NAT in number density of HNO3.
+    IF (ANY(s(t)%sphno3(1:theta_field_size) > 0.0)) THEN
+      shno3_3d(kcs:kce) = s(t)%sphno3(:)/s(t)%tnd(:)*c_hono2
     ELSE
       shno3_3d(kcs:kce) = 0.0
     END IF
@@ -460,26 +466,26 @@ DO k=1,model_levels
     ! Calculate chemical fluxes for MODE
     IF (ihso3_h2o2 > 0) THEN
       delSO2_wet_H2O2(kcs:kce) = delSO2_wet_H2O2(kcs:kce) +                    &
-        s%rk(:,ihso3_h2o2)*s%y(:,nn_so2)*s%y(:,nn_h2o2)*s%cdt_diag
+        s(t)%rk(:,ihso3_h2o2)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_h2o2)*s(t)%cdt_diag
     END IF
     IF (ihso3_o3 > 0) THEN
       delSO2_wet_O3(kcs:kce) = delSO2_wet_O3(kcs:kce) +                        &
-        s%rk(:,ihso3_o3)*s%y(:,nn_so2)*s%y(:,nn_o3)*s%cdt_diag
+        s(t)%rk(:,ihso3_o3)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_o3)*s(t)%cdt_diag
     END IF
     IF (iso3_o3 > 0) THEN
       delSO2_wet_O3(kcs:kce) = delSO2_wet_O3(kcs:kce) +                        &
-        s%rk(:,iso3_o3)*s%y(:,nn_so2)*s%y(:,nn_o3)*s%cdt_diag
+        s(t)%rk(:,iso3_o3)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_o3)*s(t)%cdt_diag
     END IF
     ! net H2SO4 production - note that this is affected by
     ! l_fix_ukca_h2so4_ystore above. Y value is concentration
     ! from chemistry prior to zftr being over-written below
     IF (iso2_oh > 0 .AND. ih2so4_hv > 0) THEN
       delh2so4_chem(kcs:kce) = delh2so4_chem(kcs:kce) +                        &
-       (s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh) -                           &
-        s%rk(:,ih2so4_hv)*s%y(:,nn_h2so4))*s%cdt_diag
+       (s(t)%rk(:,iso2_oh)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_oh) -                  &
+        s(t)%rk(:,ih2so4_hv)*s(t)%y(:,nn_h2so4))*s(t)%cdt_diag
     ELSE IF (iso2_oh > 0) THEN
       delh2so4_chem(kcs:kce) = delh2so4_chem(kcs:kce) +                        &
-       s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh)*s%cdt_diag
+       s(t)%rk(:,iso2_oh)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_oh)*s(t)%cdt_diag
     END IF
 
     IF (uph2so4inaer == 1) THEN
@@ -489,11 +495,12 @@ DO k=1,model_levels
         ! calculate delh2so4_chem as the difference in H2SO4 over chemistry
         ! zftr is already in VMR, so divide by diagnostic chemistry timestep to
         ! give as vmr/s
-        delh2so4_chem(kcs:kce) = (zftr(:,istore_h2so4) - ystore(:)) / s%cdt_diag
+        delh2so4_chem(kcs:kce) = (zftr(:,istore_h2so4) - ystore(:)) /          &
+                                  s(t)%cdt_diag
         ! primary array passed is zftr, so copy back to this, NOT s%y
         zftr(:,istore_h2so4) = ystore(:)
       ELSE
-        s%y(:,nn_h2so4) = ystore(:)
+        s(t)%y(:,nn_h2so4) = ystore(:)
       END IF
     END IF
   END IF
@@ -545,13 +552,13 @@ DO k=1,model_levels
   ! O1D mmr
   IF (O1D_in_ss) THEN
     l = name2ntpindex('O(1D)     ')
-    ntp_data(kcs:kce,l) = s%y(:,nn_o1d)/s%tnd(:)*c_o1d
+    ntp_data(kcs:kce,l) = s(t)%y(:,nn_o1d)/s(t)%tnd(:)*c_o1d
   END IF
 
   ! O3P mmr
   IF (O3P_in_ss) THEN
     l = name2ntpindex('O(3P)     ')
-    ntp_data(kcs:kce,l) = s%y(:,nn_o3p)/s%tnd(:)*c_o3p
+    ntp_data(kcs:kce,l) = s(t)%y(:,nn_o3p)/s(t)%tnd(:)*c_o3p
   END IF
 
   ! First copy the concentrations from the zftr array to the
@@ -563,7 +570,7 @@ DO k=1,model_levels
 
     IF (n_ch4 > 0) THEN
       IF (specf(jspf) == advt(n_ch4)) THEN
-        atm_ch4_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*          &
+        atm_ch4_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*       &
                                1.0e6/avogadro
       END IF
     END IF
@@ -571,7 +578,7 @@ DO k=1,model_levels
     ! CO
     IF (n_co > 0) THEN
       IF (specf(jspf) == advt(n_co)) THEN
-        atm_co_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*           &
+        atm_co_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*        &
                               1.0e6/avogadro
       END IF
     END IF
@@ -579,7 +586,7 @@ DO k=1,model_levels
     ! N2O
     IF (n_n2o > 0) THEN
       IF (specf(jspf) == advt(n_n2o)) THEN
-        atm_n2o_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*          &
+        atm_n2o_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*       &
                                1.0e6/avogadro
       END IF
     END IF
@@ -587,7 +594,7 @@ DO k=1,model_levels
     ! CFC-12
     IF (n_cf2cl2 > 0) THEN
       IF (specf(jspf) == advt(n_cf2cl2)) THEN
-        atm_cf2cl2_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*       &
+        atm_cf2cl2_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*    &
                                   1.0e6/avogadro
       END IF
     END IF
@@ -595,7 +602,7 @@ DO k=1,model_levels
     ! CFC-11
     IF (n_cfcl3 > 0) THEN
       IF (specf(jspf) == advt(n_cfcl3)) THEN
-        atm_cfcl3_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*        &
+        atm_cfcl3_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*     &
                                  1.0e6/avogadro
       END IF
     END IF
@@ -603,7 +610,7 @@ DO k=1,model_levels
     ! CH3Br
     IF (n_mebr > 0) THEN
       IF (specf(jspf) == advt(n_mebr)) THEN
-        atm_mebr_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*         &
+        atm_mebr_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*      &
                                 1.0e6/avogadro
       END IF
     END IF
@@ -611,7 +618,7 @@ DO k=1,model_levels
     ! H2
     IF (n_h2 > 0) THEN
       IF (specf(jspf) == advt(n_h2)) THEN
-        atm_h2_mol(kcs:kce) = zftr(:,jspf)*s%tnd(:)*volume(kcs:kce)*           &
+        atm_h2_mol(kcs:kce) = zftr(:,jspf)*s(t)%tnd(:)*volume(kcs:kce)*        &
                               1.0e6/avogadro
       END IF
     END IF

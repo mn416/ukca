@@ -99,6 +99,7 @@ USE ukca_missing_data_mod, ONLY: rmdi
 USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_cdrive_mod, ONLY: asad_cdrive, asad_cdrive_init
+!$ USE omp_lib
 
 !!!! Note: LFRIC-specific pre-processor directives used in this module are
 !!!! inappropriate in UKCA and should be removed but must be retained while
@@ -232,6 +233,8 @@ LOGICAL :: l_autotune_local
 LOGICAL :: stratflag(model_levels)
 LOGICAL :: have_nat1d(model_levels)
 
+INTEGER :: t ! Thread/team id
+
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -289,7 +292,7 @@ CALL asad_cdrive_init()
 !$OMP         zp, zprt1d, zq, zt, co2_1d, zwetrt2,                             &
 !$OMP         kcs, kce, chunk_size, dpd_full, dpw_full,                        &
 !$OMP         fpsc1_full, fpsc2_full, prk_full, y_full, jspf, jna,             &
-!$OMP         H_plus_1d_arr)                                                   &
+!$OMP         H_plus_1d_arr, t)                                                &
 !$OMP SHARED(advt, all_ntp, atm_cf2cl2_mol, atm_cfcl3_mol, atm_ch4_mol,        &
 !$OMP        atm_co_mol, atm_h2_mol, atm_mebr_mol, atm_n2o_mol, avogadro,      &
 !$OMP        c_species, c_na_species, cloud_frac,                              &
@@ -308,7 +311,10 @@ CALL asad_cdrive_init()
 !$OMP        o1d_in_ss, o3p_in_ss, photol_rates, pres, q, qcf, qcl,            &
 !$OMP        row_length, rows, so4_sa, shno3_3d,                               &
 !$OMP        temp, tracer, uph2so4inaer, volume, zdryrt, zwetrt,               &
-!$OMP        H_plus_3d_arr)
+!$OMP        H_plus_3d_arr, s)
+
+t = 1
+!$ t = omp_get_thread_num()+1
 
 IF (.NOT. ALLOCATED(ystore) .AND. uph2so4inaer == 1)                           &
                              ALLOCATE(ystore(model_levels))
@@ -317,7 +323,7 @@ IF (.NOT. ALLOCATED(ystore) .AND. uph2so4inaer == 1)                           &
 ! the previous call. Since this routine allocates THREADPRIVATE arrays,
 ! we need to reallocate inside the parallel region.
 IF (l_autotune_local) THEN
-  CALL ukca_reallocate_asad_arrays(ukca_config%ukca_chem_seg_size)
+  CALL ukca_reallocate_asad_arrays(ukca_config%ukca_chem_seg_size, s(t))
 END IF
 
 !$OMP DO SCHEDULE(STATIC)
@@ -482,31 +488,31 @@ DO i=1,rows
         ! For unequal chunk sizes, reallocate arrays
         ! to ensure array conformance
         IF (chunk_size /= ukca_config%ukca_chem_seg_size) THEN
-          CALL ukca_reallocate_asad_arrays(chunk_size)
+          CALL ukca_reallocate_asad_arrays(chunk_size, s(t))
         END IF
 
         IF (uph2so4inaer == 1) THEN
           ! H2SO4 will be updated in MODE, so store old value here
           IF (ukca_config%l_fix_ukca_h2so4_ystore) THEN
-            ! primary array passed is zftr, so save this, NOT s%y
+            ! primary array passed is zftr, so save this, NOT s(t)%y
             ystore(kcs:kce) = zftr(kcs:kce,istore_h2so4)
           ELSE
-            ystore(kcs:kce) = s%y(1:chunk_size,nn_h2so4)
+            ystore(kcs:kce) = s(t)%y(1:chunk_size,nn_h2so4)
           END IF
         END IF
 
-        ! Initialise s%za for current chunk, following reallocation
-        s%za(:)=0.0
-        s%za(1:chunk_size) = so4_sa(j,i,kcs:kce)
+        ! Initialise s(t)%za for current chunk, following reallocation
+        s(t)%za(:)=0.0
+        s(t)%za(1:chunk_size) = so4_sa(j,i,kcs:kce)
 
-        ! Initialise s%sph2o for current chunk
-        s%sph2o(:) = 0.0
+        ! Initialise s(t)%sph2o for current chunk
+        s(t)%sph2o(:) = 0.0
         IF (ukca_config%l_ukca_het_psc) THEN
-          s%sph2o(1:chunk_size) = qcf(j,i,kcs:kce)/c_h2o
+          s(t)%sph2o(1:chunk_size) = qcf(j,i,kcs:kce)/c_h2o
         END IF
 
         ! Call asad_cdrive with segmented arrays
-        CALL asad_cdrive(s,                                                    &
+        CALL asad_cdrive(s(t),                                                 &
                          zftr(kcs:kce,:),                                      &
                          zp(kcs:kce),                                          &
                          zt(kcs:kce),                                          &
@@ -524,22 +530,22 @@ DO i=1,rows
                          stratflag(kcs:kce),                                   &
                          H_plus_1d_arr(kcs:kce))
 
-        ! Store the full column values of s%dpd, s%dpw, s%fpsc1,
-        ! s%fpsc2, s%prk and s%y - these are needed later on
+        ! Store the full column values of s(t)%dpd, s(t)%dpw, s(t)%fpsc1,
+        ! s(t)%fpsc2, s(t)%prk and s(t)%y - these are needed later on
         ! for the calculation of 3D flux diagnostics
         ! outside the chunking loop
-        dpd_full(kcs:kce,:)=s%dpd(1:chunk_size,:)
-        dpw_full(kcs:kce,:)=s%dpw(1:chunk_size,:)
-        fpsc1_full(kcs:kce)=s%fpsc1(1:chunk_size)
-        fpsc2_full(kcs:kce)=s%fpsc2(1:chunk_size)
-        prk_full(kcs:kce,:)=s%prk(1:chunk_size,:)
-        y_full(kcs:kce,:)=s%y(1:chunk_size,:)
+        dpd_full(kcs:kce,:)=s(t)%dpd(1:chunk_size,:)
+        dpw_full(kcs:kce,:)=s(t)%dpw(1:chunk_size,:)
+        fpsc1_full(kcs:kce)=s(t)%fpsc1(1:chunk_size)
+        fpsc2_full(kcs:kce)=s(t)%fpsc2(1:chunk_size)
+        prk_full(kcs:kce,:)=s(t)%prk(1:chunk_size,:)
+        y_full(kcs:kce,:)=s(t)%y(1:chunk_size,:)
 
         IF (ukca_config%l_ukca_het_psc) THEN
           ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
-          ! Note that s%sphno3 is NAT in number density of HNO3.
-          IF (ANY(s%sphno3(:) > 0.0)) THEN
-            shno3_3d(j,i,kcs:kce) = (s%sphno3(:)/s%tnd(:))*c_hono2
+          ! Note that s(t)%sphno3 is NAT in number density of HNO3.
+          IF (ANY(s(t)%sphno3(:) > 0.0)) THEN
+            shno3_3d(j,i,kcs:kce) = (s(t)%sphno3(:)/s(t)%tnd(:))*c_hono2
           ELSE
             shno3_3d(j,i,kcs:kce) = 0.0
           END IF
@@ -548,24 +554,25 @@ DO i=1,rows
         IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_nr_aqchem) THEN
           ! Calculate chemical fluxes for MODE
           IF (ihso3_h2o2 > 0) delSO2_wet_H2O2(j,i,kcs:kce) =                   &
-            delSO2_wet_H2O2(j,i,kcs:kce) + (s%rk(:,ihso3_h2o2)*                &
-            s%y(:,nn_so2)*s%y(:,nn_h2o2))*s%cdt_diag
+            delSO2_wet_H2O2(j,i,kcs:kce) + (s(t)%rk(:,ihso3_h2o2)*             &
+            s(t)%y(:,nn_so2)*s(t)%y(:,nn_h2o2))*s(t)%cdt_diag
           IF (ihso3_o3 > 0) delSO2_wet_O3(j,i,kcs:kce) =                       &
-            delSO2_wet_O3(j,i,kcs:kce) + (s%rk(:,ihso3_o3)*                    &
-            s%y(:,nn_so2)*s%y(:,nn_o3))*s%cdt_diag
+            delSO2_wet_O3(j,i,kcs:kce) + (s(t)%rk(:,ihso3_o3)*                 &
+            s(t)%y(:,nn_so2)*s(t)%y(:,nn_o3))*s(t)%cdt_diag
           IF (iso3_o3 > 0) delSO2_wet_O3(j,i,kcs:kce) =                        &
-            delSO2_wet_O3(j,i,kcs:kce) + (s%rk(:,iso3_o3)*                     &
-            s%y(:,nn_so2)*s%y(:,nn_o3))*s%cdt_diag
+            delSO2_wet_O3(j,i,kcs:kce) + (s(t)%rk(:,iso3_o3)*                  &
+            s(t)%y(:,nn_so2)*s(t)%y(:,nn_o3))*s(t)%cdt_diag
           ! net H2SO4 production - note that this is affected by
           ! l_fix_ukca_h2so4_ystore above. Y value is concentration
           ! from chemistry prior to zftr being over-written below
           IF (iso2_oh > 0 .AND. ih2so4_hv > 0) THEN
             delh2so4_chem(j,i,kcs:kce) = delh2so4_chem(j,i,kcs:kce) +          &
-             ((s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh)) -                   &
-              (s%rk(:,ih2so4_hv)*s%y(:,nn_h2so4)))*s%cdt_diag
+             ((s(t)%rk(:,iso2_oh)*s(t)%y(:,nn_so2)*s(t)%y(:,nn_oh)) -          &
+              (s(t)%rk(:,ih2so4_hv)*s(t)%y(:,nn_h2so4)))*s(t)%cdt_diag
           ELSE IF (iso2_oh > 0) THEN
             delh2so4_chem(j,i,kcs:kce) = delh2so4_chem(j,i,kcs:kce) +          &
-              (s%rk(:,iso2_oh)*s%y(:,nn_so2)*s%y(:,nn_oh))*s%cdt_diag
+              (s(t)%rk(:,iso2_oh)*s(t)%y(:,nn_so2)*                            &
+               s(t)%y(:,nn_oh))*s(t)%cdt_diag
           END IF
 
           IF (uph2so4inaer == 1) THEN
@@ -577,11 +584,11 @@ DO i=1,rows
               ! zftr is already in VMR, so divide by diagnostic chemistry
               ! timestep to give as vmr/s
               delh2so4_chem(j,i,kcs:kce) = (zftr(kcs:kce,istore_h2so4)         &
-                                             - ystore(kcs:kce)) / s%cdt_diag
-              ! primary array passed is zftr, so copy back to this, NOT s%y
+                                             - ystore(kcs:kce)) / s(t)%cdt_diag
+              ! primary array passed is zftr, so copy back to this, NOT s(t)%y
               zftr(kcs:kce,istore_h2so4) = ystore(kcs:kce)
             ELSE
-              s%y(:,nn_h2so4) = ystore(kcs:kce)
+              s(t)%y(:,nn_h2so4) = ystore(kcs:kce)
             END IF
           END IF
         END IF
@@ -625,13 +632,15 @@ DO i=1,rows
         ! O1D mmr
         IF (o1d_in_ss) THEN
           l = name2ntpindex('O(1D)     ')
-          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s%y(:,nn_o1d)/s%tnd(:) ) * c_o1d
+          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s(t)%y(:,nn_o1d)/s(t)%tnd(:) )   &
+                                            * c_o1d
         END IF
 
         ! O3P mmr
         IF (o3p_in_ss) THEN
           l = name2ntpindex('O(3P)     ')
-          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s%y(:,nn_o3p)/s%tnd(:) ) * c_o3p
+          all_ntp(l)%data_3d(j,i,kcs:kce) = ( s(t)%y(:,nn_o3p)/s(t)%tnd(:) )   &
+                                            * c_o3p
         END IF
 
         ! First copy the concentrations from the zftr array to the
@@ -642,7 +651,7 @@ DO i=1,rows
         DO jspf = 1, jpcspf
           IF (n_ch4 > 0) THEN
             IF (specf(jspf) == advt(n_ch4)) THEN
-              atm_ch4_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*          &
+              atm_ch4_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*       &
                                   volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -650,7 +659,7 @@ DO i=1,rows
           ! CO
           IF (n_co > 0) THEN
             IF (specf(jspf) == advt(n_co)) THEN
-              atm_co_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*           &
+              atm_co_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*        &
                                   volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -658,7 +667,7 @@ DO i=1,rows
           ! N2O
           IF (n_n2o > 0) THEN
             IF (specf(jspf) == advt(n_n2o)) THEN
-              atm_n2o_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*          &
+              atm_n2o_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*       &
                                    volume(j,i,kcs:kce)*1.0e6/avogadro
             END IF
           END IF
@@ -666,7 +675,7 @@ DO i=1,rows
           ! CFC-12
           IF (n_cf2cl2 > 0) THEN
             IF (specf(jspf) == advt(n_cf2cl2)) THEN
-              atm_cf2cl2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*       &
+              atm_cf2cl2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*    &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -674,7 +683,7 @@ DO i=1,rows
           ! CFC-11
           IF (n_cfcl3 > 0) THEN
             IF (specf(jspf) == advt(n_cfcl3)) THEN
-              atm_cfcl3_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*        &
+              atm_cfcl3_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*     &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -682,7 +691,7 @@ DO i=1,rows
           ! CH3Br
           IF (n_mebr > 0) THEN
             IF (specf(jspf) == advt(n_mebr)) THEN
-              atm_mebr_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*         &
+              atm_mebr_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*      &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -690,7 +699,7 @@ DO i=1,rows
           ! H2
           IF (n_h2 > 0) THEN
             IF (specf(jspf) == advt(n_h2)) THEN
-              atm_h2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s%tnd(:)*           &
+              atm_h2_mol(j,i,kcs:kce) = zftr(kcs:kce,jspf)*s(t)%tnd(:)*        &
                                    volume(j,i,kcs:kce)* 1.0e6/avogadro
             END IF
           END IF
@@ -702,7 +711,7 @@ DO i=1,rows
       ! If current chunk size is not equal to ukca_chem_seg_size,
       !reallocate asad arrays ready for next column
       IF (chunk_size /= ukca_config%ukca_chem_seg_size) THEN
-        CALL ukca_reallocate_asad_arrays(ukca_config%ukca_chem_seg_size)
+        CALL ukca_reallocate_asad_arrays(ukca_config%ukca_chem_seg_size, s(t))
       END IF
 
       ! 3D flux diagnostics
@@ -749,15 +758,16 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
 END SUBROUTINE ukca_chemistry_ctl_col
 
-SUBROUTINE ukca_reallocate_asad_arrays(n_pnts)
+SUBROUTINE ukca_reallocate_asad_arrays(n_pnts, s)
 
 USE asad_mod, ONLY: method, spfjsize_max, jpspec, jpcspf, jpnr,                &
-                    s=>asad_state
+                    asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config, int_method_nr
 
 IMPLICIT NONE
 
 INTEGER, INTENT(IN) :: n_pnts
+TYPE(asad_state_type), INTENT(INOUT), TARGET :: s
 
 ! Set integration method (1 = IMPACT; 3 = N-R solver; 5 = Backward-Euler)
 method = ukca_config%ukca_int_method
