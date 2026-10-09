@@ -277,7 +277,7 @@ END SUBROUTINE asad_bimol_init
 
 
 SUBROUTINE asad_bimol( s, n_points, stratflag_opt )
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: specf, spb, ab, peps, nbrkx,                        &
                            jpspb, jpcspf, jpbk, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config

@@ -41,6 +41,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_TOTNUD_MOD'
 CONTAINS
 
 SUBROUTINE asad_totnud(s, n_points)
+!$OMP DECLARE TARGET
 
 USE asad_mod, ONLY: pmin, asad_state_type
 USE ukca_config_constants_mod, ONLY: boltzmann
@@ -64,8 +65,10 @@ REAL(KIND=jprb)               :: zhook_handle
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_TOTNUD'
 
+!$OMP DECLARE TARGET
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
 zb = boltzmann*1.0e6
 
 !       1. Total number density (1e6 converts numbers to /cm**3).

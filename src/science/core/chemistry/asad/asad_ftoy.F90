@@ -189,7 +189,7 @@ END IF
 END SUBROUTINE asad_ftoy_init
 
 SUBROUTINE asad_ftoy(s, ofirst,iter, num_iter, n_points, ix, jy, nlev)
-
+!$OMP DECLARE TARGET
 USE asad_mod,            ONLY: peps, nstst, jpfm, jpif, jpna,                  &
                                moffam, majors, ilstmin, ilft, nodd,            &
                                nlmajmin, madvtr, nlstst, ctype, ftol,          &
@@ -197,9 +197,9 @@ USE asad_mod,            ONLY: peps, nstst, jpfm, jpif, jpna,                  &
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
-USE ereport_mod, ONLY: ereport
-
-USE errormessagelength_mod, ONLY: errormessagelength
+!XXX
+!USE ereport_mod, ONLY: ereport
+!USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_fyfixr_mod, ONLY: asad_fyfixr
 USE asad_fyinit_mod, ONLY: asad_fyinit
@@ -240,7 +240,7 @@ INTEGER       :: itr
 INTEGER       :: icode       ! Error code
 INTEGER       :: iro2        ! Counter for RO2 species
 
-CHARACTER (LEN=errormessagelength) :: cmessage     ! Error message
+!CHARACTER (LEN=errormessagelength) :: cmessage     ! Error message
 INTEGER :: errcode          ! Variable passed to ereport
 
 REAL          :: zthresh
@@ -335,8 +335,8 @@ IF (ofirst .AND. iter < 5) THEN
   iter = 5
 #if !defined(__AMDGCN__) && !defined(__NVPTX__)
   icode = -1
-  cmessage = 'iter too low on first call, resetting to 5'
-  CALL ereport('ASAD_FTOY',icode,cmessage)
+!  cmessage = 'iter too low on first call, resetting to 5'
+!  CALL ereport('ASAD_FTOY',icode,cmessage)
 #endif
 END IF
 

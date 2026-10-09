@@ -38,7 +38,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_PHOTOL_MOD'
 CONTAINS
 
 SUBROUTINE ukca_photol(s,prt,n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: nprkx, jppj, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook

@@ -114,7 +114,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_PRLS_MOD'
 CONTAINS
 
 SUBROUTINE asad_prls( s, kl, knspec, kspec, ldepem )
-
+!$OMP DECLARE TARGET
 USE asad_mod,            ONLY: nuni, nspi, ngrp, nprdx1, nprdx2,               &
                                nprdx3, ntabfp, frpx, nldepx, nnfrp,            &
                                jpspec, jpnr, asad_state_type

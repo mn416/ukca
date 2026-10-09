@@ -455,6 +455,7 @@ END SUBROUTINE setup_spfuljac
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SUBROUTINE spfuljac(s, n_points, cdt, min_pivot, nonzero_map, spfj)
+!$OMP DECLARE TARGET
 !
 !  Routine to calculate the Jacobian in sparse format
 !
@@ -604,7 +605,7 @@ END SUBROUTINE spfuljac
 
 SUBROUTINE splinslv2(n_points, bb, xx, min_pivot, max_val,                     &
                      nonzero_map_unordered, modified_map, spfj)
-
+!$OMP DECLARE TARGET
 USE asad_mod, ONLY: jpcspf, spfjsize_max, total
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
@@ -748,6 +749,7 @@ END SUBROUTINE splinslv2
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SUBROUTINE spresolv2(n_points, bb, xx, min_pivot, modified_map, spfj, max_val)
+!$OMP DECLARE TARGET
 
 ! This subroutine determines x where L U z = P b with P' z = x
 ! The L U factors are supplied to this routine and contained with spfj array.

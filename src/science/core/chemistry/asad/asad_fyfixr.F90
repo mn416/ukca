@@ -56,6 +56,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYFIXR_MOD'
 CONTAINS
 
 SUBROUTINE asad_fyfixr(s, n_points)
+!$OMP DECLARE TARGET
 
 USE asad_mod,       ONLY: nlmajmin, jpif, moffam, madvtr, majors,              &
                           ctype, asad_state_type

@@ -38,7 +38,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_DRYDEP_MOD'
 CONTAINS
 
 SUBROUTINE ukca_drydep(s, nlev, dryrt, n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,       ONLY: ndepd, nldepd, jpdd, asad_state_type
 USE ukca_config_specification_mod,ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim

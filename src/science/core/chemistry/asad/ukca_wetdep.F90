@@ -39,7 +39,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_WETDEP_MOD'
 CONTAINS
 
 SUBROUTINE ukca_wetdep(s,wetrt,n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,         ONLY: ndepw, nldepw, jpdw, asad_state_type
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook

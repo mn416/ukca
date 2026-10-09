@@ -193,7 +193,7 @@ END IF
 END SUBROUTINE asad_hetero_init
 
 SUBROUTINE asad_hetero(s, n_points, cld_f, cld_l, rc_het, H_plus_1d_arr)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
                            iho2_h, in2o5_h, iso3_o3, ihso3_o3, ih2o2_oh,       &
                            ihno3_oh, spb, sph, nbrkx, nhrkx,                   &
@@ -201,7 +201,7 @@ USE asad_mod,        ONLY: ih_o3, ih_h2o2, ih_so2, ih_hno3, ihso3_h2o2,        &
                            jphk, jpdw, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_chem_offline, ONLY: nwet_constant
-USE ukca_fdiss_constant_mod, ONLY: ukca_fdiss_constant
+!USE ukca_fdiss_constant_mod, ONLY: ukca_fdiss_constant
 USE ukca_config_constants_mod,  ONLY: rho_water, avogadro
 USE ukca_constants,  ONLY: m_air, H_plus
 USE parkind1,        ONLY: jprb, jpim
@@ -265,15 +265,16 @@ END IF
 
 ! Assign fraction of O3 dissolved
 IF (ANY(cld_l > qcl_min)) THEN
-  IF ((ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) .AND.    &
-      nwet_constant > 0 ) THEN
-    ! send H_plus array to calculate fraction dissolved in offline oxidants
-    CALL ukca_fdiss_constant(n_points, qcl_min, s%t, s%p, cld_l,               &
-                           fdiss_constant, H_plus_1d_arr)
-    fdiss_o3(:) = fdiss_constant(:,ih_o3_const,1)
-  ELSE
+! XXX: assume offline is off
+!  IF ((ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) .AND.    &
+!      nwet_constant > 0 ) THEN
+!    ! send H_plus array to calculate fraction dissolved in offline oxidants
+!    CALL ukca_fdiss_constant(n_points, qcl_min, s%t, s%p, cld_l,               &
+!                           fdiss_constant, H_plus_1d_arr)
+!    fdiss_o3(:) = fdiss_constant(:,ih_o3_const,1)
+!  ELSE
     fdiss_o3(:) = fdiss(:,ih_o3,1)
-  END IF
+!  END IF
 END IF
 
 !    2. Calculate heterogeneous rates and reduce rates due to aqueous fraction

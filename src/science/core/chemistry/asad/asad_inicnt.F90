@@ -48,16 +48,17 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_INICNT_MOD'
 CONTAINS
 
 SUBROUTINE asad_inicnt( s, species, y_out, klen, nlev )
-
+!$OMP DECLARE TARGET
 USE asad_mod,              ONLY: nlfro2, jpro2, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_constants,        ONLY: c_oh, c_o3, c_no3, c_ho2
-USE ukca_environment_fields_mod, ONLY: o3_offline, oh_offline,                 &
-                           no3_offline, ho2_offline
+! XXX
+!USE ukca_environment_fields_mod, ONLY: o3_offline, oh_offline,                 &
+!                           no3_offline, ho2_offline
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
-USE ereport_mod, ONLY: ereport
-USE errormessagelength_mod, ONLY: errormessagelength
+!USE ereport_mod, ONLY: ereport
+!USE errormessagelength_mod, ONLY: errormessagelength
 
 IMPLICIT NONE
 
@@ -80,7 +81,8 @@ INTEGER :: rows                   ! rows for theta field
 INTEGER :: iro2                   ! Counter for RO2 species
 INTEGER :: j                      ! Loop variable
 
-CHARACTER (LEN=errormessagelength) :: cmessage
+!XXX
+!CHARACTER (LEN=errormessagelength) :: cmessage
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -122,33 +124,36 @@ ELSE IF (species(1:4) == 'RO2 ') THEN
     y_out(:) = fro2(:)/s%tnd(:)
   ELSE
     errcode = 126
-    cmessage = 'RO2 should only be a species if l_ukca_ro2_perm == T'
-    CALL ereport('ASAD_INICNT',errcode,cmessage)
+! XXX
+!    cmessage = 'RO2 should only be a species if l_ukca_ro2_perm == T'
+!    CALL ereport('ASAD_INICNT',errcode,cmessage)
   END IF
 
-ELSE IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
-  ! These species are converted from mass mixing ratio to vmr
-  IF (species(1:4) == 'OH  ') THEN
-    y_out(:) = RESHAPE(oh_offline(1:row_length,1:rows,nlev),[klen])
-    y_out(:) = y_out(:)/c_oh
-  ELSE IF (species(1:4) == 'O3  ') THEN
-    y_out(:) = RESHAPE(o3_offline(1:row_length,1:rows,nlev),[klen])
-    y_out(:) = y_out(:)/c_o3
-  ELSE IF (species(1:4) == 'NO3 ') THEN
-    y_out(:) = RESHAPE(no3_offline(1:row_length,1:rows,nlev),[klen])
-    y_out(:) = y_out(:)/c_no3
-  ELSE IF (species(1:4) == 'HO2 ') THEN
-    y_out(:) = RESHAPE(ho2_offline(1:row_length,1:rows,nlev),[klen])
-    y_out(:) = y_out(:)/c_ho2
-  ELSE
-    errcode = 125
-    cmessage = ' Species '//species//' is not treated by this routine'
-    CALL ereport('ASAD_INICNT',errcode,cmessage)
-  END IF
+!XXX: assuming not offline
+!ELSE IF (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be) THEN
+!  ! These species are converted from mass mixing ratio to vmr
+!  IF (species(1:4) == 'OH  ') THEN
+!    y_out(:) = RESHAPE(oh_offline(1:row_length,1:rows,nlev),[klen])
+!    y_out(:) = y_out(:)/c_oh
+!  ELSE IF (species(1:4) == 'O3  ') THEN
+!    y_out(:) = RESHAPE(o3_offline(1:row_length,1:rows,nlev),[klen])
+!    y_out(:) = y_out(:)/c_o3
+!  ELSE IF (species(1:4) == 'NO3 ') THEN
+!    y_out(:) = RESHAPE(no3_offline(1:row_length,1:rows,nlev),[klen])
+!    y_out(:) = y_out(:)/c_no3
+!  ELSE IF (species(1:4) == 'HO2 ') THEN
+!    y_out(:) = RESHAPE(ho2_offline(1:row_length,1:rows,nlev),[klen])
+!    y_out(:) = y_out(:)/c_ho2
+!  ELSE
+!    errcode = 125
+!    cmessage = ' Species '//species//' is not treated by this routine'
+!    CALL ereport('ASAD_INICNT',errcode,cmessage)
+!  END IF
 ELSE
   errcode=124
-  cmessage= ' Species '//species//' not treated by this routine'
-  CALL ereport('ASAD_INICNT',errcode,cmessage)
+! XXX
+!  cmessage= ' Species '//species//' not treated by this routine'
+!  CALL ereport('ASAD_INICNT',errcode,cmessage)
 END IF
 
 ! Convert to molecules/cm^3 from vmr

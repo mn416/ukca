@@ -117,7 +117,7 @@ END SUBROUTINE asad_cdrive_init
 SUBROUTINE asad_cdrive(s, ftr, pp, pt, pq, co2_1d, cld_f, cld_l,               &
                        ix, jy, nlev, dryrt, wetrt, rc_het, prt,                &
                        n_points, have_nat, stratflag, H_plus_1d_arr)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: ctype, jpspec, jpcspf, jppj, jpdd,                  &
                            jpdw, jpif, lvmr, madvtr, method,                   &
                            moffam, ndepd, ndepw, nfphot, nit0,                 &
@@ -129,8 +129,8 @@ USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
 
-USE umPrintMgr, ONLY: umMessage, umPrint
-USE errormessagelength_mod, ONLY: errormessagelength
+!USE umPrintMgr, ONLY: umMessage, umPrint
+!USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_bedriv_mod, ONLY: asad_bedriv
 USE asad_bimol_mod, ONLY: asad_bimol
@@ -195,7 +195,7 @@ LOGICAL :: gphot
 
 LOGICAL :: first_call = .TRUE.
 
-CHARACTER(LEN=errormessagelength) :: cmessage          ! Error message
+!CHARACTER(LEN=errormessagelength) :: cmessage          ! Error message
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -270,6 +270,7 @@ IF ( ndepd /= 0 ) CALL ukca_drydep(s, nlev, dryrt, n_points)
 
 gphot = .TRUE.
 nl = n_points
+#if 0
 SELECT CASE (method)
 CASE (0)
 
@@ -307,6 +308,7 @@ CASE (1)
   IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
 CASE (3)
+#endif
 
   !     6.3   Sparse Newton-Raphson solver
   !           ============================
@@ -326,6 +328,7 @@ CASE (3)
   CALL asad_spmjpdriv(s, ix, jy, nlev, nl)
   IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
+#if 0
 CASE (5)
 
   !     6.5   Backward Euler solver
@@ -353,6 +356,7 @@ CASE DEFAULT
   CALL ereport('ASAD_CDRIVE',errcode,cmessage)
 
 END SELECT ! End of SELECT CASE statement for method
+#endif
 
 
 !       7.  Determine concentrations and tendencies to be returned to

@@ -80,7 +80,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FULJAC_MOD'
 CONTAINS
 
 SUBROUTINE asad_fuljac(s, n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: ctype, frpx, jpfm, jpif, jpmsp,                     &
                            madvtr, moffam, ndepd, ndepw, nfrpx,                &
                            njcoth, nltrf, nmzjac, nmsjac, nodd,                &

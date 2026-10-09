@@ -73,7 +73,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_DIFFUN_MOD'
 CONTAINS
 
 SUBROUTINE asad_diffun( s, kl )
-
+!$OMP DECLARE TARGET
 USE asad_mod,               ONLY: nodd, moffam, madvtr, nf, nlf,               &
                                   jpcspf, asad_state_type
 USE parkind1, ONLY: jprb, jpim

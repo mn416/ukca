@@ -68,6 +68,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_STEADY_MOD'
 CONTAINS
 
 SUBROUTINE asad_steady( s, kl )
+!$OMP DECLARE TARGET
 
 USE asad_mod,               ONLY: peps, nspi, nssi, nssrt, nssrx,              &
                                   nssri, nsspt, nsspi, nsst, nspo1d,           &

@@ -269,16 +269,16 @@ END IF
 
 ! Fill stratospheric flag indicator and ntp_data array
 stratflag(:,:,:) = L_stratosphere(:,:,:)
-!$OMP PARALLEL DEFAULT(NONE) PRIVATE(l)                                        &
-!$OMP SHARED(all_ntp, ntp_data, tot_n_pnts)
-!$OMP DO SCHEDULE(DYNAMIC)
+!x$OMP PARALLEL DEFAULT(NONE) PRIVATE(l)                                        &
+!x$OMP SHARED(all_ntp, ntp_data, tot_n_pnts)
+!x$OMP DO SCHEDULE(DYNAMIC)
 DO l = 1, dim_ntp
   IF (all_ntp(l)%l_required) THEN
     ntp_data(:,:,:,l) = all_ntp(l)%data_3d(:,:,:)
   END IF
 END DO
-!$OMP END DO
-!$OMP END PARALLEL
+!x$OMP END DO
+!x$OMP END PARALLEL
 
 ! Store tracer mmr for use in ASAD chemical solver
 zq(:,:,:) = q(:,:,:)/c_h2o
@@ -444,7 +444,7 @@ CALL asad_cdrive_init()
 ! same grid point at the same time.
 
 ! 3D chunking loop
-!$OMP PARALLEL DO DEFAULT(NONE) SCHEDULE(DYNAMIC) COLLAPSE(3)                  &
+!$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
 !$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
 !$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
@@ -458,7 +458,7 @@ DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
     DO xi = 1, row_length, chunk_n_x
       t = 1
-      !$ t = omp_get_thread_num()+1
+      !$ t = omp_get_team_num()+1
 
       ! Chunk start, end, and offset in Z dimension
       ze = MIN(model_levels, zi + (chunk_n_z - 1))
@@ -533,7 +533,7 @@ DO zi = 1, model_levels, chunk_n_z
     END DO
   END DO
 END DO
-!$OMP END PARALLEL DO
+!$OMP END TARGET TEAMS DISTRIBUTE
 
 IF (ukca_config%l_ukca_het_psc) THEN
   ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
@@ -626,12 +626,12 @@ END IF
 ! The indices (n_ch4, n_n2o etc.) don't refer to the location
 ! in the zftr array if RO2_NTP is true, but instead to the
 ! location in the tracer array.
-!$OMP PARALLEL DEFAULT(NONE) PRIVATE(jspf)                                     &
-!$OMP SHARED(advt, atm_cf2cl2_mol, atm_cfcl3_mol, atm_ch4_mol, atm_co_mol,     &
-!$OMP        atm_h2_mol, atm_mebr_mol, atm_n2o_mol, avogadro, jpcspf,          &
-!$OMP        n_cf2cl2, n_cfcl3, n_ch4, n_co, n_h2, n_mebr, n_n2o, specf,       &
-!$OMP        volume, zftr, full_tnd)
-!$OMP DO SCHEDULE(DYNAMIC)
+!x$OMP PARALLEL DEFAULT(NONE) PRIVATE(jspf)                                     &
+!x$OMP SHARED(advt, atm_cf2cl2_mol, atm_cfcl3_mol, atm_ch4_mol, atm_co_mol,     &
+!x$OMP        atm_h2_mol, atm_mebr_mol, atm_n2o_mol, avogadro, jpcspf,          &
+!x$OMP        n_cf2cl2, n_cfcl3, n_ch4, n_co, n_h2, n_mebr, n_n2o, specf,       &
+!x$OMP        volume, zftr, full_tnd)
+!x$OMP DO SCHEDULE(DYNAMIC)
 DO jspf = 1, jpcspf
 
   IF (n_ch4 > 0) THEN
@@ -690,8 +690,8 @@ DO jspf = 1, jpcspf
   END IF
 
 END DO ! End loop through species in zftr array
-!$OMP END DO
-!$OMP END PARALLEL
+!x$OMP END DO
+!x$OMP END PARALLEL
 
 IF (ALLOCATED(ystore)) DEALLOCATE(ystore)
 
@@ -725,16 +725,16 @@ DO js = 1,jpspec
 END DO       ! Close loop through all species
 
 ! Map ntp_data back into 3D array
-!$OMP PARALLEL DEFAULT(NONE) PRIVATE(l)                                        &
-!$OMP SHARED(all_ntp, model_levels, ntp_data, row_length, rows)
-!$OMP DO SCHEDULE(DYNAMIC)
+!x$OMP PARALLEL DEFAULT(NONE) PRIVATE(l)                                        &
+!x$OMP SHARED(all_ntp, model_levels, ntp_data, row_length, rows)
+!x$OMP DO SCHEDULE(DYNAMIC)
 DO l = 1, dim_ntp
   IF (all_ntp(l)%l_required) THEN
     all_ntp(l)%data_3d(:,:,:) = ntp_data(:,:,:,l)
   END IF
 END DO
-!$OMP END DO
-!$OMP END PARALLEL
+!x$OMP END DO
+!x$OMP END PARALLEL
 
 ! XXX: this looks wrong as s%y accessed outside parallel region
 ! Preserve non-fixed behaviour when chunking is disabled

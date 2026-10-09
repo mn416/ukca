@@ -106,12 +106,13 @@ END IF
 END SUBROUTINE asad_fyinit_init
 
 SUBROUTINE asad_fyinit(s, ofirst, n_points, ix, jy, nlev)
-
+!$OMP DECLARE TARGET
 USE asad_mod,             ONLY: ctype, ilcf, ilct, ilftr, ilss,                &
                                 jpoo, jpcf, jpco, jpif, jpna,                  &
                                 jpsp, madvtr, moffam, nlmajmin, peps,          &
                                 speci, jsro2, jpspec, asad_state_type
-USE ukca_diurnal_oxidant, ONLY: ukca_set_diurnal_ox, ukca_set_diurnal_ox_col
+!XXX
+!USE ukca_diurnal_oxidant, ONLY: ukca_set_diurnal_ox, ukca_set_diurnal_ox_col
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_environment_fields_mod, ONLY: atmospheric_co2,                        &
                                        atmospheric_h2,                         &
@@ -121,11 +122,11 @@ USE ukca_environment_fields_mod, ONLY: atmospheric_co2,                        &
 USE ukca_constants, ONLY: c_co2, c_h2, c_n2, c_o2, c_ch4
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
-USE ereport_mod, ONLY: ereport
-USE errormessagelength_mod, ONLY: errormessagelength
+!USE ereport_mod, ONLY: ereport
+!USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_inicnt_mod, ONLY: asad_inicnt
-USE asad_inicnt_col_mod, ONLY: asad_inicnt_col
+!USE asad_inicnt_col_mod, ONLY: asad_inicnt_col
 IMPLICIT NONE
 
 TYPE(asad_state_type), INTENT(INOUT) :: s
@@ -161,7 +162,7 @@ REAL, PARAMETER :: fn2_default  = 0.78084
 REAL, PARAMETER :: fo2_default  = 0.20945
 REAL, PARAMETER :: fch4_default = 1.76e-6
 
-CHARACTER(LEN=errormessagelength) :: cmessage
+!CHARACTER(LEN=errormessagelength) :: cmessage
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -251,11 +252,12 @@ IF ( ofirst ) THEN
     ELSE IF ( speci(js) == 'CH4       ' ) THEN
       zcnst = fch4
     ELSE
-      cmessage=' Value not supplied for '//speci(js)//                         &
-               ',setting value to zero'
+!XXXX
+!    cmessage=' Value not supplied for '//speci(js)//                         &
+!             ',setting value to zero'
       errcode=-1
 
-      CALL ereport('ASAD_FYINIT',errcode,cmessage)
+!      CALL ereport('ASAD_FYINIT',errcode,cmessage)
       zcnst = 0.0
     END IF
 
@@ -289,26 +291,28 @@ END DO
 IF (ofirst) THEN
   DO j = 1, icf
     js = ilcf(j)
-    IF (ukca_config%l_ukca_asad_columns) THEN
-      CALL asad_inicnt_col(s, speci(js), s%y(1,js), n_points, ix, jy)
-    ELSE
+    !XXX: assuming not column mode
+!    IF (ukca_config%l_ukca_asad_columns) THEN
+!      CALL asad_inicnt_col(s, speci(js), s%y(1,js), n_points, ix, jy)
+!    ELSE
       CALL asad_inicnt(s, speci(js), s%y(1,js), n_points, nlev)
-    END IF
+!    END IF
   END DO
 END IF
 
 ! Impose a diurnal profile on offline oxidants read in as time mean
-IF (ofirst .AND.                                                               &
-    (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be)) THEN
-  DO j = 1, icf
-    js = ilcf(j)
-    IF (ukca_config%l_ukca_asad_columns) THEN
-      CALL ukca_set_diurnal_ox_col(speci(js),  s%y(:,js), n_points, ix, jy)
-    ELSE
-      CALL ukca_set_diurnal_ox(speci(js),  s%y(:,js), n_points, nlev)
-    END IF
-  END DO
-END IF
+! XXX: assuming not offline
+!IF (ofirst .AND.                                                               &
+!    (ukca_config%l_ukca_offline .OR. ukca_config%l_ukca_offline_be)) THEN
+!  DO j = 1, icf
+!    js = ilcf(j)
+!    IF (ukca_config%l_ukca_asad_columns) THEN
+!      CALL ukca_set_diurnal_ox_col(speci(js),  s%y(:,js), n_points, ix, jy)
+!    ELSE
+!      CALL ukca_set_diurnal_ox(speci(js),  s%y(:,js), n_points, nlev)
+!    END IF
+!  END DO
+!END IF
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

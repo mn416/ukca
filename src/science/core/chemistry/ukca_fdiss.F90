@@ -30,7 +30,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_FDISS_MOD'
 CONTAINS
 
 SUBROUTINE ukca_fdiss(n_points, qcl_min, t, p, qcl, fdiss, H_plus_1d_arr)
-
+!$OMP DECLARE TARGET
 
 USE asad_mod,            ONLY: ddhr, dhr, kd298, k298, jpeq, jpdw
 USE ukca_constants,      ONLY: m_air

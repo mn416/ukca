@@ -75,7 +75,7 @@ END IF
 END SUBROUTINE asad_trimol_init
 
 SUBROUTINE asad_trimol(s, n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: at, ntrkx, spt, peps, specf,                        &
                            jpcspf, jptk, asad_state_type
 USE parkind1, ONLY: jprb, jpim

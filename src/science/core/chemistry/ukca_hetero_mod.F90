@@ -195,6 +195,7 @@ END SUBROUTINE ukca_solidphase_init
 
 
 SUBROUTINE ukca_hetero(s, n_points, have_nat, stratflag)
+!$OMP DECLARE TARGET
 ! Description:
 !
 ! Changed from version by Peter Breasicke to allow for dynamical limitation of
@@ -733,6 +734,7 @@ END SUBROUTINE ukca_hetero
 
 !==========================================================================
 SUBROUTINE ukca_br_gamma(kstart,kend,kchmlev,t,thbr,gam_br)
+!$OMP DECLARE TARGET
 ! Calculate gamma on ice and NAT for bromine reactions
 
 IMPLICIT NONE
@@ -803,7 +805,7 @@ END SUBROUTINE ukca_br_gamma
 !===========================================================================
 SUBROUTINE ukca_shi_liquid_aerosol(kstart,kend,kchmlev,t,th2o,                 &
                                    thcl,tcnit,gam3arr)
-
+!$OMP DECLARE TARGET
 !*********************************************************************
 !subroutine description
 !
@@ -1131,7 +1133,7 @@ END SUBROUTINE ukca_shi_liquid_aerosol
 
 ! ######################################################################
 SUBROUTINE ukca_solidphase(s, n_points)
-
+!$OMP DECLARE TARGET
 ! Description:
 !
 ! *** *solidphase* - adds HONO2 and H2O in solid state back to main
@@ -1206,6 +1208,7 @@ SUBROUTINE ukca_calckpsc(s, sasa,t,th2o,thcl,tcnit,tn2o5,thocl,                &
                     akpsc1,akpsc2,akpsc3,akpsc4,akpsc5,                        &
                     lpsa,lphocl,lppsc,lpsimp,                                  &
                     kchmlev,kstart,kend,dt)
+!$OMP DECLARE TARGET
 !
 !     CALCKPSC - CALCULATION OF HETEROGENEOUS REACTION RATES
 !
@@ -1490,6 +1493,7 @@ END SUBROUTINE ukca_calckpsc
 ! ######################################################################
 SUBROUTINE ukca_eqcomp(t,th2o,kstart,kend,kchmlev,lphocl,                      &
     rpcncl,hshcl,hhocl)
+!$OMP DECLARE TARGET
 !
 !-----------------------------------------------------------------------
 !
@@ -1841,6 +1845,7 @@ END SUBROUTINE ukca_eqcomp
 
 ! ######################################################################
 SUBROUTINE ukca_position(xc,n,x,jx,ier,iorder)
+!$OMP DECLARE TARGET
 !
 !     Auxiliary subroutine for Eqcomp, Slimane Bekki, Nov. 1991
 !
@@ -1906,7 +1911,7 @@ END SUBROUTINE ukca_position
 ! ######################################################################
 SUBROUTINE ukca_pscpres(s,t,p,tnd,th2o,thno3,                                  &
                    kstart,kend,kchmlev, have_nat, sph2o)
-
+!$OMP DECLARE TARGET
 USE asad_mod,           ONLY: asad_state_type
 
 IMPLICIT NONE

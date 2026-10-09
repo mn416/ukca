@@ -44,7 +44,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYSELF_MOD'
 CONTAINS
 
 SUBROUTINE asad_fyself(s, n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod,        ONLY: nstst, nlstst, nspi, jpnr, asad_state_type
 USE parkind1,        ONLY: jprb, jpim
 USE yomhook,         ONLY: lhook, dr_hook

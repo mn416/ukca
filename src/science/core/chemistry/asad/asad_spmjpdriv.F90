@@ -104,17 +104,16 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_SPMJPDRIV_MOD'
 CONTAINS
 
 SUBROUTINE asad_spmjpdriv(s, ix,jy,nlev,n_points)
-
+!$OMP DECLARE TARGET
 USE asad_mod, ONLY: jpcspf, jpspec, nitfg, speci, asad_state_type
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 USE ereport_mod, ONLY: ereport
-USE umPrintMgr, ONLY: umMessage, umPrint, PrintStatus, PrStatus_Oper
-
-USE ukca_um_legacy_mod,  ONLY: mype
-
-USE errormessagelength_mod, ONLY: errormessagelength
+!XXX
+!USE umPrintMgr, ONLY: umMessage, umPrint, PrintStatus, PrStatus_Oper
+!USE ukca_um_legacy_mod,  ONLY: mype
+!USE errormessagelength_mod, ONLY: errormessagelength
 
 USE asad_diffun_mod, ONLY: asad_diffun
 USE asad_spimpmjp_mod, ONLY: asad_spimpmjp
@@ -144,7 +143,7 @@ INTEGER :: jit                      ! Iteration for asad_ftoy
 INTEGER :: errcode                  ! Variable passed to ereport
 LOGICAL :: not_first_call = .FALSE.
 
-CHARACTER(LEN=errormessagelength) :: cmessage
+!CHARACTER(LEN=errormessagelength) :: cmessage
 
 REAL :: cdt_initial                 ! Initial chemistry timestep
 REAL :: f_initial(n_points,jpcspf)  ! Saved s%f array from previous solver call
@@ -190,7 +189,7 @@ DO WHILE (iter <= iredo)
     s%f(1:n_points,:)=f_initial(1:n_points,:)
 
     IF (exit_code == 4) THEN
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
       ! Debug slow convergence systems - switch this on in 'spimpmjp'
       IF (s%ltrig) THEN
         errcode=1
@@ -211,7 +210,7 @@ DO WHILE (iter <= iredo)
       s%cdt = s%cdt/2.0
       iredo = iredo*2
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
       IF (ukca_config%l_ukca_debug_asad) THEN
         ! Added extra print statements here for verbosity
         WRITE(umMessage,"('ASAD: failed to converge at location  = ',I0)")     &
@@ -232,7 +231,7 @@ DO WHILE (iter <= iredo)
 
       ! Drop out if too many successive halvings fail
       IF (iredo >= max_redo) THEN
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
         IF (printstatus >= prstatus_oper) THEN
           WRITE(umMessage,"(' Resetting array after',i4,' iterations')") iredo
           CALL umPrint(umMessage,src='asad_spmjpdriv')
@@ -255,7 +254,7 @@ DO WHILE (iter <= iredo)
   END IF
 END DO
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
 IF (iredo > 2) THEN
   WRITE(umMessage,"('   No. iterations =',i2)") iredo
   CALL umPrint(umMessage,src='asad_spmjpdriv')

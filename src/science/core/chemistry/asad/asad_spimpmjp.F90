@@ -139,7 +139,7 @@ END SUBROUTINE asad_spimpmjp_init
 
 
 SUBROUTINE forward_euler(s, n_points, f, f_initial, f_min, nonzero_map, spfj)
-
+!$OMP DECLARE TARGET
 USE asad_mod,            ONLY: jpcspf, spfjsize_max, asad_state_type
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
@@ -184,7 +184,7 @@ END SUBROUTINE forward_euler
 ! *********************************************************************
 
 SUBROUTINE calc_residual_error(s, n_points,residual_error,G_f,f_min)
-
+!$OMP DECLARE TARGET
 USE asad_mod,            ONLY: jpcspf, nlf, asad_state_type
 USE yomhook,             ONLY: lhook, dr_hook
 USE parkind1,            ONLY: jprb, jpim
@@ -231,6 +231,7 @@ END SUBROUTINE calc_residual_error
 ! *********************************************************************
 
 SUBROUTINE calc_error_norm(n_points,error_norm,f,f_incr,f_min)
+!$OMP DECLARE TARGET
 
 USE asad_mod,            ONLY: jpcspf
 USE yomhook,             ONLY: lhook, dr_hook
@@ -271,16 +272,17 @@ END SUBROUTINE calc_error_norm
 
 SUBROUTINE asad_spimpmjp(s, exit_code, ix, jy, nlev, n_points, location,       &
                          solver_iter)
-
+!$OMP DECLARE TARGET
 USE asad_mod,           ONLY: ptol, peps, nitnr, nstst, nonzero_map,           &
                               jpcspf, nonzero_map_unordered, asad_state_type
 USE asad_sparse_vars,   ONLY: spfuljac, spresolv2, splinslv2
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE yomhook,            ONLY: lhook, dr_hook
 USE parkind1,           ONLY: jprb, jpim
-USE umPrintMgr,         ONLY: printstatus, PrStatus_Oper, PrStatus_Diag,       &
-                              umMessage, umPrint
-USE errormessagelength_mod, ONLY: errormessagelength
+!XXX
+!USE umPrintMgr,         ONLY: printstatus, PrStatus_Oper, PrStatus_Diag,      &
+!                              umMessage, umPrint
+!USE errormessagelength_mod, ONLY: errormessagelength
 USE ukca_um_legacy_mod, ONLY: mype
 USE asad_diffun_mod,    ONLY: asad_diffun
 USE asad_fuljac_mod,    ONLY: asad_fuljac
@@ -349,8 +351,9 @@ INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
 CHARACTER(LEN=*),   PARAMETER :: RoutineName='ASAD_SPIMPMJP'
 
-CHARACTER(LEN=errormessagelength) :: cmessage1 = "(1x,i2,20(1x,1pG12.4))"
-CHARACTER(LEN=errormessagelength) :: cmessage2 = "(1x,a3,20(1x,1pG12.4))"
+!XXX
+!CHARACTER(LEN=errormessagelength) :: cmessage1 = "(1x,i2,20(1x,1pG12.4))"
+!CHARACTER(LEN=errormessagelength) :: cmessage2 = "(1x,a3,20(1x,1pG12.4))"
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
@@ -391,7 +394,7 @@ DO iter=1,ukca_config%nrsteps
 
   IF (nstst /= 0 .AND. ifi ==0) CALL asad_steady( s, n_points )
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
   IF (s%ltrig .AND. printstatus >= prstatus_oper) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
@@ -451,7 +454,7 @@ DO iter=1,ukca_config%nrsteps
 
   CALL spfuljac(s,n_points,s%cdt,f_min,nonzero_map,s%spfj)
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     WRITE(umMessage,"('Iteration ',i4)") iter
     CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -476,7 +479,7 @@ DO iter=1,ukca_config%nrsteps
   CALL splinslv2(n_points,G_f,f_incr,f_min,f_max,nonzero_map_unordered,        &
                     s%modified_map,s%spfj)
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
   IF (s%ltrig .AND. printstatus == PrStatus_Diag) THEN
     DO jl=1,n_points
       WRITE(umMessage,"('Point: ',i4)") jl
@@ -589,7 +592,7 @@ IF (exit_code /= 0) THEN
   s%f = f_initial
   solver_iter = iter
 
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
   IF (count_negatives > maxneg) THEN
     WRITE(umMessage,"('Negatives - exceeds maxneg')")
     CALL umPrint(umMessage,src='asad_spimpmjp')
@@ -603,7 +606,7 @@ IF (exit_code /= 0) THEN
 
   IF (iter >= ltrig_iter) THEN
     exit_code = 4 ! exit with debug option for use in asad_spmjpdriv
-#if !defined(__AMDGCN__) && !defined(__NVPTX__)
+#if 0
     WRITE(umMessage,                                                           &
 "('Convergence problems (',i3,1x,'iter) at location=',i3,' pe=',i3)")          &
     iter, location, mype
