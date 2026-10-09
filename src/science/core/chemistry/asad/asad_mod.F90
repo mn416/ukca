@@ -621,7 +621,7 @@ IF (method == int_method_NR) THEN
 END IF
 
 n_parallel = 1
-!$ n_parallel = omp_get_max_threads()
+!$ n_parallel = omp_get_max_teams()
 
 IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_parallel))
 
