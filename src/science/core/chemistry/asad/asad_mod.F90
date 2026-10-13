@@ -742,7 +742,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_MOD_INIT_SPATIAL_VARS'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 n_parallel = 1
-!$ n_parallel = omp_get_max_threads()
+!$ n_parallel = omp_get_max_teams()
 
 ! Set integration method (1 = IMPACT; 3 = N-R solver; 5 = Backward-Euler)
 method = ukca_config%ukca_int_method
