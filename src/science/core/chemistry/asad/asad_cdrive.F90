@@ -315,11 +315,11 @@ IMPLICIT NONE
 
 ! Subroutine interface
 TYPE(asad_state_type), INTENT(INOUT) :: s    ! ASAD mutable state
-INTEGER, INTENT(IN) :: n_points
 
 ! Size of arrays adapted to number of chemically active species,
 ! rather than number of tracers
 REAL, INTENT(OUT) :: ftr(n_points,jpcspf)   ! Tracer concs
+INTEGER, INTENT(IN) :: n_points
 
 !       Local variables
 INTEGER :: jtr                                ! Loop variable

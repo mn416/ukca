@@ -446,11 +446,12 @@ CALL asad_cdrive_init()
 ! taken to avoid data races where two different threads are computing the
 ! same grid point at the same time.
 
-n_chunks_z = (model_levels+chunk_n_z-1) / model_levels
-n_chunks_y = (rows+chunk_n_y-1) / rows
-n_chunks_x = (row_length+chunk_n_x-1) / row_length
+n_chunks_z = (model_levels+chunk_n_z-1) / chunk_n_z
+n_chunks_y = (rows+chunk_n_y-1) / chunk_n_y
+n_chunks_x = (row_length+chunk_n_x-1) / chunk_n_x
 
-!$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
+! 3D chunking loops
+!$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
 !$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
 !$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
 !$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
@@ -508,108 +509,10 @@ DO zi = 1, model_levels, chunk_n_z
         have_nat(xs:xe,ys:ye,zs:ze),                                           &
         stratflag(xs:xe,ys:ye,zs:ze),                                          &
         H_plus(xs:xe,ys:ye,zs:ze))
-      CALL asad_spmjpdriv(s(t), ix, jy, k, chunk_n_pnts)
-      CALL asad_cdrive_post(s(t), chunk_zftr, chunk_n_pnts)
-
-      ! Copy from ASAD module variables to full-domain arrays
-      zftr(xi:xe,yi:ye,zi:ze,:) = chunk_zftr(xo:,yo:,zo:,:)
-
-      chunk_dpd(:,:,:,:) = RESHAPE(s(t)%dpd, SHAPE(chunk_dpd))
-      full_dpd(xi:xe,yi:ye,zi:ze,:) = chunk_dpd(xo:,yo:,zo:,:)
-
-      chunk_dpw(:,:,:,:) = RESHAPE(s(t)%dpw, SHAPE(chunk_dpw))
-      full_dpw(xi:xe,yi:ye,zi:ze,:) = chunk_dpw(xo:,yo:,zo:,:)
-
-      chunk_fpsc1(:,:,:) = RESHAPE(s(t)%fpsc1, SHAPE(chunk_fpsc1))
-      full_fpsc1(xi:xe,yi:ye,zi:ze) = chunk_fpsc1(xo:,yo:,zo:)
-
-      chunk_fpsc2(:,:,:) = RESHAPE(s(t)%fpsc2, SHAPE(chunk_fpsc2))
-      full_fpsc2(xi:xe,yi:ye,zi:ze) = chunk_fpsc2(xo:,yo:,zo:)
-
-      chunk_prk(:,:,:,:) = RESHAPE(s(t)%prk, SHAPE(chunk_prk))
-      full_prk(xi:xe,yi:ye,zi:ze,:) = chunk_prk(xo:,yo:,zo:,:)
-
-      chunk_y(:,:,:,:) = RESHAPE(s(t)%y, SHAPE(chunk_y))
-      full_y(xi:xe,yi:ye,zi:ze,:) = chunk_y(xo:,yo:,zo:,:)
-
-      chunk_sphno3(:,:,:) = RESHAPE(s(t)%sphno3, SHAPE(chunk_sphno3))
-      full_sphno3(xi:xe,yi:ye,zi:ze) = chunk_sphno3(xo:,yo:,zo:)
-
-      chunk_tnd(:,:,:) = RESHAPE(s(t)%tnd, SHAPE(chunk_tnd))
-      full_tnd(xi:xe,yi:ye,zi:ze) = chunk_tnd(xo:,yo:,zo:)
-
-      chunk_rk(:,:,:,:) = RESHAPE(s(t)%rk, SHAPE(chunk_rk))
-      full_rk(xi:xe,yi:ye,zi:ze,:) = chunk_rk(xo:,yo:,zo:,:)
     END DO
   END DO
 END DO
-!$OMP END TARGET TEAMS DISTRIBUTE
-
-
-#if 0
-! 3D chunking loops
-!x$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
-!x$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
-!x$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
-!x$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
-!x$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!x$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
-!x$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
-!x$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
-!x$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!x$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
-!x$OMP        n_chunks_x)
-DO zi = 1, model_levels, chunk_n_z
-  DO yi = 1, rows, chunk_n_y
-    DO xi = 1, row_length, chunk_n_x
-      t = ((zi-1)/chunk_n_z) * n_chunks_y * n_chunks_x                         &
-        + ((yi-1)/chunk_n_y) * n_chunks_x                                      &
-        + ((xi-1)/chunk_n_x) + 1
-
-      ! Chunk start, end, and offset in Z dimension
-      ze = MIN(model_levels, zi + (chunk_n_z - 1))
-      zs = ze - chunk_n_z + 1
-      zo = zi - zs + 1
-
-      ! Chunk start, end, and offset in Y dimension
-      ye = MIN(rows, yi + (chunk_n_y - 1))
-      ys = ye - chunk_n_y + 1
-      yo = yi - ys + 1
-
-      ! Chunk start, end, and offset in X dimension
-      xe = MIN(row_length, xi + (chunk_n_x - 1))
-      xs = xe - chunk_n_x + 1
-      xo = xi - xs + 1
-
-      ! Copy from full-domain arrays to ASAD module variables
-      s(t)%sph2o(:) = RESHAPE(full_sph2o(xs:xe,ys:ye,zs:ze), SHAPE(s(t)%sph2o))
-      s(t)%za(:) = RESHAPE(full_za(xs:xe,ys:ye,zs:ze), SHAPE(s(t)%za))
-      chunk_zftr(:,:,:,:) = full_zftr(xs:xe,ys:ye,zs:ze,:)
-
-      CALL asad_cdrive_pre(                                                    &
-        s(t),                                                                  &
-        chunk_zftr,                                                            &
-        pres(xs:xe,ys:ye,zs:ze),                                               &
-        temp(xs:xe,ys:ye,zs:ze),                                               &
-        zq(xs:xe,ys:ye,zs:ze),                                                 &
-        co2_tmp(xs:xe,ys:ye,zs:ze),                                            &
-        cloud_frac(xs:xe,ys:ye,zs:ze),                                         &
-        qcl(xs:xe,ys:ye,zs:ze),                                                &
-        ix,                                                                    &
-        jy,                                                                    &
-        k,                                                                     &
-        zdryrt2(xs:xe,ys:ye,zs:ze,:),                                          &
-        zwetrt(xs:xe,ys:ye,zs:ze,:),                                           &
-        rc_het(xs:xe,ys:ye,zs:ze,:),                                           &
-        zprt(xs:xe,ys:ye,zs:ze,:),                                             &
-        chunk_n_pnts,                                                          &
-        have_nat(xs:xe,ys:ye,zs:ze),                                           &
-        stratflag(xs:xe,ys:ye,zs:ze),                                          &
-        H_plus(xs:xe,ys:ye,zs:ze))
-    END DO
-  END DO
-END DO
-!x$OMP END PARALLEL DO
+!$OMP END PARALLEL DO
 
 !$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, yi, xi, t)                                                   &
@@ -632,17 +535,17 @@ DO zi = 1, model_levels, chunk_n_z
 END DO
 !$OMP END TARGET TEAMS DISTRIBUTE
 
-!x$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
-!x$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
-!x$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
-!x$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
-!x$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!x$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
-!x$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
-!x$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
-!x$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!x$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
-!x$OMP        n_chunks_x)
+!$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
+!$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
+!$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
+!$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
+!$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
+!$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
+!$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
+!$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
+!$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
+!$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
+!$OMP        n_chunks_x)
 DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
     DO xi = 1, row_length, chunk_n_x
@@ -699,9 +602,7 @@ DO zi = 1, model_levels, chunk_n_z
     END DO
   END DO
 END DO
-!x$OMP END PARALLEL DO
-
-#endif
+!$OMP END PARALLEL DO
 
 IF (ukca_config%l_ukca_het_psc) THEN
   ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.
