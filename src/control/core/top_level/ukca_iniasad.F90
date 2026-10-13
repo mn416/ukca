@@ -36,7 +36,7 @@ CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'UKCA_INIASAD_MOD'
 
 CONTAINS
 
-SUBROUTINE ukca_iniasad(npoints)
+SUBROUTINE ukca_iniasad(npoints, nchunks)
 
 USE ukca_chem_defs_mod,   ONLY: chch_defs
 USE asad_mod,             ONLY: ldepd, ldepw, ih_o3, ih_h2o2,                  &
@@ -52,7 +52,7 @@ USE errormessagelength_mod, ONLY: errormessagelength
 USE asad_cinit_mod, ONLY: asad_cinit
 IMPLICIT NONE
 
-INTEGER, INTENT(IN) :: npoints   ! no of spatial points
+INTEGER, INTENT(IN) :: npoints, nchunks
 
 !       Local variables
 
@@ -87,7 +87,7 @@ IF (printstatus >= prstatus_oper) THEN
   CALL umPrint(umMessage,src='ukca_iniasad')
 END IF
 
-CALL asad_mod_init(npoints)
+CALL asad_mod_init(npoints, nchunks)
 
 ! Set up dry and wet deposition logicals using module switches
 ldepd(:) = .FALSE.
@@ -150,7 +150,7 @@ END SUBROUTINE ukca_iniasad
 
 ! ######################################################################
 
-SUBROUTINE ukca_iniasad_spatial_vars(npoints)
+SUBROUTINE ukca_iniasad_spatial_vars(npoints, nchunks)
 
 USE asad_mod,             ONLY: asad_mod_init_spatial_vars
 USE parkind1,             ONLY: jprb, jpim
@@ -158,7 +158,7 @@ USE yomhook,              ONLY: lhook, dr_hook
 
 IMPLICIT NONE
 
-INTEGER, INTENT(IN) :: npoints   ! no of spatial points
+INTEGER, INTENT(IN) :: npoints, nchunks
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -168,7 +168,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_INIASAD_SPATIAL_VARS'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-CALL asad_mod_init_spatial_vars(npoints)
+CALL asad_mod_init_spatial_vars(npoints, nchunks)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

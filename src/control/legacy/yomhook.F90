@@ -28,6 +28,8 @@ IMPLICIT NONE
 
 LOGICAL, PARAMETER :: lhook = .FALSE.
 
+!$OMP DECLARE TARGET(lhook)
+
 CONTAINS
 
 SUBROUTINE dr_hook(routine_name, code, handle)

@@ -582,7 +582,7 @@ TYPE(autotune_type), ALLOCATABLE, SAVE :: autotune_state
 #endif
 
 ! Full-domain chunk size in each dimension
-INTEGER :: full_chunk_x, full_chunk_y, full_chunk_z
+INTEGER :: full_chunk_x, full_chunk_y, full_chunk_z, n_chunks
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_MAIN1'
 
@@ -630,10 +630,15 @@ IF (ukca_config%l_ukca_asad_full) THEN
     full_chunk_z = model_levels
   END IF
   n_pnts = full_chunk_x * full_chunk_y * full_chunk_z
+  n_chunks = (model_levels + full_chunk_z - 1) / full_chunk_z                  &
+           * (rows + full_chunk_y - 1) / full_chunk_y                          &
+           * (row_length + full_chunk_x - 1) / full_chunk_x
 ELSE IF (ukca_config%l_ukca_asad_columns) THEN
   n_pnts = ukca_config%ukca_chem_seg_size
+  n_chunks = 1 ! XXX
 ELSE
   n_pnts = theta_field_size
+  n_chunks = 1 ! XXX
 END IF
 
 ! On first call, check for availability of UKCA configuration data
@@ -849,7 +854,7 @@ IF (l_first_call) THEN
 
   IF (ukca_config%l_ukca_chem) THEN
 
-    CALL ukca_iniasad(n_pnts)
+    CALL ukca_iniasad(n_pnts, n_chunks)
 
     ! Check that some CLASSIC aerosol types/processes are modelled if
     ! heterogeneous reactions on CLASSIC aerosols are used in UKCA.
@@ -981,7 +986,7 @@ END IF
 ! Reallocate the spatial variables in ASAD if persistence is off
 IF (ukca_config%l_ukca_chem .AND. ukca_config%l_ukca_persist_off .AND.         &
     (.NOT. l_first_call)) THEN
-  CALL ukca_iniasad_spatial_vars(n_pnts)
+  CALL ukca_iniasad_spatial_vars(n_pnts, n_chunks)
 END IF
 
 ! set up nmr and mmr indices on first call, only if using

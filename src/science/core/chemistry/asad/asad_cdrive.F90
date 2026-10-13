@@ -114,7 +114,7 @@ END IF
 
 END SUBROUTINE asad_cdrive_init
 
-SUBROUTINE asad_cdrive(s, ftr, pp, pt, pq, co2_1d, cld_f, cld_l,               &
+SUBROUTINE asad_cdrive_pre(s, ftr, pp, pt, pq, co2_1d, cld_f, cld_l,           &
                        ix, jy, nlev, dryrt, wetrt, rc_het, prt,                &
                        n_points, have_nat, stratflag, H_plus_1d_arr)
 !$OMP DECLARE TARGET
@@ -270,45 +270,10 @@ IF ( ndepd /= 0 ) CALL ukca_drydep(s, nlev, dryrt, n_points)
 
 gphot = .TRUE.
 nl = n_points
-#if 0
+
+! XXX: assuming method 3
 SELECT CASE (method)
-CASE (0)
-
-  !     6.0  Not integrating: just compute tendencies.
-  CALL ukca_photol(s, prt, nl)
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
-  CALL asad_ftoy(s, first_call, nit0, num_iter, nl, ix, jy, nlev)
-  CALL asad_diffun(s, nl)
-  IF (ukca_config%l_ukca_het_psc) THEN
-    CALL ukca_solidphase(s, nl)
-    CALL asad_posthet()
-  END IF
-
-CASE (1)
-
-  !     6.1  IMPACT integration: first compute heterogeneous
-  !          and photolysis rates, species and tendencies.
-  !          ===============================================
-
-  DO js = 1, s%ncsteps
-    s%jsubs = js
-    gfirst = s%jsubs == 1
-    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(s%jsubs-1,nfphot) == 0
-
-    ! pass num_iter to asad_ftoy
-    num_iter=0
-
-    IF (gphot) CALL ukca_photol(s, prt, nl)
-    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
-    CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
-    CALL asad_diffun(s, nl)
-    CALL asad_jac(s, nl)
-    CALL asad_impact(s, nl, ix, jy, nlev)
-  END DO
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
-
 CASE (3)
-#endif
 
   !     6.3   Sparse Newton-Raphson solver
   !           ============================
@@ -325,39 +290,48 @@ CASE (3)
   IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
   CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
   CALL asad_diffun(s, nl)
-  CALL asad_spmjpdriv(s, ix, jy, nlev, nl)
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
-
-#if 0
-CASE (5)
-
-  !     6.5   Backward Euler solver
-  !           =====================
-
-  DO js = 1, s%ncsteps
-    s%jsubs = js
-    gfirst = s%jsubs == 1
-    IF (nfphot /= 0 .AND. .NOT. gfirst) gphot = MOD(s%jsubs-1,nfphot) == 0
-
-    ! pass num_iter to asad_ftoy
-    num_iter=0
-
-    IF (gphot) CALL ukca_photol(s, prt, nl)
-    IF (ukca_config%l_ukca_het_psc) CALL ukca_hetero(s, nl, have_nat, stratflag)
-    CALL asad_ftoy(s, gfirst, nitfg, num_iter, nl, ix, jy, nlev)
-    CALL asad_bedriv(s, ix, jy, nl, nlev)
-  END DO
-  IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
-
 CASE DEFAULT
 
-  WRITE(cmessage,"('Integration method ',i0,' not supported.')") method
-  errcode=1
-  CALL ereport('ASAD_CDRIVE',errcode,cmessage)
+  !WRITE(cmessage,"('Integration method ',i0,' not supported.')") method
+  !errcode=1
+  !CALL ereport('ASAD_CDRIVE',errcode,cmessage)
 
 END SELECT ! End of SELECT CASE statement for method
-#endif
 
+IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
+RETURN
+END SUBROUTINE asad_cdrive_pre
+
+SUBROUTINE asad_cdrive_post(s, ftr, n_points)
+!$OMP DECLARE TARGET
+USE asad_mod,        ONLY: ctype, jpspec, jpcspf, jppj, jpdd,                  &
+                           jpdw, jpif, lvmr, madvtr,                           &
+                           moffam, nodd, asad_state_type
+USE ukca_hetero_mod, ONLY: ukca_hetero, ukca_solidphase
+USE ukca_config_specification_mod, ONLY: ukca_config
+
+IMPLICIT NONE
+
+
+! Subroutine interface
+TYPE(asad_state_type), INTENT(INOUT) :: s    ! ASAD mutable state
+INTEGER, INTENT(IN) :: n_points
+
+! Size of arrays adapted to number of chemically active species,
+! rather than number of tracers
+REAL, INTENT(OUT) :: ftr(n_points,jpcspf)   ! Tracer concs
+
+!       Local variables
+INTEGER :: jtr                                ! Loop variable
+INTEGER :: jl                                 ! Loop variable
+INTEGER :: js                                 ! Loop variable
+INTEGER :: nl
+INTEGER :: ifam
+INTEGER :: itr
+INTEGER :: iodd
+
+nl = n_points
+IF (ukca_config%l_ukca_het_psc) CALL ukca_solidphase(s, nl)
 
 !       7.  Determine concentrations and tendencies to be returned to
 !           the model depending on whether or not the chemistry has
@@ -398,7 +372,6 @@ IF ( lvmr ) THEN
   END DO
 END IF
 
-IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
-RETURN
-END SUBROUTINE asad_cdrive
+END SUBROUTINE asad_cdrive_post
+
 END MODULE asad_cdrive_mod

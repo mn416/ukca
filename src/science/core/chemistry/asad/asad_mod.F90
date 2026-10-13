@@ -425,6 +425,37 @@ LOGICAL :: ljacx
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='ASAD_MOD'
 
+!$OMP DECLARE TARGET(                                                          &
+!$OMP&  asad_state, init_cdt, init_cdt_diag, init_interval,                    &
+!$OMP&  init_ncsteps, init_ncsteps_factor, jpctr, jpspec, jpro2,               &
+!$OMP&  jpcspf, jpbk, jptk, jppj, jphk, jpnr, jpdd, jpdw, depvel,              &
+!$OMP&  k298, dhr, kd298, ddhr, ct_k298, ct_dhr, ct_kd298, ct_ddhr,            &
+!$OMP&  ab, at, aj, ah, ztabpd, madvtr, majors, moffam, nodd, nltrf,           &
+!$OMP&  nltr3, nlnaro2, nlfro2, ipa2, nltrim, nlpdv, nfrpx, ntabfp,            &
+!$OMP&  ntabpd, npdfr, ngrp, njcgrp, nprdx3, nprdx2, nprdx1, njacx3,           &
+!$OMP&  njacx2, njacx1, nmpjac, npjac1, nbrkx, ntrkx, nprkx, nhrkx,            &
+!$OMP&  nlall, nlstst, nlf, nlmajmin, nldepd, nldepw, nldepx,                  &
+!$OMP&  njcoth, nmzjac, nzjac1, njcoss, nmsjac, nsjac1, nsspt, nspi,           &
+!$OMP&  nsspi, nssi, nssrt, nssri, nssrx, frpb, frpt, frpj, frph,              &
+!$OMP&  frpx, nonzero_map_unordered, nonzero_map, reorder, ilcf,               &
+!$OMP&  ilss, ilct, ilftr, ilft, ilstmin, ldepd, ldepw, advt, nadvt,           &
+!$OMP&  family, speci, spro2, specf, ctype, spb, spt, spj, sph,                &
+!$OMP&  pmin, ptol, ftol, kfphot, jpss, jpssr, nvar, nllv, ninv,               &
+!$OMP&  nout, jpem, jpeq, jddept, jddepc, jpdwio, jpemio, jpfrpd,              &
+!$OMP&  jpab, jpat, jpaj, jpah, jpspb, jpspt, jpspj, jpsph, jpmsp,             &
+!$OMP&  jppjac, jpkargs, jprargs, jpcargs, total, jpfrpb, jpfrpt,              &
+!$OMP&  jpfrpj, jpfrph, jpfrpx, jpcio, spfjsize_max, maxterms,                 &
+!$OMP&  maxfterms, nposterms, nnegterms, nfracterms, posterms,                 &
+!$OMP&  negterms, fracterms, base_tracer, ffrac, jpfm, jpif, jpsp,             &
+!$OMP&  jpna, jpco, jpcf, jpoo, lvmr, o1d_in_ss, o3p_in_ss, n_in_ss,           &
+!$OMP&  h_in_ss, nss_o1d, nss_o3p, nss_n, nss_h, peps, tslimit,                &
+!$OMP&  nrsteps_max, nitnr, nitfg, ntrf, ntr3, nnaf, nro2, nuni,               &
+!$OMP&  nsst, nit0, nfphot, method, nnfrp, nstst, nf, ndepd, ndepw,            &
+!$OMP&  ntro3, ntroh, ntrho2, ntrno, nspo1d, nspo3p, nspo3, nspoh,             &
+!$OMP&  nspho2, nspno, nspn, nsph, ih_o3, ih_h2o2, ih_so2, ih_hno3,            &
+!$OMP&  ih_o3_const, ihso3_h2o2, ihso3_o3, iso3_o3, ih2so4_hv,                 &
+!$OMP&  iso2_oh, ih2o2_oh, ihno3_oh, in2o5_h, iho2_h, jsro2, ljacx)
+
 CONTAINS
 
 ! ######################################################################
@@ -467,7 +498,7 @@ END SUBROUTINE asad_mod_pre_setup_init
 
 
 ! ######################################################################
-SUBROUTINE asad_mod_init(n_points)
+SUBROUTINE asad_mod_init(n_points, n_states)
 
 ! To allocate and initialise ASAD arrays and variables
 
@@ -475,9 +506,9 @@ SUBROUTINE asad_mod_init(n_points)
 
 IMPLICIT NONE
 
-INTEGER, INTENT(IN) :: n_points
+INTEGER, INTENT(IN) :: n_points, n_states
 
-INTEGER :: n_parallel, i
+INTEGER :: i
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -620,13 +651,10 @@ IF (method == int_method_NR) THEN
   IF (.NOT. ALLOCATED(ffrac))       ALLOCATE(ffrac(spfjsize_max, maxfterms))
 END IF
 
-n_parallel = 1
-!$ n_parallel = omp_get_max_teams()
-
-IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_parallel))
+IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_states))
 
 ! The arrays which have copies on all threads
-DO i = 1, n_parallel
+DO i = 1, n_states
   
   ! pd is a TARGET
   IF (.NOT. ALLOCATED(asad_state(i)%pd))                                       &
@@ -721,7 +749,7 @@ END SUBROUTINE asad_mod_init
 
 ! ######################################################################
 
-SUBROUTINE asad_mod_init_spatial_vars(n_points)
+SUBROUTINE asad_mod_init_spatial_vars(n_points, n_states)
 
 ! To allocate and initialise 2D/3D ASAD arrays and variables
 ! Called every chemistry timestep
@@ -730,9 +758,9 @@ SUBROUTINE asad_mod_init_spatial_vars(n_points)
 
 IMPLICIT NONE
 
-INTEGER, INTENT(IN) :: n_points
+INTEGER, INTENT(IN) :: n_points, n_states
 
-INTEGER :: n_parallel, i
+INTEGER :: i
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
@@ -741,15 +769,12 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_MOD_INIT_SPATIAL_VARS'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
-n_parallel = 1
-!$ n_parallel = omp_get_max_teams()
-
 ! Set integration method (1 = IMPACT; 3 = N-R solver; 5 = Backward-Euler)
 method = ukca_config%ukca_int_method
 
-IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_parallel))
+IF (.NOT. ALLOCATED(asad_state)) ALLOCATE(asad_state(n_states))
 
-DO i = 1, n_parallel
+DO i = 1, n_states
   ! prod and slos are pointers
   IF (ASSOCIATED(asad_state(i)%prod))       NULLIFY(asad_state(i)%prod)
   IF (ASSOCIATED(asad_state(i)%slos))       NULLIFY(asad_state(i)%slos)

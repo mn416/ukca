@@ -788,6 +788,8 @@ INTERFACE copy_config_vector
   MODULE PROCEDURE copy_config_vector_integer
 END INTERFACE copy_config_vector
 
+!$OMP DECLARE TARGET(ukca_config)
+
 CONTAINS
 
 ! ----------------------------------------------------------------------

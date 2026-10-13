@@ -78,7 +78,9 @@ USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_wetdep,                             &
                                 asad_psc_diagnostic,                           &
                                 asad_chemical_diagnostics
-USE asad_cdrive_mod,      ONLY: asad_cdrive, asad_cdrive_init
+USE asad_cdrive_mod,      ONLY: asad_cdrive_pre, asad_cdrive_post,             &
+                                asad_cdrive_init
+USE asad_spmjpdriv_mod,   ONLY: asad_spmjpdriv
 USE ukca_cspecies,        ONLY: c_species, c_na_species, n_cf2cl2, n_cfcl3,    &
                                 n_ch4, n_co, n_h2, n_h2so4, n_mebr, n_n2o,     &
                                 nn_h2o2, nn_h2so4, nn_o1d, nn_o3, nn_o3p,      &
@@ -434,7 +436,7 @@ DO k=1,model_levels
     END IF
   END IF
 
-  CALL asad_cdrive(s(t),                                                       &
+  CALL asad_cdrive_pre(s(t),                                                   &
                    zftr,                                                       &
                    pres(kcs:kce),                                              &
                    temp(kcs:kce),                                              &
@@ -451,6 +453,8 @@ DO k=1,model_levels
                    have_nat(kcs:kce),                                          &
                    L_stratosphere(kcs:kce),                                    &
                    H_plus(kcs:kce))
+  CALL asad_spmjpdriv(s(t), ix, jy, k, theta_field_size)
+  CALL asad_cdrive_post(s(t), zftr, theta_field_size)
 
   IF (ukca_config%l_ukca_het_psc) THEN
     ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.

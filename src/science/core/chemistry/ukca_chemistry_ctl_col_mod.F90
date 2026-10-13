@@ -98,7 +98,8 @@ USE ukca_missing_data_mod, ONLY: rmdi
 
 USE errormessagelength_mod, ONLY: errormessagelength
 
-USE asad_cdrive_mod, ONLY: asad_cdrive, asad_cdrive_init
+USE asad_cdrive_mod, ONLY: asad_cdrive_pre, asad_cdrive_post, asad_cdrive_init
+USE asad_spmjpdriv_mod, ONLY: asad_spmjpdriv
 !$ USE omp_lib
 
 !!!! Note: LFRIC-specific pre-processor directives used in this module are
@@ -512,7 +513,7 @@ DO i=1,rows
         END IF
 
         ! Call asad_cdrive with segmented arrays
-        CALL asad_cdrive(s(t),                                                 &
+        CALL asad_cdrive_pre(s(t),                                             &
                          zftr(kcs:kce,:),                                      &
                          zp(kcs:kce),                                          &
                          zt(kcs:kce),                                          &
@@ -529,6 +530,8 @@ DO i=1,rows
                          have_nat1d(kcs:kce),                                  &
                          stratflag(kcs:kce),                                   &
                          H_plus_1d_arr(kcs:kce))
+        CALL asad_spmjpdriv(s(t), j, i, klevel, theta_field_size)
+        CALL asad_cdrive_post(s(t), zftr, theta_field_size)
 
         ! Store the full column values of s(t)%dpd, s(t)%dpw, s(t)%fpsc1,
         ! s(t)%fpsc2, s(t)%prk and s(t)%y - these are needed later on
