@@ -426,35 +426,22 @@ LOGICAL :: ljacx
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='ASAD_MOD'
 
 !$OMP DECLARE TARGET(                                                          &
-!$OMP&  asad_state, init_cdt, init_cdt_diag, init_interval,                    &
-!$OMP&  init_ncsteps, init_ncsteps_factor, jpctr, jpspec, jpro2,               &
-!$OMP&  jpcspf, jpbk, jptk, jppj, jphk, jpnr, jpdd, jpdw, depvel,              &
-!$OMP&  k298, dhr, kd298, ddhr, ct_k298, ct_dhr, ct_kd298, ct_ddhr,            &
-!$OMP&  ab, at, aj, ah, ztabpd, madvtr, majors, moffam, nodd, nltrf,           &
-!$OMP&  nltr3, nlnaro2, nlfro2, ipa2, nltrim, nlpdv, nfrpx, ntabfp,            &
-!$OMP&  ntabpd, npdfr, ngrp, njcgrp, nprdx3, nprdx2, nprdx1, njacx3,           &
-!$OMP&  njacx2, njacx1, nmpjac, npjac1, nbrkx, ntrkx, nprkx, nhrkx,            &
-!$OMP&  nlall, nlstst, nlf, nlmajmin, nldepd, nldepw, nldepx,                  &
-!$OMP&  njcoth, nmzjac, nzjac1, njcoss, nmsjac, nsjac1, nsspt, nspi,           &
-!$OMP&  nsspi, nssi, nssrt, nssri, nssrx, frpb, frpt, frpj, frph,              &
-!$OMP&  frpx, nonzero_map_unordered, nonzero_map, reorder, ilcf,               &
-!$OMP&  ilss, ilct, ilftr, ilft, ilstmin, ldepd, ldepw, advt, nadvt,           &
-!$OMP&  family, speci, spro2, specf, ctype, spb, spt, spj, sph,                &
-!$OMP&  pmin, ptol, ftol, kfphot, jpss, jpssr, nvar, nllv, ninv,               &
-!$OMP&  nout, jpem, jpeq, jddept, jddepc, jpdwio, jpemio, jpfrpd,              &
-!$OMP&  jpab, jpat, jpaj, jpah, jpspb, jpspt, jpspj, jpsph, jpmsp,             &
-!$OMP&  jppjac, jpkargs, jprargs, jpcargs, total, jpfrpb, jpfrpt,              &
-!$OMP&  jpfrpj, jpfrph, jpfrpx, jpcio, spfjsize_max, maxterms,                 &
-!$OMP&  maxfterms, nposterms, nnegterms, nfracterms, posterms,                 &
-!$OMP&  negterms, fracterms, base_tracer, ffrac, jpfm, jpif, jpsp,             &
-!$OMP&  jpna, jpco, jpcf, jpoo, lvmr, o1d_in_ss, o3p_in_ss, n_in_ss,           &
-!$OMP&  h_in_ss, nss_o1d, nss_o3p, nss_n, nss_h, peps, tslimit,                &
-!$OMP&  nrsteps_max, nitnr, nitfg, ntrf, ntr3, nnaf, nro2, nuni,               &
-!$OMP&  nsst, nit0, nfphot, method, nnfrp, nstst, nf, ndepd, ndepw,            &
-!$OMP&  ntro3, ntroh, ntrho2, ntrno, nspo1d, nspo3p, nspo3, nspoh,             &
-!$OMP&  nspho2, nspno, nspn, nsph, ih_o3, ih_h2o2, ih_so2, ih_hno3,            &
-!$OMP&  ih_o3_const, ihso3_h2o2, ihso3_o3, iso3_o3, ih2so4_hv,                 &
-!$OMP&  iso2_oh, ih2o2_oh, ihno3_oh, in2o5_h, iho2_h, jsro2, ljacx)
+!$OMP&  base_tracer, ctype, ffrac, fracterms, frpx, ilcf, ilct,                &
+!$OMP&  ilft, ilftr, ilss, ilstmin, jpcf, jpco, jpcspf, jpfm,                  &
+!$OMP&  jpfrpx, jpif, jpmsp, jpna, jpnr, jpoo, jpro2, jpsp, jpspec,            &
+!$OMP&  jsro2, madvtr, majors, maxfterms, maxterms, moffam, ndepd,             &
+!$OMP&  ndepw, negterms, nf, nfracterms, nfrpx, ngrp, nitnr, njcoth,           &
+!$OMP&  nldepx, nlf, nlfro2, nlmajmin, nlstst, nltrf, nmsjac,                  &
+!$OMP&  nmzjac, nnegterms, nnfrp, nodd, nonzero_map,                           &
+!$OMP&  nonzero_map_unordered, npdfr, nposterms, nprdx1, nprdx2,               &
+!$OMP&  nprdx3, nsjac1, nspi, nstst, ntabfp, ntabpd, ntrf, ntrho2,             &
+!$OMP&  ntrno, ntro3, ntroh, nuni, nzjac1, peps, posterms, ptol,               &
+!$OMP&  reorder, specf, speci, spfjsize_max, total, ztabpd,                    &
+!$OMP&  nssi, nssrt, nssrx,                                                    &
+!$OMP&  nssri, nsspt, nsspi, nsst, nspo1d,                                     &
+!$OMP&  nspo3, nspoh, nspo3p, nsph, nuni,                                      &
+!$OMP&  nspho2, nspno, nspn, nss_o3p, nss_o1d,                                 &
+!$OMP&  nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss, nitfg)
 
 CONTAINS
 

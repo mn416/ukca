@@ -57,6 +57,7 @@ IMPLICIT NONE
 
 LOGICAL :: initialised = .FALSE.
 INTEGER :: iss, ict, iftr, icf
+!$OMP DECLARE TARGET(iss, ict, iftr, icf)
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYINIT_MOD'
 

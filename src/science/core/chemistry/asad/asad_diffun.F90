@@ -95,7 +95,6 @@ INTEGER :: js                  ! Index
 
 LOGICAL :: gfam
 LOGICAL :: gtr
-LOGICAL :: gdepem = .TRUE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -117,7 +116,7 @@ END DO
 !       2. Calculate production & loss terms of individual species
 !          --------- ---------- - ---- ----- -- ---------- -------
 
-CALL asad_prls( s, kl, nf, nlf, gdepem )
+CALL asad_prls( s, kl, nf, nlf, .TRUE. )
 
 !       3. Calculate tendencies
 !          --------- ----------

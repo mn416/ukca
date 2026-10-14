@@ -131,6 +131,8 @@ LOGICAL, PARAMETER :: l_twobin_dust = .FALSE.
 ! Required by asad_inrats_mod
 INTEGER, PARAMETER :: mype = 0  ! Serial case
 
+!$OMP DECLARE TARGET(mype)
+
 ! Required by ukca_activate_mod, ukca_mode_setup, ukca_vapour_mod and/or
 ! ukca_volume_mode_mod
 

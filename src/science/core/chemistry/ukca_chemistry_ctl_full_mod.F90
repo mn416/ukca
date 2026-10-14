@@ -451,17 +451,17 @@ n_chunks_y = (rows+chunk_n_y-1) / chunk_n_y
 n_chunks_x = (row_length+chunk_n_x-1) / chunk_n_x
 
 ! 3D chunking loops
-!$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
-!$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
-!$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
-!$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
-!$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
-!$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
-!$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
-!$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
-!$OMP        n_chunks_x)
+!x$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
+!x$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
+!x$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
+!x$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
+!x$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
+!x$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
+!x$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
+!x$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
+!x$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
+!x$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
+!x$OMP        n_chunks_x)
 DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
     DO xi = 1, row_length, chunk_n_x
@@ -512,16 +512,12 @@ DO zi = 1, model_levels, chunk_n_z
     END DO
   END DO
 END DO
-!$OMP END PARALLEL DO
+!x$OMP END PARALLEL DO
 
 !$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, yi, xi, t)                                                   &
 !$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
-!$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
-!$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
-!$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
+!$OMP        rows, row_length, ix, jy, k, s, n_chunks_z, n_chunks_y,           &
 !$OMP        n_chunks_x)
 DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
@@ -535,17 +531,17 @@ DO zi = 1, model_levels, chunk_n_z
 END DO
 !$OMP END TARGET TEAMS DISTRIBUTE
 
-!$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
-!$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
-!$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
-!$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
-!$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
-!$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
-!$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
-!$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
-!$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
-!$OMP        n_chunks_x)
+!x$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
+!x$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
+!x$OMP         chunk_zftr, chunk_dpd, chunk_dpw, chunk_fpsc1, chunk_fpsc2,      &
+!x$OMP         chunk_prk, chunk_y, chunk_sphno3, chunk_tnd, chunk_rk, t)        &
+!x$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
+!x$OMP        rows, row_length, jpspec, full_sph2o, full_za, full_y, full_dpd,  &
+!x$OMP        full_dpw, full_fpsc1, full_fpsc2, full_prk, full_sphno3,          &
+!x$OMP        full_tnd, full_rk, pres, temp, zq, co2_tmp, cloud_frac, qcl,      &
+!x$OMP        zdryrt2, zwetrt, zprt, rc_het, have_nat, stratflag, H_plus,       &
+!x$OMP        zftr, full_zftr, ix, jy, k, s, n_chunks_z, n_chunks_y,            &
+!x$OMP        n_chunks_x)
 DO zi = 1, model_levels, chunk_n_z
   DO yi = 1, rows, chunk_n_y
     DO xi = 1, row_length, chunk_n_x
@@ -602,7 +598,7 @@ DO zi = 1, model_levels, chunk_n_z
     END DO
   END DO
 END DO
-!$OMP END PARALLEL DO
+!x$OMP END PARALLEL DO
 
 IF (ukca_config%l_ukca_het_psc) THEN
   ! Save MMR of NAT PSC particles into 3-D array for PSC sedimentation.

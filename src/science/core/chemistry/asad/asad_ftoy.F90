@@ -132,6 +132,8 @@ INTEGER :: istmin
 INTEGER :: ift
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FTOY_MOD'
 
+!$OMP DECLARE TARGET(istmin, ift)
+
 CONTAINS
 
 SUBROUTINE asad_ftoy_init()
@@ -251,7 +253,6 @@ REAL          :: zc(n_points)
 REAL          :: zd(n_points)
 
 LOGICAL       :: gconv
-LOGICAL       :: gdepem = .FALSE.
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -380,7 +381,7 @@ DO jit = 1, iter
   !             Regardless of whether the user has them turned on or not.
   !             See method above.
 
-  CALL asad_prls( s, n_points, istmin, ilstmin, gdepem )
+  CALL asad_prls( s, n_points, istmin, ilstmin, .FALSE. )
 
   !         4.2 Initialise ratios
 

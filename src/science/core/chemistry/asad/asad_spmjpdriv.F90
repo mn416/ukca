@@ -141,7 +141,7 @@ INTEGER :: num_iter                 ! Total nonlinear solver iteration count
 INTEGER :: jit                      ! Iteration for asad_ftoy
 
 INTEGER :: errcode                  ! Variable passed to ereport
-LOGICAL :: not_first_call = .FALSE.
+LOGICAL, PARAMETER :: not_first_call = .FALSE.
 
 !CHARACTER(LEN=errormessagelength) :: cmessage
 

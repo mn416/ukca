@@ -126,7 +126,7 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='ASAD_FULJAC'
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 deltt=1.0/s%cdt
 !
-s%fj = 0.0
+s%fj(:,:,:) = 0.0
 DO i=1,jpcspf
   s%fj(:,i,i)=-deltt*s%f(:,i)
 END DO

@@ -325,7 +325,7 @@ REAL :: damp1
 REAL :: error_norm
 REAL :: residual_error
 
-LOGICAL :: not_first_call = .FALSE.
+LOGICAL, PARAMETER :: not_first_call = .FALSE.
 
 REAL :: f_initial(n_points,jpcspf) ! Concentration from previous timestep,s%f(t=n)
 REAL :: f_incr(n_points,jpcspf)  ! Increment at end of NR step that is added to
