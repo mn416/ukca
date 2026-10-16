@@ -958,4 +958,25 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE asad_mod_dealloc_spatial_vars
 
+SUBROUTINE asad_mod_target_update()
+IMPLICIT NONE
+!$OMP TARGET UPDATE TO( &
+!$OMP& base_tracer, ctype, ffrac, fracterms, frpx, ilcf, ilct, &
+!$OMP& ilft, ilftr, ilss, ilstmin, jpcspf, &
+!$OMP& jpfrpx, jpnr, jpro2, jpspec, &
+!$OMP& jsro2, madvtr, majors, maxfterms, maxterms, moffam, ndepd, &
+!$OMP& ndepw, negterms, nf, nfracterms, nfrpx, ngrp, nitnr, njcoth, &
+!$OMP& nldepx, nlf, nlfro2, nlmajmin, nlstst, nltrf, nmsjac, &
+!$OMP& nmzjac, nnegterms, nnfrp, nodd, nonzero_map, &
+!$OMP& nonzero_map_unordered, npdfr, nposterms, nprdx1, nprdx2, &
+!$OMP& nprdx3, nsjac1, nspi, nstst, ntabfp, ntabpd, ntrf, ntrho2, &
+!$OMP& ntrno, ntro3, ntroh, nuni, nzjac1, peps, posterms, &
+!$OMP& reorder, specf, speci, spfjsize_max, total, ztabpd, &
+!$OMP& nssi, nssrt, nssrx, &
+!$OMP& nssri, nsspt, nsspi, nsst, nspo1d, &
+!$OMP& nspo3, nspoh, nspo3p, nsph, nuni, &
+!$OMP& nspho2, nspno, nspn, &
+!$OMP& o3p_in_ss, n_in_ss, h_in_ss, nitfg)
+END SUBROUTINE asad_mod_target_update
+
 END MODULE asad_mod

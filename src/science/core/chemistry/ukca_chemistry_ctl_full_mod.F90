@@ -70,7 +70,8 @@ USE asad_mod,             ONLY: advt, ctype, ihso3_h2o2, ihso3_o3, ih2so4_hv,  &
                                 iso2_oh, iso3_o3, jpctr, jpcspf, jpdd,         &
                                 jpdw, jpnr, jppj, jpro2, jpspec,               &
                                 nadvt, nlnaro2, nprkx, o1d_in_ss, o3p_in_ss,   &
-                                specf, speci, spro2, s=>asad_state
+                                specf, speci, spro2, s=>asad_state,            &
+                                asad_mod_target_update
 USE asad_cdrive_mod,      ONLY: asad_cdrive_pre, asad_cdrive_post,             &
                                 asad_cdrive_init
 USE asad_spmjpdriv_mod, ONLY: asad_spmjpdriv
@@ -87,7 +88,7 @@ USE ukca_cspecies,        ONLY: c_species, c_na_species, n_cf2cl2, n_cfcl3,    &
                                 nn_h2o2, nn_h2so4, nn_o1d, nn_o3, nn_o3p,      &
                                 nn_oh, nn_so2
 USE ukca_constants,       ONLY: c_h2o, c_hono2, c_o1d, c_o3p, c_co2
-USE ukca_config_constants_mod, ONLY: avogadro
+USE ukca_config_constants_mod, ONLY: rmol, avogadro, boltzmann
 USE ukca_config_specification_mod, ONLY: ukca_config
 USE ukca_ntp_mod,         ONLY: ntp_type, dim_ntp, name2ntpindex
 
@@ -95,6 +96,7 @@ USE yomhook,              ONLY: lhook, dr_hook
 USE parkind1,             ONLY: jprb, jpim
 USE ereport_mod,          ONLY: ereport
 USE umPrintMgr,           ONLY: umMessage, umPrint
+USE ukca_um_legacy_mod,   ONLY: mype
 
 USE ukca_missing_data_mod, ONLY: rmdi
 
@@ -513,6 +515,10 @@ DO zi = 1, model_levels, chunk_n_z
   END DO
 END DO
 !x$OMP END PARALLEL DO
+
+!$OMP TARGET UPDATE TO(ukca_config, rmol, avogadro, boltzmann,                 &
+!$OMP&                 lhook, mype, jpim, jprb)
+CALL asad_mod_target_update()
 
 !$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, yi, xi, t)                                                   &
