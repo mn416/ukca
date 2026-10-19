@@ -256,6 +256,9 @@ INTEGER :: n_chunks_x, n_chunks_y, n_chunks_z
 INTEGER :: t ! Thread/team id
 INTEGER :: cdt_diag
 
+integer(kind=8) :: start_count, end_count, count_rate
+real(kind=8)    :: elapsed_time
+
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_CHEMISTRY_CTL_FULL'
 
 
@@ -520,6 +523,7 @@ END DO
 !$OMP&                 lhook, mype, jpim, jprb)
 CALL asad_mod_target_update()
 
+call system_clock(count=start_count, count_rate=count_rate)
 !$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, yi, xi, t)                                                   &
 !$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
@@ -536,6 +540,9 @@ DO zi = 1, model_levels, chunk_n_z
   END DO
 END DO
 !$OMP END TARGET TEAMS DISTRIBUTE
+call system_clock(count=end_count)
+elapsed_time = real(end_count - start_count, 8) / real(count_rate, 8)
+print '(A, F10.5, A)', "Elapsed wall clock time: ", elapsed_time, " seconds."
 
 !x$OMP PARALLEL DO DEFAULT(NONE) COLLAPSE(3)                                    &
 !x$OMP PRIVATE(zi, ze, zs, zo, yi, ye, ys, yo, xi, xe, xs, xo,                  &
