@@ -57,7 +57,6 @@ IMPLICIT NONE
 
 LOGICAL :: initialised = .FALSE.
 INTEGER :: iss, ict, iftr, icf
-!$OMP DECLARE TARGET(iss, ict, iftr, icf)
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FYINIT_MOD'
 
@@ -103,7 +102,6 @@ IF (.NOT. initialised) THEN
   END DO
   initialised = .TRUE.
 END IF
-!$OMP TARGET UPDATE TO(iss, ict, iftr, icf)
 END SUBROUTINE asad_fyinit_init
 
 SUBROUTINE asad_fyinit(s, ofirst, n_points, ix, jy, nlev)

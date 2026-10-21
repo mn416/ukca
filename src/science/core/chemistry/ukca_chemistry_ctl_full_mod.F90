@@ -519,10 +519,6 @@ DO zi = 1, model_levels, chunk_n_z
 END DO
 !x$OMP END PARALLEL DO
 
-!$OMP TARGET UPDATE TO(ukca_config, rmol, avogadro, boltzmann,                 &
-!$OMP&                 lhook, mype, jpim, jprb)
-CALL asad_mod_target_update()
-
 call system_clock(count=start_count, count_rate=count_rate)
 !$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
 !$OMP PRIVATE(zi, yi, xi, t)                                                   &

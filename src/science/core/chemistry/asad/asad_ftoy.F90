@@ -132,8 +132,6 @@ INTEGER :: istmin
 INTEGER :: ift
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ASAD_FTOY_MOD'
 
-!$OMP DECLARE TARGET(istmin, ift)
-
 CONTAINS
 
 SUBROUTINE asad_ftoy_init()
@@ -188,7 +186,6 @@ IF (.NOT. initialised) THEN
   END IF
 END IF
 
-!$OMP TARGET UPDATE TO(istmin, ift)
 END SUBROUTINE asad_ftoy_init
 
 SUBROUTINE asad_ftoy(s, ofirst,iter, num_iter, n_points, ix, jy, nlev)

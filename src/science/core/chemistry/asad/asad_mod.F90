@@ -425,33 +425,6 @@ LOGICAL :: ljacx
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='ASAD_MOD'
 
-!x$OMP DECLARE TARGET( &
-!x$OMP&  jpcf, jpco, jpcspf, jpfm, jpfrpx, jpif, jpmsp, jpna, jpnr, &
-!x$OMP&  jpoo, jpro2, jpsp, jpspec, jsro2, maxfterms, maxterms, ndepd, &
-!x$OMP&  ndepw, nf, nitnr, nnfrp, nstst, ntrf, ntrho2, ntrno, ntro3, &
-!x$OMP&  ntroh, nuni, peps, ptol, spfjsize_max, total, nsst, nspo1d, &
-!x$OMP&  nspo3, nspoh, nspo3p, nsph, nspho2, nspno, nspn, &
-!x$OMP&  nss_o3p, nss_o1d, nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss, &
-!x$OMP&  nitfg)
-
-!$OMP DECLARE TARGET(                                                          &
-!$OMP&  base_tracer, ctype, ffrac, fracterms, frpx, ilcf, ilct,                &
-!$OMP&  ilft, ilftr, ilss, ilstmin, jpcf, jpco, jpcspf, jpfm,                  &
-!$OMP&  jpfrpx, jpif, jpmsp, jpna, jpnr, jpoo, jpro2, jpsp, jpspec,            &
-!$OMP&  jsro2, madvtr, majors, maxfterms, maxterms, moffam, ndepd,             &
-!$OMP&  ndepw, negterms, nf, nfracterms, nfrpx, ngrp, nitnr, njcoth,           &
-!$OMP&  nldepx, nlf, nlfro2, nlmajmin, nlstst, nltrf, nmsjac,                  &
-!$OMP&  nmzjac, nnegterms, nnfrp, nodd, nonzero_map,                           &
-!$OMP&  nonzero_map_unordered, npdfr, nposterms, nprdx1, nprdx2,               &
-!$OMP&  nprdx3, nsjac1, nspi, nstst, ntabfp, ntabpd, ntrf, ntrho2,             &
-!$OMP&  ntrno, ntro3, ntroh, nuni, nzjac1, peps, posterms, ptol,               &
-!$OMP&  reorder, specf, speci, spfjsize_max, total, ztabpd,                    &
-!$OMP&  nssi, nssrt, nssrx,                                                    &
-!$OMP&  nssri, nsspt, nsspi, nsst, nspo1d,                                     &
-!$OMP&  nspo3, nspoh, nspo3p, nsph, nuni,                                      &
-!$OMP&  nspho2, nspno, nspn, nss_o3p, nss_o1d,                                 &
-!$OMP&  nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss, nitfg)
-
 CONTAINS
 
 ! ######################################################################
@@ -487,8 +460,6 @@ IF (.NOT. ALLOCATED(specf)) ALLOCATE(specf(jpcspf))
 IF (.NOT. ALLOCATED(family)) ALLOCATE(family(jpspec))
 IF (.NOT. ALLOCATED(speci)) ALLOCATE(speci(jpspec))
 IF (.NOT. ALLOCATED(ctype)) ALLOCATE(ctype(jpspec))
-
-!$OMP TARGET ENTER DATA MAP(TO: ctype, nlfro2, nltrf, nodd, specf, speci)
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
@@ -741,15 +712,6 @@ DO i = 1, n_states
   
 END DO
 
-!$OMP TARGET ENTER DATA MAP(TO: &
-!$OMP&  base_tracer, ffrac, fracterms, frpx, ilcf, ilct, ilft, &
-!$OMP&  ilftr, ilss, ilstmin, madvtr, majors, moffam, negterms, &
-!$OMP&  nfracterms, nfrpx, ngrp, njcoth, nldepx, nlf, nlmajmin, &
-!$OMP&  nlstst, nmsjac, nmzjac, nnegterms, nonzero_map, &
-!$OMP&  nonzero_map_unordered, npdfr, nposterms, nprdx1, nprdx2, &
-!$OMP&  nprdx3, nsjac1, nspi, ntabfp, ntabpd, nzjac1, posterms, &
-!$OMP&  reorder, ztabpd, nssi, nssrt, nssrx, nssri, nsspt, nsspi)
-
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN
 END SUBROUTINE asad_mod_init
@@ -980,14 +942,6 @@ END SUBROUTINE asad_mod_dealloc_spatial_vars
 
 SUBROUTINE asad_mod_target_update()
 IMPLICIT NONE
-!$OMP TARGET UPDATE TO( &
-!$OMP&  jpcf, jpco, jpcspf, jpfm, jpfrpx, jpif, jpmsp, jpna, jpnr, &
-!$OMP&  jpoo, jpro2, jpsp, jpspec, jsro2, maxfterms, maxterms, ndepd, &
-!$OMP&  ndepw, nf, nitnr, nnfrp, nstst, ntrf, ntrho2, ntrno, ntro3, &
-!$OMP&  ntroh, nuni, peps, ptol, spfjsize_max, total, nsst, nspo1d, &
-!$OMP&  nspo3, nspoh, nspo3p, nsph, nspho2, nspno, nspn, &
-!$OMP&  nss_o3p, nss_o1d, nss_n, nss_h, o3p_in_ss, n_in_ss, h_in_ss, &
-!$OMP&  nitfg)
 END SUBROUTINE asad_mod_target_update
 
 END MODULE asad_mod

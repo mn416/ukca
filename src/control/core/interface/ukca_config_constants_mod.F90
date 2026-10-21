@@ -95,8 +95,6 @@ LOGICAL, SAVE :: l_ukca_constants_available = .FALSE.
 
 CHARACTER(LEN=*), PARAMETER :: ModuleName = 'UKCA_CONFIG_CONSTANTS_MOD'
 
-!$OMP DECLARE TARGET(rmol, avogadro, boltzmann)
-
 CONTAINS
 
 ! ----------------------------------------------------------------------
