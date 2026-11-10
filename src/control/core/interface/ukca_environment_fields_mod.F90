@@ -472,10 +472,6 @@ TYPE(env_field_ptrs_type), ALLOCATABLE, SAVE, PUBLIC ::                        &
 
 CHARACTER(LEN=*), PARAMETER :: ModuleName='UKCA_ENVIRONMENT_FIELDS_MOD'
 
-!$OMP DECLARE TARGET (atmospheric_co2, atmospheric_h2,                         &
-!$OMP&                atmospheric_n2, atmospheric_o2,                          &
-!$OMP&                atmospheric_ch4)
-
 CONTAINS
 
 ! ----------------------------------------------------------------------

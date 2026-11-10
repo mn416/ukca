@@ -74,7 +74,7 @@ USE asad_mod,             ONLY: advt, ctype, ihso3_h2o2, ihso3_o3, ih2so4_hv,  &
                                 asad_mod_target_update
 USE asad_cdrive_mod,      ONLY: asad_cdrive_pre, asad_cdrive_post,             &
                                 asad_cdrive_init
-USE asad_spmjpdriv_mod, ONLY: asad_spmjpdriv
+USE asad_spmjpdriv_full_mod, ONLY: asad_spmjpdriv
 USE asad_chem_flux_diags, ONLY: l_asad_use_chem_diags,                         &
                                 l_asad_use_drydep,                             &
                                 l_asad_use_flux_rxns,                          &
@@ -519,27 +519,24 @@ DO zi = 1, model_levels, chunk_n_z
 END DO
 !x$OMP END PARALLEL DO
 
-!$OMP TARGET UPDATE TO(ukca_config, rmol, avogadro, boltzmann,                 &
-!$OMP&                 lhook, mype, jpim, jprb)
-CALL asad_mod_target_update()
-
 call system_clock(count=start_count, count_rate=count_rate)
-!$OMP TARGET TEAMS DISTRIBUTE DEFAULT(NONE) COLLAPSE(3)                        &
-!$OMP PRIVATE(zi, yi, xi, t)                                                   &
-!$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
-!$OMP        rows, row_length, ix, jy, k, s, n_chunks_z, n_chunks_y,           &
-!$OMP        n_chunks_x)
-DO zi = 1, model_levels, chunk_n_z
-  DO yi = 1, rows, chunk_n_y
-    DO xi = 1, row_length, chunk_n_x
-      t = ((zi-1)/chunk_n_z) * n_chunks_y * n_chunks_x                         &
-        + ((yi-1)/chunk_n_y) * n_chunks_x                                      &
-        + ((xi-1)/chunk_n_x) + 1
-      CALL asad_spmjpdriv(s(t), ix, jy, k, chunk_n_pnts)
-    END DO
-  END DO
-END DO
-!$OMP END TARGET TEAMS DISTRIBUTE
+call asad_spmjpdriv(chunk_n_pnts)
+!x$OMP TARGET TEAMS DISTRIBUTE COLLAPSE(3)                                      &
+!x$OMP PRIVATE(zi, yi, xi, t)                                                   &
+!x$OMP SHARED(chunk_n_pnts, chunk_n_x, chunk_n_y, chunk_n_z, model_levels,      &
+!x$OMP        rows, row_length, ix, jy, k, s, n_chunks_z, n_chunks_y,           &
+!x$OMP        n_chunks_x)
+!DO zi = 1, model_levels, chunk_n_z
+!  DO yi = 1, rows, chunk_n_y
+!    DO xi = 1, row_length, chunk_n_x
+!      t = ((zi-1)/chunk_n_z) * n_chunks_y * n_chunks_x                         &
+!        + ((yi-1)/chunk_n_y) * n_chunks_x                                      &
+!        + ((xi-1)/chunk_n_x) + 1
+!      CALL asad_spmjpdriv(s(t), ix, jy, k, chunk_n_pnts)
+!    END DO
+!  END DO
+!END DO
+!x$OMP END TARGET TEAMS DISTRIBUTE
 call system_clock(count=end_count)
 elapsed_time = real(end_count - start_count, 8) / real(count_rate, 8)
 print '(A, F10.5, A)', "Elapsed wall clock time: ", elapsed_time, " seconds."

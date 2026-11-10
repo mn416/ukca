@@ -630,9 +630,11 @@ IF (ukca_config%l_ukca_asad_full) THEN
     full_chunk_z = model_levels
   END IF
   n_pnts = full_chunk_x * full_chunk_y * full_chunk_z
-  n_chunks = (model_levels + full_chunk_z - 1) / full_chunk_z                  &
-           * (rows + full_chunk_y - 1) / full_chunk_y                          &
-           * (row_length + full_chunk_x - 1) / full_chunk_x
+  print *, "###", full_chunk_x, full_chunk_y, full_chunk_z
+  n_chunks = ((model_levels + full_chunk_z - 1) / full_chunk_z)                &
+           * ((rows + full_chunk_y - 1) / full_chunk_y)                        &
+           * ((row_length + full_chunk_x - 1) / full_chunk_x)
+  print *, "###", model_levels, rows, row_length, n_chunks
 ELSE IF (ukca_config%l_ukca_asad_columns) THEN
   n_pnts = ukca_config%ukca_chem_seg_size
   n_chunks = 1 ! XXX
