@@ -533,15 +533,12 @@ module asad_spmjpdriv_full_mod
     integer :: j_30
     real :: fro2_5(n_points)
     integer :: t
-    integer :: tmp_n
     integer :: n_states
 
   ix = 0
   jy = 0
   nlev = 0
   n_states = size(s)
-  ! TODO: try COPY(s)?
-
   !$ACC  PARALLEL LOOP GANG &
   !$ACC& PRIVATE(exit_code, ncsteps_initial, iredo, js, iter, location, &
   !$ACC& solver_iter, num_iter, jit, errcode, cdt_initial, f_initial, &
@@ -613,7 +610,7 @@ module asad_spmjpdriv_full_mod
   !$ACC& ir1_5, ir2_5, ip1_5, ip2_5, ip3_5, iunip1_5, iss_6, ir_5, &
   !$ACC& ix_9, istart_14, iend_14, fr_5,  errcode_9, &
   !$ACC& row_length_2, rows_2, iro2_5, j_30,  fro2_5, &
-  !$ACC& t, tmp_n)
+  !$ACC& t)
   do t = 1, n_states
     ncsteps_initial = s(t)%ncsteps
     cdt_initial = s(t)%cdt
@@ -1083,7 +1080,7 @@ module asad_spmjpdriv_full_mod
             do j_1 = 1, nstst, 1
               js_1 = nlstst(j_1)
               do jl_3 = 1, n_points, 1
-                if (peps < s(t)%prod(jl_3,js_1) .AND. peps > ABS(s(t)%y(jl_3,js_1))) then
+                if (peps < s(t)%pd(jl_3,js_1) .AND. peps > ABS(s(t)%y(jl_3,js_1))) then
                   s(t)%y(jl_3,js_1) = peps
                 end if
               enddo
@@ -1091,8 +1088,8 @@ module asad_spmjpdriv_full_mod
           end if
           do js_9 = 1, jpspec, 1
             do jl_14 = 1, n_points, 1
-              s(t)%prod(jl_14,js_9) = 0.0
-              s(t)%slos(jl_14,js_9) = 0.0
+              s(t)%pd(jl_14,js_9) = 0.0
+              s(t)%pd(jl_14,js_9 + jpspec) = 0.0
             enddo
           enddo
           do jr_4 = 1, nuni, 1
@@ -1153,7 +1150,7 @@ module asad_spmjpdriv_full_mod
             do j_13 = istart_4, iend_4, 1
               js_9 = nldepx(j_13)
               do jl_14 = 1, n_points, 1
-                s(t)%slos(jl_14,js_9) = s(t)%slos(jl_14,js_9) + (s(t)%dpd(jl_14,js_9) + s(t)%dpw(jl_14,js_9)) * s(t)%y(jl_14,js_9)
+                s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + (s(t)%dpd(jl_14,js_9) + s(t)%dpw(jl_14,js_9)) * s(t)%y(jl_14,js_9)
               enddo
             enddo
             istart_4 = nldepx(3)
@@ -1161,7 +1158,7 @@ module asad_spmjpdriv_full_mod
             do j_13 = istart_4, iend_4, 1
               js_9 = nldepx(j_13)
               do jl_14 = 1, n_points, 1
-                s(t)%slos(jl_14,js_9) = s(t)%slos(jl_14,js_9) + s(t)%dpd(jl_14,js_9) * s(t)%y(jl_14,js_9)
+                s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + s(t)%dpd(jl_14,js_9) * s(t)%y(jl_14,js_9)
               enddo
             enddo
             istart_4 = nldepx(5)
@@ -1169,7 +1166,7 @@ module asad_spmjpdriv_full_mod
             do j_13 = istart_4, iend_4, 1
               js_9 = nldepx(j_13)
               do jl_14 = 1, n_points, 1
-                s(t)%slos(jl_14,js_9) = s(t)%slos(jl_14,js_9) + s(t)%dpw(jl_14,js_9) * s(t)%y(jl_14,js_9)
+                s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + s(t)%dpw(jl_14,js_9) * s(t)%y(jl_14,js_9)
               enddo
             enddo
           end if
@@ -1185,11 +1182,11 @@ module asad_spmjpdriv_full_mod
               if (peps > s(t)%y(jl_3,js_1)) then
                 sl = 0.0
               else
-                sl = s(t)%slos(jl_3,js_1) / s(t)%y(jl_3,js_1)
+                sl = s(t)%pd(jl_3,js_1 + jpspec) / s(t)%y(jl_3,js_1)
               end if
               if (peps < s(t)%qa(jl_3,js_1)) then
                 zb(jl_3) = sl - s(t)%qa(jl_3,js_1) * s(t)%y(jl_3,js_1)
-                zc(jl_3) = s(t)%prod(jl_3,js_1)
+                zc(jl_3) = s(t)%pd(jl_3,js_1)
                 zd(jl_3) = zb(jl_3) * zb(jl_3) + 4.0 * s(t)%qa(jl_3,js_1) * zc(jl_3)
                 if (zd(jl_3) > 0.0) then
                   s(t)%y(jl_3,js_1) = (zb(jl_3) - SQRT(zd(jl_3))) / (-2.0 * s(t)%qa(jl_3,js_1))
@@ -1200,7 +1197,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_3,js_1) = zb(jl_3) / (-2.0 * s(t)%qa(jl_3,js_1))
                 end if
               elseif (peps < sl .AND. peps >= s(t)%qa(jl_3,js_1)) then
-                s(t)%y(jl_3,js_1) = s(t)%prod(jl_3,js_1) / sl
+                s(t)%y(jl_3,js_1) = s(t)%pd(jl_3,js_1) / sl
               else
                 s(t)%y(jl_3,js_1) = 0.0
               end if
@@ -1234,7 +1231,7 @@ module asad_spmjpdriv_full_mod
             if (not_first_call_1 .AND. jit_2 == 1) then
               do jl_3 = 1, n_points, 1
                 if (peps < s(t)%y(jl_3,js_1)) then
-                  sl = s(t)%slos(jl_3,js_1) / s(t)%y(jl_3,js_1)
+                  sl = s(t)%pd(jl_3,js_1 + jpspec) / s(t)%y(jl_3,js_1)
                 else
                   sl = 0.0
                 end if
@@ -1490,8 +1487,8 @@ module asad_spmjpdriv_full_mod
         enddo
         do js_10 = 1, jpspec, 1
           do jl_15 = 1, n_points, 1
-            s(t)%prod(jl_15,js_10) = 0.0
-            s(t)%slos(jl_15,js_10) = 0.0
+            s(t)%pd(jl_15,js_10) = 0.0
+            s(t)%pd(jl_15,js_10 + jpspec) = 0.0
           enddo
         enddo
         do jr_5 = 1, nuni, 1
@@ -1510,7 +1507,7 @@ module asad_spmjpdriv_full_mod
         enddo
         do jskip_1 = 0, jpspec, jpspec
           do j_14 = 1, nf, 1
-            js_10 = nlf(j_14 - 1 + LBOUND(nlf, dim=1)) + jskip_1
+            js_10 = nlf(j_14) + jskip_1
             ip3_1 = ngrp(js_10,3)
             ip2_1 = ngrp(js_10,2)
             ip1_1 = ngrp(js_10,1)
@@ -1552,7 +1549,7 @@ module asad_spmjpdriv_full_mod
           do j_14 = istart_5, iend_5, 1
             js_10 = nldepx(j_14)
             do jl_15 = 1, n_points, 1
-              s(t)%slos(jl_15,js_10) = s(t)%slos(jl_15,js_10) + (s(t)%dpd(jl_15,js_10) + s(t)%dpw(jl_15,js_10)) * s(t)%y(jl_15,js_10)
+              s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + (s(t)%dpd(jl_15,js_10) + s(t)%dpw(jl_15,js_10)) * s(t)%y(jl_15,js_10)
             enddo
           enddo
           istart_5 = nldepx(3)
@@ -1560,7 +1557,7 @@ module asad_spmjpdriv_full_mod
           do j_14 = istart_5, iend_5, 1
             js_10 = nldepx(j_14)
             do jl_15 = 1, n_points, 1
-              s(t)%slos(jl_15,js_10) = s(t)%slos(jl_15,js_10) + s(t)%dpd(jl_15,js_10) * s(t)%y(jl_15,js_10)
+              s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + s(t)%dpd(jl_15,js_10) * s(t)%y(jl_15,js_10)
             enddo
           enddo
           istart_5 = nldepx(5)
@@ -1568,7 +1565,7 @@ module asad_spmjpdriv_full_mod
           do j_14 = istart_5, iend_5, 1
             js_10 = nldepx(j_14)
             do jl_15 = 1, n_points, 1
-              s(t)%slos(jl_15,js_10) = s(t)%slos(jl_15,js_10) + s(t)%dpw(jl_15,js_10) * s(t)%y(jl_15,js_10)
+              s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + s(t)%dpw(jl_15,js_10) * s(t)%y(jl_15,js_10)
             enddo
           enddo
         end if
@@ -1579,7 +1576,7 @@ module asad_spmjpdriv_full_mod
           gfam = ifam_1 /= 0
           gtr = itr_2 /= 0
           do jl_4 = 1, n_points, 1
-            s(t)%ydot(jl_4,js_2) = s(t)%prod(jl_4,js_2) - s(t)%slos(jl_4,js_2)
+            s(t)%ydot(jl_4,js_2) = s(t)%pd(jl_4,js_2) - s(t)%pd(jl_4,js_2 + jpspec)
             if (gfam .AND. (.NOT.gtr .OR. gtr .AND. s(t)%linfam(jl_4,itr_2))) then
               s(t)%fdot(jl_4,ifam_1) = s(t)%fdot(jl_4,ifam_1) + nodd(js_2) * s(t)%ydot(jl_4,js_2)
             end if
@@ -1607,7 +1604,7 @@ module asad_spmjpdriv_full_mod
         residual_error = 0.0
         do jtr_3 = 1, jpcspf, 1
           j_4 = nlf(jtr_3)
-          tmprc(1:n_points,jtr_3) = s(t)%prod(1:n_points,j_4) + s(t)%slos(1:n_points,j_4)
+          tmprc(1:n_points,jtr_3) = s(t)%pd(1:n_points,j_4) + s(t)%pd(1:n_points,j_4 + jpspec)
         enddo
         do jtr_3 = 1, jpcspf, 1
           do jl_5 = 1, n_points, 1
@@ -1646,7 +1643,7 @@ module asad_spmjpdriv_full_mod
         deltt_2 = 1.0 / s(t)%cdt
         s(t)%spfj(:,:) = 0.0
         do i_4 = 1, jpcspf, 1
-          s(t)%spfj(:,nonzero_map(i_4 - 1 + LBOUND(nonzero_map, dim=1),i_4 - 1 + LBOUND(nonzero_map, dim=2))) = -deltt_2 * s(t)%f(:,i_4)
+          s(t)%spfj(:,nonzero_map(i_4,i_4)) = -deltt_2 * s(t)%f(:,i_4)
         enddo
         do p_1 = 1, total, 1
           do i_4 = nposterms(p_1), 1, -1
@@ -1665,7 +1662,7 @@ module asad_spmjpdriv_full_mod
             do jn_1 = 1, jpmsp, 1
               ij_1 = njcoth(irj_1,jn_1)
               if (ij_1 /= 0) then
-                p_1 = nonzero_map(ij_1 - 1 + LBOUND(nonzero_map, dim=1),ntro3 - 1 + LBOUND(nonzero_map, dim=2))
+                p_1 = nonzero_map(ij_1,ntro3)
                 if (jn_1 < 3) then
                   s(t)%spfj(:,p_1) = s(t)%spfj(:,p_1) - s(t)%prk(:,irj_1) * s(t)%deriv(:,jc_1,1)
                 else
@@ -1681,7 +1678,7 @@ module asad_spmjpdriv_full_mod
             itrd_1 = madvtr(js_3)
             ityped_1 = ctype(js_3)
             if (ifamd_1 /= 0) then
-              p_1 = nonzero_map(ifamd_1 - 1 + LBOUND(nonzero_map, dim=1),ifamd_1 - 1 + LBOUND(nonzero_map, dim=2))
+              p_1 = nonzero_map(ifamd_1,ifamd_1)
               do jl_6 = 1, n_points, 1
                 if (ityped_1 == jpfm .OR. ityped_1 == jpif .AND. s(t)%linfam(jl_6,itrd_1)) then
                   s(t)%spfj(jl_6,p_1) = s(t)%spfj(jl_6,p_1) - nodd(js_3) * (s(t)%dpd(jl_6,js_3) + s(t)%dpw(jl_6,js_3)) * s(t)%y(jl_6,js_3)
@@ -1689,7 +1686,7 @@ module asad_spmjpdriv_full_mod
               enddo
             end if
             if (itrd_1 /= 0) then
-              p_1 = nonzero_map(itrd_1 - 1 + LBOUND(nonzero_map, dim=1),itrd_1 - 1 + LBOUND(nonzero_map, dim=2))
+              p_1 = nonzero_map(itrd_1,itrd_1)
               s(t)%spfj(:,p_1) = s(t)%spfj(:,p_1) - (s(t)%dpd(:,js_3) + s(t)%dpw(:,js_3)) * s(t)%y(:,js_3)
             end if
           enddo
@@ -1703,9 +1700,7 @@ module asad_spmjpdriv_full_mod
           enddo
         enddo
         total1 = total
-        s(t)%modified_map(:,:) = nonzero_map_unordered(1 - 1 + LBOUND(nonzero_map_unordered, dim=1):jpcspf - 1 + &
-&LBOUND(nonzero_map_unordered, dim=1),1 - 1 + LBOUND(nonzero_map_unordered, dim=2):jpcspf - 1 + LBOUND(nonzero_map_unordered, &
-&dim=2))
+        s(t)%modified_map(:,:) = nonzero_map_unordered(1:jpcspf,1:jpcspf)
         do kr = 1, jpcspf, 1
           pivot(:) = s(t)%spfj(:,s(t)%modified_map(kr,kr))
           do i_5 = 1, n_points, 1
@@ -1905,9 +1900,9 @@ module asad_spmjpdriv_full_mod
                 row_length_1 = ukca_config%row_length
                 rows_1 = ukca_config%rows
                 if (species_tmp_1(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) then
-                  s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_11) = s(t)%co2(:)
+                  s(t)%y(1:n_points,js_11) = s(t)%co2(:)
                 elseif (species_tmp_1(1:4) == 'H2O ') then
-                  s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_11) = s(t)%wp(:)
+                  s(t)%y(1:n_points,js_11) = s(t)%wp(:)
                 elseif (species_tmp_1(1:4) == 'RO2 ') then
                   if (ukca_config%l_ukca_ro2_perm) then
                     fro2_3(:) = 0.0
@@ -1915,15 +1910,14 @@ module asad_spmjpdriv_full_mod
                       iro2_3 = nlfro2(j_22)
                       fro2_3(:) = fro2_3(:) + s(t)%f(:,iro2_3)
                     enddo
-                    s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_11) = fro2_3(:) / s(t)%tnd(:)
+                    s(t)%y(1:n_points,js_11) = fro2_3(:) / s(t)%tnd(:)
                   else
                     errcode_5 = 126
                   end if
                 else
                   errcode_5 = 124
                 end if
-                s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_11) = s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points &
-&- 1 + LBOUND(s(t)%y, dim=1),js_11) * s(t)%tnd(:)
+                s(t)%y(1:n_points,js_11) = s(t)%y(1:n_points,js_11) * s(t)%tnd(:)
               enddo
             end if
             if (ukca_config%l_ukca_ro2_perm) then
@@ -2001,7 +1995,7 @@ module asad_spmjpdriv_full_mod
                 do j_6 = 1, nstst, 1
                   js_4 = nlstst(j_6)
                   do jl_9 = 1, n_points, 1
-                    if (peps < s(t)%prod(jl_9,js_4) .AND. peps > ABS(s(t)%y(jl_9,js_4))) then
+                    if (peps < s(t)%pd(jl_9,js_4) .AND. peps > ABS(s(t)%y(jl_9,js_4))) then
                       s(t)%y(jl_9,js_4) = peps
                     end if
                   enddo
@@ -2009,8 +2003,8 @@ module asad_spmjpdriv_full_mod
               end if
               do js_14 = 1, jpspec, 1
                 do jl_19 = 1, n_points, 1
-                  s(t)%prod(jl_19,js_14) = 0.0
-                  s(t)%slos(jl_19,js_14) = 0.0
+                  s(t)%pd(jl_19,js_14) = 0.0
+                  s(t)%pd(jl_19,js_14 + jpspec) = 0.0
                 enddo
               enddo
               do jr_7 = 1, nuni, 1
@@ -2029,7 +2023,7 @@ module asad_spmjpdriv_full_mod
               enddo
               do jskip_2 = 0, jpspec, jpspec
                 do j_19 = 1, istmin, 1
-                  js_14 = ilstmin(j_19 - 1 + LBOUND(ilstmin, dim=1)) + jskip_2
+                  js_14 = ilstmin(j_19) + jskip_2
                   ip3_2 = ngrp(js_14,3)
                   ip2_2 = ngrp(js_14,2)
                   ip1_2 = ngrp(js_14,1)
@@ -2071,7 +2065,7 @@ module asad_spmjpdriv_full_mod
                 do j_19 = istart_8, iend_8, 1
                   js_14 = nldepx(j_19)
                   do jl_19 = 1, n_points, 1
-                    s(t)%slos(jl_19,js_14) = s(t)%slos(jl_19,js_14) + (s(t)%dpd(jl_19,js_14) + s(t)%dpw(jl_19,js_14)) * s(t)%y(jl_19,js_14)
+                    s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + (s(t)%dpd(jl_19,js_14) + s(t)%dpw(jl_19,js_14)) * s(t)%y(jl_19,js_14)
                   enddo
                 enddo
                 istart_8 = nldepx(3)
@@ -2079,7 +2073,7 @@ module asad_spmjpdriv_full_mod
                 do j_19 = istart_8, iend_8, 1
                   js_14 = nldepx(j_19)
                   do jl_19 = 1, n_points, 1
-                    s(t)%slos(jl_19,js_14) = s(t)%slos(jl_19,js_14) + s(t)%dpd(jl_19,js_14) * s(t)%y(jl_19,js_14)
+                    s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + s(t)%dpd(jl_19,js_14) * s(t)%y(jl_19,js_14)
                   enddo
                 enddo
                 istart_8 = nldepx(5)
@@ -2087,7 +2081,7 @@ module asad_spmjpdriv_full_mod
                 do j_19 = istart_8, iend_8, 1
                   js_14 = nldepx(j_19)
                   do jl_19 = 1, n_points, 1
-                    s(t)%slos(jl_19,js_14) = s(t)%slos(jl_19,js_14) + s(t)%dpw(jl_19,js_14) * s(t)%y(jl_19,js_14)
+                    s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + s(t)%dpw(jl_19,js_14) * s(t)%y(jl_19,js_14)
                   enddo
                 enddo
               end if
@@ -2103,11 +2097,11 @@ module asad_spmjpdriv_full_mod
                   if (peps > s(t)%y(jl_9,js_4)) then
                     sl_1 = 0.0
                   else
-                    sl_1 = s(t)%slos(jl_9,js_4) / s(t)%y(jl_9,js_4)
+                    sl_1 = s(t)%pd(jl_9,js_4 + jpspec) / s(t)%y(jl_9,js_4)
                   end if
                   if (peps < s(t)%qa(jl_9,js_4)) then
                     zb_1(jl_9) = sl_1 - s(t)%qa(jl_9,js_4) * s(t)%y(jl_9,js_4)
-                    zc_1(jl_9) = s(t)%prod(jl_9,js_4)
+                    zc_1(jl_9) = s(t)%pd(jl_9,js_4)
                     zd_1(jl_9) = zb_1(jl_9) * zb_1(jl_9) + 4.0 * s(t)%qa(jl_9,js_4) * zc_1(jl_9)
                     if (zd_1(jl_9) > 0.0) then
                       s(t)%y(jl_9,js_4) = (zb_1(jl_9) - SQRT(zd_1(jl_9))) / (-2.0 * s(t)%qa(jl_9,js_4))
@@ -2118,7 +2112,7 @@ module asad_spmjpdriv_full_mod
                       s(t)%y(jl_9,js_4) = zb_1(jl_9) / (-2.0 * s(t)%qa(jl_9,js_4))
                     end if
                   elseif (peps < sl_1 .AND. peps >= s(t)%qa(jl_9,js_4)) then
-                    s(t)%y(jl_9,js_4) = s(t)%prod(jl_9,js_4) / sl_1
+                    s(t)%y(jl_9,js_4) = s(t)%pd(jl_9,js_4) / sl_1
                   else
                     s(t)%y(jl_9,js_4) = 0.0
                   end if
@@ -2152,7 +2146,7 @@ module asad_spmjpdriv_full_mod
                 if (not_first_call_1 .AND. jit_1 == 1) then
                   do jl_9 = 1, n_points, 1
                     if (peps < s(t)%y(jl_9,js_4)) then
-                      sl_1 = s(t)%slos(jl_9,js_4) / s(t)%y(jl_9,js_4)
+                      sl_1 = s(t)%pd(jl_9,js_4 + jpspec) / s(t)%y(jl_9,js_4)
                     else
                       sl_1 = 0.0
                     end if
@@ -2408,8 +2402,8 @@ module asad_spmjpdriv_full_mod
             enddo
             do js_15 = 1, jpspec, 1
               do jl_20 = 1, n_points, 1
-                s(t)%prod(jl_20,js_15) = 0.0
-                s(t)%slos(jl_20,js_15) = 0.0
+                s(t)%pd(jl_20,js_15) = 0.0
+                s(t)%pd(jl_20,js_15 + jpspec) = 0.0
               enddo
             enddo
             do jr_8 = 1, nuni, 1
@@ -2428,7 +2422,7 @@ module asad_spmjpdriv_full_mod
             enddo
             do jskip_3 = 0, jpspec, jpspec
               do j_20 = 1, nf, 1
-                js_15 = nlf(j_20 - 1 + LBOUND(nlf, dim=1)) + jskip_3
+                js_15 = nlf(j_20) + jskip_3
                 ip3_3 = ngrp(js_15,3)
                 ip2_3 = ngrp(js_15,2)
                 ip1_3 = ngrp(js_15,1)
@@ -2470,7 +2464,7 @@ module asad_spmjpdriv_full_mod
               do j_20 = istart_9, iend_9, 1
                 js_15 = nldepx(j_20)
                 do jl_20 = 1, n_points, 1
-                  s(t)%slos(jl_20,js_15) = s(t)%slos(jl_20,js_15) + (s(t)%dpd(jl_20,js_15) + s(t)%dpw(jl_20,js_15)) * s(t)%y(jl_20,js_15)
+                  s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + (s(t)%dpd(jl_20,js_15) + s(t)%dpw(jl_20,js_15)) * s(t)%y(jl_20,js_15)
                 enddo
               enddo
               istart_9 = nldepx(3)
@@ -2478,7 +2472,7 @@ module asad_spmjpdriv_full_mod
               do j_20 = istart_9, iend_9, 1
                 js_15 = nldepx(j_20)
                 do jl_20 = 1, n_points, 1
-                  s(t)%slos(jl_20,js_15) = s(t)%slos(jl_20,js_15) + s(t)%dpd(jl_20,js_15) * s(t)%y(jl_20,js_15)
+                  s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + s(t)%dpd(jl_20,js_15) * s(t)%y(jl_20,js_15)
                 enddo
               enddo
               istart_9 = nldepx(5)
@@ -2486,7 +2480,7 @@ module asad_spmjpdriv_full_mod
               do j_20 = istart_9, iend_9, 1
                 js_15 = nldepx(j_20)
                 do jl_20 = 1, n_points, 1
-                  s(t)%slos(jl_20,js_15) = s(t)%slos(jl_20,js_15) + s(t)%dpw(jl_20,js_15) * s(t)%y(jl_20,js_15)
+                  s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + s(t)%dpw(jl_20,js_15) * s(t)%y(jl_20,js_15)
                 enddo
               enddo
             end if
@@ -2497,7 +2491,7 @@ module asad_spmjpdriv_full_mod
               gfam_1 = ifam_3 /= 0
               gtr_1 = itr_4 /= 0
               do jl_10 = 1, n_points, 1
-                s(t)%ydot(jl_10,js_5) = s(t)%prod(jl_10,js_5) - s(t)%slos(jl_10,js_5)
+                s(t)%ydot(jl_10,js_5) = s(t)%pd(jl_10,js_5) - s(t)%pd(jl_10,js_5 + jpspec)
                 if (gfam_1 .AND. (.NOT.gtr_1 .OR. gtr_1 .AND. s(t)%linfam(jl_10,itr_4))) then
                   s(t)%fdot(jl_10,ifam_3) = s(t)%fdot(jl_10,ifam_3) + nodd(js_5) * s(t)%ydot(jl_10,js_5)
                 end if
@@ -2674,9 +2668,9 @@ module asad_spmjpdriv_full_mod
             row_length_2 = ukca_config%row_length
             rows_2 = ukca_config%rows
             if (species_tmp_2(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) then
-              s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_19) = s(t)%co2(:)
+              s(t)%y(1:n_points,js_19) = s(t)%co2(:)
             elseif (species_tmp_2(1:4) == 'H2O ') then
-              s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_19) = s(t)%wp(:)
+              s(t)%y(1:n_points,js_19) = s(t)%wp(:)
             elseif (species_tmp_2(1:4) == 'RO2 ') then
               if (ukca_config%l_ukca_ro2_perm) then
                 fro2_5(:) = 0.0
@@ -2684,15 +2678,14 @@ module asad_spmjpdriv_full_mod
                   iro2_5 = nlfro2(j_30)
                   fro2_5(:) = fro2_5(:) + s(t)%f(:,iro2_5)
                 enddo
-                s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_19) = fro2_5(:) / s(t)%tnd(:)
+                s(t)%y(1:n_points,js_19) = fro2_5(:) / s(t)%tnd(:)
               else
                 errcode_9 = 126
               end if
             else
               errcode_9 = 124
             end if
-            s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 + LBOUND(s(t)%y, dim=1),js_19) = s(t)%y(1 - 1 + LBOUND(s(t)%y, dim=1):n_points - 1 &
-&+ LBOUND(s(t)%y, dim=1),js_19) * s(t)%tnd(:)
+            s(t)%y(1:n_points,js_19) = s(t)%y(1:n_points,js_19) * s(t)%tnd(:)
           enddo
         end if
         if (ukca_config%l_ukca_ro2_perm) then
@@ -2770,7 +2763,7 @@ module asad_spmjpdriv_full_mod
             do j_23 = 1, nstst, 1
               js_17 = nlstst(j_23)
               do jl_21 = 1, n_points, 1
-                if (ABS(s(t)%y(jl_21,js_17)) < peps .AND. s(t)%prod(jl_21,js_17) > peps) then
+                if (ABS(s(t)%y(jl_21,js_17)) < peps .AND. s(t)%pd(jl_21,js_17) > peps) then
                   s(t)%y(jl_21,js_17) = peps
                 end if
               enddo
@@ -2778,8 +2771,8 @@ module asad_spmjpdriv_full_mod
           end if
           do js_22 = 1, jpspec, 1
             do jl_26 = 1, n_points, 1
-              s(t)%prod(jl_26,js_22) = 0.0
-              s(t)%slos(jl_26,js_22) = 0.0
+              s(t)%pd(jl_26,js_22) = 0.0
+              s(t)%pd(jl_26,js_22 + jpspec) = 0.0
             enddo
           enddo
           do jr_10 = 1, nuni, 1
@@ -2798,7 +2791,7 @@ module asad_spmjpdriv_full_mod
           enddo
           do jskip_4 = 0, jpspec, jpspec
             do j_28 = 1, istmin, 1
-              js_22 = ilstmin(j_28 - 1 + LBOUND(ilstmin, dim=1)) + jskip_4
+              js_22 = ilstmin(j_28) + jskip_4
               ip3_4 = ngrp(js_22,3)
               ip2_4 = ngrp(js_22,2)
               ip1_4 = ngrp(js_22,1)
@@ -2840,7 +2833,7 @@ module asad_spmjpdriv_full_mod
             do j_28 = istart_13, iend_13, 1
               js_22 = nldepx(j_28)
               do jl_26 = 1, n_points, 1
-                s(t)%slos(jl_26,js_22) = s(t)%slos(jl_26,js_22) + (s(t)%dpd(jl_26,js_22) + s(t)%dpw(jl_26,js_22)) * s(t)%y(jl_26,js_22)
+                s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + (s(t)%dpd(jl_26,js_22) + s(t)%dpw(jl_26,js_22)) * s(t)%y(jl_26,js_22)
               enddo
             enddo
             istart_13 = nldepx(3)
@@ -2848,7 +2841,7 @@ module asad_spmjpdriv_full_mod
             do j_28 = istart_13, iend_13, 1
               js_22 = nldepx(j_28)
               do jl_26 = 1, n_points, 1
-                s(t)%slos(jl_26,js_22) = s(t)%slos(jl_26,js_22) + s(t)%dpd(jl_26,js_22) * s(t)%y(jl_26,js_22)
+                s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + s(t)%dpd(jl_26,js_22) * s(t)%y(jl_26,js_22)
               enddo
             enddo
             istart_13 = nldepx(5)
@@ -2856,7 +2849,7 @@ module asad_spmjpdriv_full_mod
             do j_28 = istart_13, iend_13, 1
               js_22 = nldepx(j_28)
               do jl_26 = 1, n_points, 1
-                s(t)%slos(jl_26,js_22) = s(t)%slos(jl_26,js_22) + s(t)%dpw(jl_26,js_22) * s(t)%y(jl_26,js_22)
+                s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + s(t)%dpw(jl_26,js_22) * s(t)%y(jl_26,js_22)
               enddo
             enddo
           end if
@@ -2872,11 +2865,11 @@ module asad_spmjpdriv_full_mod
               if (s(t)%y(jl_21,js_17) < peps) then
                 sl_2 = 0.0
               else
-                sl_2 = s(t)%slos(jl_21,js_17) / s(t)%y(jl_21,js_17)
+                sl_2 = s(t)%pd(jl_21,js_17 + jpspec) / s(t)%y(jl_21,js_17)
               end if
               if (s(t)%qa(jl_21,js_17) > peps) then
                 zb_2(jl_21) = sl_2 - s(t)%qa(jl_21,js_17) * s(t)%y(jl_21,js_17)
-                zc_2(jl_21) = s(t)%prod(jl_21,js_17)
+                zc_2(jl_21) = s(t)%pd(jl_21,js_17)
                 zd_2(jl_21) = zb_2(jl_21) * zb_2(jl_21) + 4.0 * s(t)%qa(jl_21,js_17) * zc_2(jl_21)
                 if (zd_2(jl_21) > 0.0) then
                   s(t)%y(jl_21,js_17) = (zb_2(jl_21) - SQRT(zd_2(jl_21))) / (-2.0 * s(t)%qa(jl_21,js_17))
@@ -2887,7 +2880,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_21,js_17) = zb_2(jl_21) / (-2.0 * s(t)%qa(jl_21,js_17))
                 end if
               elseif (s(t)%qa(jl_21,js_17) <= peps .AND. sl_2 > peps) then
-                s(t)%y(jl_21,js_17) = s(t)%prod(jl_21,js_17) / sl_2
+                s(t)%y(jl_21,js_17) = s(t)%pd(jl_21,js_17) / sl_2
               else
                 s(t)%y(jl_21,js_17) = 0.0
               end if
@@ -2921,7 +2914,7 @@ module asad_spmjpdriv_full_mod
             if (not_first_call .AND. jit_3 == 1) then
               do jl_21 = 1, n_points, 1
                 if (s(t)%y(jl_21,js_17) > peps) then
-                  sl_2 = s(t)%slos(jl_21,js_17) / s(t)%y(jl_21,js_17)
+                  sl_2 = s(t)%pd(jl_21,js_17 + jpspec) / s(t)%y(jl_21,js_17)
                 else
                   sl_2 = 0.0
                 end if
@@ -3008,8 +3001,8 @@ module asad_spmjpdriv_full_mod
         enddo
         do js_23 = 1, jpspec, 1
           do jl_27 = 1, n_points, 1
-            s(t)%prod(jl_27,js_23) = 0.0
-            s(t)%slos(jl_27,js_23) = 0.0
+            s(t)%pd(jl_27,js_23) = 0.0
+            s(t)%pd(jl_27,js_23 + jpspec) = 0.0
           enddo
         enddo
         do jr_11 = 1, nuni, 1
@@ -3028,7 +3021,7 @@ module asad_spmjpdriv_full_mod
         enddo
         do jskip_5 = 0, jpspec, jpspec
           do j_29 = 1, nf, 1
-            js_23 = nlf(j_29 - 1 + LBOUND(nlf, dim=1)) + jskip_5
+            js_23 = nlf(j_29) + jskip_5
             ip3_5 = ngrp(js_23,3)
             ip2_5 = ngrp(js_23,2)
             ip1_5 = ngrp(js_23,1)
@@ -3070,7 +3063,7 @@ module asad_spmjpdriv_full_mod
           do j_29 = istart_14, iend_14, 1
             js_23 = nldepx(j_29)
             do jl_27 = 1, n_points, 1
-              s(t)%slos(jl_27,js_23) = s(t)%slos(jl_27,js_23) + (s(t)%dpd(jl_27,js_23) + s(t)%dpw(jl_27,js_23)) * s(t)%y(jl_27,js_23)
+              s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + (s(t)%dpd(jl_27,js_23) + s(t)%dpw(jl_27,js_23)) * s(t)%y(jl_27,js_23)
             enddo
           enddo
           istart_14 = nldepx(3)
@@ -3078,7 +3071,7 @@ module asad_spmjpdriv_full_mod
           do j_29 = istart_14, iend_14, 1
             js_23 = nldepx(j_29)
             do jl_27 = 1, n_points, 1
-              s(t)%slos(jl_27,js_23) = s(t)%slos(jl_27,js_23) + s(t)%dpd(jl_27,js_23) * s(t)%y(jl_27,js_23)
+              s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + s(t)%dpd(jl_27,js_23) * s(t)%y(jl_27,js_23)
             enddo
           enddo
           istart_14 = nldepx(5)
@@ -3086,7 +3079,7 @@ module asad_spmjpdriv_full_mod
           do j_29 = istart_14, iend_14, 1
             js_23 = nldepx(j_29)
             do jl_27 = 1, n_points, 1
-              s(t)%slos(jl_27,js_23) = s(t)%slos(jl_27,js_23) + s(t)%dpw(jl_27,js_23) * s(t)%y(jl_27,js_23)
+              s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + s(t)%dpw(jl_27,js_23) * s(t)%y(jl_27,js_23)
             enddo
           enddo
         end if
@@ -3097,7 +3090,7 @@ module asad_spmjpdriv_full_mod
           gfam_2 = ifam_9 /= 0
           gtr_2 = itr_10 /= 0
           do jl_22 = 1, n_points, 1
-            s(t)%ydot(jl_22,js_18) = s(t)%prod(jl_22,js_18) - s(t)%slos(jl_22,js_18)
+            s(t)%ydot(jl_22,js_18) = s(t)%pd(jl_22,js_18) - s(t)%pd(jl_22,js_18 + jpspec)
             if (gfam_2 .AND. (.NOT.gtr_2 .OR. gtr_2 .AND. s(t)%linfam(jl_22,itr_10))) then
               s(t)%fdot(jl_22,ifam_9) = s(t)%fdot(jl_22,ifam_9) + nodd(js_18) * s(t)%ydot(jl_22,js_18)
             end if
