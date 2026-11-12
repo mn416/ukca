@@ -840,9 +840,11 @@ module asad_spmjpdriv_full_mod
       cdt_initial = s(t)%cdt
       iredo = s(t)%ncsteps_factor
       do idx = 1, UBOUND(f_initial, dim=2), 1
+        !$acc loop vector private(idx_1)
         do idx_1 = 1, UBOUND(f_initial, dim=1), 1
-          f_initial(idx_1,idx) = s(t)%f(idx_1,idx )
+          f_initial(idx_1,idx) = s(t)%f(idx_1,idx)
         enddo
+        
       enddo
       s(t)%ltrig = .false.
       if (ukca_config%l_ukca_asad_full) then
@@ -865,142 +867,196 @@ module asad_spmjpdriv_full_mod
         deltt = 1.0 / s(t)%cdt
         damp1 = 0.5
         do idx_2 = 1, jpcspf, 1
+          !$acc loop vector private(idx_3)
           do idx_3 = 1, n_points, 1
-            f_initial_1(idx_3,idx_2) = s(t)%f(idx_3 ,idx_2 )
+            f_initial_1(idx_3,idx_2) = s(t)%f(idx_3,idx_2)
           enddo
+          
         enddo
         do widx2 = 1, jpcspf, 1
+          !$acc loop vector private(widx1)
           do widx1 = 1, n_points, 1
             if (s(t)%f(widx1,widx2) < f_min) then
               s(t)%f(widx1,widx2) = f_min
             end if
           enddo
+          
         enddo
         if (nstst /= 0) then
           do idx_4 = 1, UBOUND(s(t)%deriv, dim=3), 1
             do idx_5 = 1, UBOUND(s(t)%deriv, dim=2), 1
+              !$acc loop vector private(idx_6)
               do idx_6 = 1, UBOUND(s(t)%deriv, dim=1), 1
                 s(t)%deriv(idx_6,idx_5,idx_4) = 1.0
               enddo
+              
             enddo
           enddo
           do ix_1 = 1, nsst, 1
+            !$acc loop vector private(idx_7)
             do idx_7 = 1, n_points, 1
               ssnum(idx_7) = 0.0
             enddo
+            
+            !$acc loop vector private(idx_8)
             do idx_8 = 1, n_points, 1
               ssden(idx_8) = 0.0
             enddo
+            
             do idx_9 = 1, 4, 1
+              !$acc loop vector private(idx_10)
               do idx_10 = 1, n_points, 1
                 dssden(idx_10,idx_9) = 0.0
               enddo
+              
             enddo
             do idx_11 = 1, 4, 1
+              !$acc loop vector private(idx_12)
               do idx_12 = 1, n_points, 1
                 dssnum(idx_12,idx_11) = 0.0
               enddo
+              
             enddo
             do jr = 1, nsspt(ix_1), 1
               i_1 = nsspi(ix_1,jr)
               if (i_1 <= nuni) then
+                !$acc loop vector private(idx_13)
                 do idx_13 = 1, n_points, 1
                   ssnum(idx_13) = ssnum(idx_13) + s(t)%rk(idx_13,i_1) * s(t)%y(idx_13,nspi(i_1,1))
                 enddo
+                
                 if (ix_1 < 5 .AND. nspo3 == nspi(i_1,1)) then
+                  !$acc loop vector private(idx_14)
                   do idx_14 = 1, n_points, 1
                     dssnum(idx_14,n_o3) = dssnum(idx_14,n_o3) + s(t)%rk(idx_14,i_1)
                   enddo
+                  
                 end if
                 if (ix_1 < 5 .AND. nspno == nspi(i_1,1)) then
+                  !$acc loop vector private(idx_15)
                   do idx_15 = 1, n_points, 1
                     dssnum(idx_15,n_no) = dssnum(idx_15,n_no) + s(t)%rk(idx_15,i_1)
                   enddo
+                  
                 end if
               else
+                !$acc loop vector private(idx_16)
                 do idx_16 = 1, n_points, 1
                   ssnum(idx_16) = ssnum(idx_16) + s(t)%rk(idx_16,i_1) * s(t)%y(idx_16,nspi(i_1,1)) * s(t)%y(idx_16,nspi(i_1,2))
                 enddo
+                
                 if (ix_1 < 5) then
                   if (nspo1d == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_17)
                     do idx_17 = 1, n_points, 1
                       dssnum(idx_17,n_o3) = dssnum(idx_17,n_o3) + s(t)%rk(idx_17,i_1) * s(t)%y(idx_17,nspi(i_1,2)) * s(t)%deriv(idx_17,nss_o1d,n_o3)
                     enddo
+                    
                   end if
                   if (nspo1d == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_18)
                     do idx_18 = 1, n_points, 1
                       dssnum(idx_18,n_o3) = dssnum(idx_18,n_o3) + s(t)%rk(idx_18,i_1) * s(t)%y(idx_18,nspi(i_1,1)) * s(t)%deriv(idx_18,nss_o1d,n_o3)
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_19)
                     do idx_19 = 1, n_points, 1
                       dssnum(idx_19,n_o3) = dssnum(idx_19,n_o3) + s(t)%rk(idx_19,i_1) * s(t)%y(idx_19,nspi(i_1,2)) * s(t)%deriv(idx_19,nss_o3p,n_o3)
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_20)
                     do idx_20 = 1, n_points, 1
                       dssnum(idx_20,n_o3) = dssnum(idx_20,n_o3) + s(t)%rk(idx_20,i_1) * s(t)%y(idx_20,nspi(i_1,1)) * s(t)%deriv(idx_20,nss_o3p,n_o3)
                     enddo
+                    
                   end if
                   if (nspo3 == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_21)
                     do idx_21 = 1, n_points, 1
                       dssnum(idx_21,n_o3) = dssnum(idx_21,n_o3) + s(t)%rk(idx_21,i_1) * s(t)%y(idx_21,nspi(i_1,2))
                     enddo
+                    
                   end if
                   if (nspo3 == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_22)
                     do idx_22 = 1, n_points, 1
                       dssnum(idx_22,n_o3) = dssnum(idx_22,n_o3) + s(t)%rk(idx_22,i_1) * s(t)%y(idx_22,nspi(i_1,1))
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_23)
                     do idx_23 = 1, n_points, 1
                       dssnum(idx_23,n_oh) = dssnum(idx_23,n_oh) + s(t)%rk(idx_23,i_1) * s(t)%y(idx_23,nspi(i_1,2)) * s(t)%deriv(idx_23,nss_o3p,n_oh)
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_24)
                     do idx_24 = 1, n_points, 1
                       dssnum(idx_24,n_oh) = dssnum(idx_24,n_oh) + s(t)%rk(idx_24,i_1) * s(t)%y(idx_24,nspi(i_1,1)) * s(t)%deriv(idx_24,nss_o3p,n_oh)
                     enddo
+                    
                   end if
                   if (nspoh == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_25)
                     do idx_25 = 1, n_points, 1
                       dssnum(idx_25,n_oh) = dssnum(idx_25,n_oh) + s(t)%rk(idx_25,i_1) * s(t)%y(idx_25,nspi(i_1,2))
                     enddo
+                    
                   end if
                   if (nspoh == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_26)
                     do idx_26 = 1, n_points, 1
                       dssnum(idx_26,n_oh) = dssnum(idx_26,n_oh) + s(t)%rk(idx_26,i_1) * s(t)%y(idx_26,nspi(i_1,1))
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_27)
                     do idx_27 = 1, n_points, 1
                       dssnum(idx_27,n_ho2) = dssnum(idx_27,n_ho2) + s(t)%rk(idx_27,i_1) * s(t)%y(idx_27,nspi(i_1,2)) * s(t)%deriv(idx_27,nss_o3p,n_ho2)
                     enddo
+                    
                   end if
                   if (nspo3p == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_28)
                     do idx_28 = 1, n_points, 1
                       dssnum(idx_28,n_ho2) = dssnum(idx_28,n_ho2) + s(t)%rk(idx_28,i_1) * s(t)%y(idx_28,nspi(i_1,1)) * s(t)%deriv(idx_28,nss_o3p,n_ho2)
                     enddo
+                    
                   end if
                   if (nspho2 == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_29)
                     do idx_29 = 1, n_points, 1
                       dssnum(idx_29,n_ho2) = dssnum(idx_29,n_ho2) + s(t)%rk(idx_29,i_1) * s(t)%y(idx_29,nspi(i_1,2))
                     enddo
+                    
                   end if
                   if (nspho2 == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_30)
                     do idx_30 = 1, n_points, 1
                       dssnum(idx_30,n_ho2) = dssnum(idx_30,n_ho2) + s(t)%rk(idx_30,i_1) * s(t)%y(idx_30,nspi(i_1,1))
                     enddo
+                    
                   end if
                   if (nspno == nspi(i_1,1)) then
+                    !$acc loop vector private(idx_31)
                     do idx_31 = 1, n_points, 1
                       dssnum(idx_31,n_no) = dssnum(idx_31,n_no) + s(t)%rk(idx_31,i_1) * s(t)%y(idx_31,nspi(i_1,2))
                     enddo
+                    
                   end if
                   if (nspno == nspi(i_1,2)) then
+                    !$acc loop vector private(idx_32)
                     do idx_32 = 1, n_points, 1
                       dssnum(idx_32,n_no) = dssnum(idx_32,n_no) + s(t)%rk(idx_32,i_1) * s(t)%y(idx_32,nspi(i_1,1))
                     enddo
+                    
                   end if
                 end if
               end if
@@ -1009,48 +1065,65 @@ module asad_spmjpdriv_full_mod
               i_1 = nssri(ix_1,jr)
               j = nssrx(ix_1,jr)
               if (i_1 <= nuni) then
+                !$acc loop vector private(idx_33)
                 do idx_33 = 1, n_points, 1
                   ssden(idx_33) = ssden(idx_33) + s(t)%rk(idx_33,i_1)
                 enddo
+                
               else
+                !$acc loop vector private(idx_34)
                 do idx_34 = 1, n_points, 1
                   ssden(idx_34) = ssden(idx_34) + s(t)%rk(idx_34,i_1) * s(t)%y(idx_34,nspi(i_1,j))
                 enddo
+                
                 if (ix_1 < 5) then
                   if (nspo3 == nspi(i_1,j)) then
+                    !$acc loop vector private(idx_35)
                     do idx_35 = 1, n_points, 1
                       dssden(idx_35,n_o3) = dssden(idx_35,n_o3) + s(t)%rk(idx_35,i_1)
                     enddo
+                    
                   end if
                   if (nspoh == nspi(i_1,j)) then
+                    !$acc loop vector private(idx_36)
                     do idx_36 = 1, n_points, 1
                       dssden(idx_36,n_oh) = dssden(idx_36,n_oh) + s(t)%rk(idx_36,i_1)
                     enddo
+                    
                   end if
                   if (nspho2 == nspi(i_1,j)) then
+                    !$acc loop vector private(idx_37)
                     do idx_37 = 1, n_points, 1
                       dssden(idx_37,n_ho2) = dssden(idx_37,n_ho2) + s(t)%rk(idx_37,i_1)
                     enddo
+                    
                   end if
                   if (nspno == nspi(i_1,j)) then
+                    !$acc loop vector private(idx_38)
                     do idx_38 = 1, n_points, 1
                       dssden(idx_38,n_no) = dssden(idx_38,n_no) + s(t)%rk(idx_38,i_1)
                     enddo
+                    
                   end if
                 end if
               end if
             enddo
+            !$acc loop vector private(idx_39)
             do idx_39 = 1, n_points, 1
               s(t)%y(idx_39,nssi(ix_1)) = ssnum(idx_39) / ssden(idx_39)
             enddo
+            
             if (ix_1 < 5) then
               do jr = 1, 4, 1
+                !$acc loop vector private(idx_40)
                 do idx_40 = 1, n_points, 1
                   s(t)%deriv(idx_40,ix_1,jr) = (ssden(idx_40) * dssnum(idx_40,jr) - ssnum(idx_40) * dssden(idx_40,jr)) / (ssden(idx_40) * ssden(idx_40))
                 enddo
+                
               enddo
             end if
           enddo
+          !$acc loop vector private(x)
           do x = 1, n_points, 1
             if (peps < s(t)%y(x,nspo1d)) then
               s(t)%deriv(x,nss_o1d,n_o3) = s(t)%deriv(x,nss_o1d,n_o3) * s(t)%y(x,nspo3) / s(t)%y(x,nspo1d)
@@ -1064,7 +1137,9 @@ module asad_spmjpdriv_full_mod
               s(t)%deriv(x,nss_o1d,n_no) = 1.0
             end if
           enddo
+          
           if (o3p_in_ss) then
+            !$acc loop vector private(x)
             do x = 1, n_points, 1
               if (peps < s(t)%y(x,nspo3p)) then
                 s(t)%deriv(x,nss_o3p,n_o3) = s(t)%deriv(x,nss_o3p,n_o3) * s(t)%y(x,nspo3) / s(t)%y(x,nspo3p)
@@ -1078,8 +1153,10 @@ module asad_spmjpdriv_full_mod
                 s(t)%deriv(x,nss_o3p,n_no) = 1.0
               end if
             enddo
+            
           end if
           if (n_in_ss) then
+            !$acc loop vector private(x)
             do x = 1, n_points, 1
               if (peps < s(t)%y(x,nspn)) then
                 s(t)%deriv(x,nss_n,n_o3) = s(t)%deriv(x,nss_n,n_o3) * s(t)%y(x,nspo3) / s(t)%y(x,nspn)
@@ -1093,8 +1170,10 @@ module asad_spmjpdriv_full_mod
                 s(t)%deriv(x,nss_n,n_no) = 1.0
               end if
             enddo
+            
           end if
           if (h_in_ss) then
+            !$acc loop vector private(x)
             do x = 1, n_points, 1
               if (peps < s(t)%y(x,nsph)) then
                 s(t)%deriv(x,nss_h,n_o3) = s(t)%deriv(x,nss_h,n_o3) * s(t)%y(x,nspo3) / s(t)%y(x,nsph)
@@ -1108,41 +1187,54 @@ module asad_spmjpdriv_full_mod
                 s(t)%deriv(x,nss_h,n_no) = 1.0
               end if
             enddo
+            
           end if
         end if
         do i_2 = 1, jpcspf, 1
+          !$acc loop vector private(jl_1)
           do jl_1 = 1, n_points, 1
             if (f_min > s(t)%f(jl_1,i_2)) then
               s(t)%f(jl_1,i_2) = f_min
             end if
           enddo
+          
         enddo
         deltt_1 = 1.0 / s(t)%cdt
         do idx_41 = 1, UBOUND(s(t)%spfj, dim=2), 1
+          !$acc loop vector private(idx_42)
           do idx_42 = 1, UBOUND(s(t)%spfj, dim=1), 1
             s(t)%spfj(idx_42,idx_41) = 0.0
           enddo
+          
         enddo
         do i_2 = 1, jpcspf, 1
+          !$acc loop vector private(idx_43)
           do idx_43 = 1, UBOUND(s(t)%spfj, dim=1), 1
-            s(t)%spfj(idx_43,nonzero_map(i_2,i_2)) = -deltt_1 * s(t)%f(idx_43 ,i_2)
+            s(t)%spfj(idx_43,nonzero_map(i_2,i_2)) = -deltt_1 * s(t)%f(idx_43,i_2)
           enddo
+          
         enddo
         do p = 1, total, 1
           do i_2 = nposterms(p), 1, -1
+            !$acc loop vector private(idx_44)
             do idx_44 = 1, UBOUND(s(t)%spfj, dim=1), 1
-              s(t)%spfj(idx_44,p) = s(t)%spfj(idx_44,p) + s(t)%prk(idx_44 ,posterms(p,i_2))
+              s(t)%spfj(idx_44,p) = s(t)%spfj(idx_44,p) + s(t)%prk(idx_44,posterms(p,i_2))
             enddo
+            
           enddo
           do i_2 = nnegterms(p), 1, -1
+            !$acc loop vector private(idx_45)
             do idx_45 = 1, UBOUND(s(t)%spfj, dim=1), 1
-              s(t)%spfj(idx_45,p) = s(t)%spfj(idx_45,p) - s(t)%prk(idx_45 ,negterms(p,i_2))
+              s(t)%spfj(idx_45,p) = s(t)%spfj(idx_45,p) - s(t)%prk(idx_45,negterms(p,i_2))
             enddo
+            
           enddo
           do i_2 = nfracterms(p), 1, -1
+            !$acc loop vector private(idx_46)
             do idx_46 = 1, UBOUND(s(t)%spfj, dim=1), 1
-              s(t)%spfj(idx_46,p) = s(t)%spfj(idx_46,p) + ffrac(p,i_2) * s(t)%prk(idx_46 ,fracterms(p,i_2))
+              s(t)%spfj(idx_46,p) = s(t)%spfj(idx_46,p) + ffrac(p,i_2) * s(t)%prk(idx_46,fracterms(p,i_2))
             enddo
+            
           enddo
         enddo
         do jc = 1, nstst, 1
@@ -1153,13 +1245,17 @@ module asad_spmjpdriv_full_mod
               if (ij /= 0) then
                 p = nonzero_map(ij,ntro3)
                 if (jn < 3) then
+                  !$acc loop vector private(idx_47)
                   do idx_47 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                    s(t)%spfj(idx_47,p) = s(t)%spfj(idx_47,p) - s(t)%prk(idx_47 ,irj) * s(t)%deriv(idx_47 ,jc,1)
+                    s(t)%spfj(idx_47,p) = s(t)%spfj(idx_47,p) - s(t)%prk(idx_47,irj) * s(t)%deriv(idx_47,jc,1)
                   enddo
+                  
                 else
+                  !$acc loop vector private(idx_48)
                   do idx_48 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                    s(t)%spfj(idx_48,p) = s(t)%spfj(idx_48,p) + s(t)%prk(idx_48 ,irj) * s(t)%deriv(idx_48 ,jc,1)
+                    s(t)%spfj(idx_48,p) = s(t)%spfj(idx_48,p) + s(t)%prk(idx_48,irj) * s(t)%deriv(idx_48,jc,1)
                   enddo
+                  
                 end if
               end if
             enddo
@@ -1172,27 +1268,34 @@ module asad_spmjpdriv_full_mod
             ityped = ctype(js_16)
             if (ifamd /= 0) then
               p = nonzero_map(ifamd,ifamd)
+              !$acc loop vector private(jl_1)
               do jl_1 = 1, n_points, 1
                 if (ityped == jpfm .OR. ityped == jpif .AND. s(t)%linfam(jl_1,itrd)) then
                   s(t)%spfj(jl_1,p) = s(t)%spfj(jl_1,p) - nodd(js_16) * (s(t)%dpd(jl_1,js_16) + s(t)%dpw(jl_1,js_16)) * s(t)%y(jl_1,js_16)
                 end if
               enddo
+              
             end if
             if (itrd /= 0) then
               p = nonzero_map(itrd,itrd)
+              !$acc loop vector private(idx_49)
               do idx_49 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                s(t)%spfj(idx_49,p) = s(t)%spfj(idx_49,p) - (s(t)%dpd(idx_49 ,js_16) + s(t)%dpw(idx_49 ,js_16)) * s(t)%y(idx_49 ,js_16)
+                s(t)%spfj(idx_49,p) = s(t)%spfj(idx_49,p) - (s(t)%dpd(idx_49,js_16) + s(t)%dpw(idx_49,js_16)) * s(t)%y(idx_49,js_16)
               enddo
+              
             end if
           enddo
         end if
         do p = 1, total, 1
+          !$acc loop vector private(idx_50)
           do idx_50 = 1, UBOUND(s(t)%spfj, dim=1), 1
-            s(t)%spfj(idx_50,p) = s(t)%spfj(idx_50,p) / s(t)%f(idx_50 ,base_tracer(p))
+            s(t)%spfj(idx_50,p) = s(t)%spfj(idx_50,p) / s(t)%f(idx_50,base_tracer(p))
           enddo
+          
         enddo
         do jtr_1 = 1, jpcspf, 1
           ip = nonzero_map(jtr_1,jtr_1)
+          !$acc loop vector private(jl_2)
           do jl_2 = 1, n_points, 1
             if (s(t)%spfj(jl_2,ip) > 0.0) then
               s(t)%f(jl_2,jtr_1) = f_initial_1(jl_2,jtr_1) + s(t)%cdt * s(t)%fdot(jl_2,jtr_1)
@@ -1203,6 +1306,7 @@ module asad_spmjpdriv_full_mod
               s(t)%f(jl_2,jtr_1) = f_min
             end if
           enddo
+          
         enddo
         do iter_1 = 1, ukca_config%nrsteps, 1
           ifi = 0
@@ -1214,19 +1318,27 @@ module asad_spmjpdriv_full_mod
           sl = 0.0
           zthresh = 2.0 / s(t)%cdt
           do idx_51 = 1, jpspec, 1
+            !$acc loop vector private(idx_52)
             do idx_52 = 1, n_points, 1
               zy(idx_52,idx_51) = 0.0
             enddo
+            
           enddo
+          !$acc loop vector private(idx_53)
           do idx_53 = 1, n_points, 1
             zb(idx_53) = 0.0
           enddo
+          
+          !$acc loop vector private(idx_54)
           do idx_54 = 1, n_points, 1
             zc(idx_54) = 0.0
           enddo
+          
+          !$acc loop vector private(idx_55)
           do idx_55 = 1, n_points, 1
             zd(idx_55) = 0.0
           enddo
+          
           if (not_first_call_1) then
             peps10 = 10.0 * peps
             istart_2 = nlmajmin(1)
@@ -1234,23 +1346,29 @@ module asad_spmjpdriv_full_mod
             do j_10 = istart_2, iend_2, 1
               js_6 = nlmajmin(j_10)
               ifam_4 = moffam(js_6)
+              !$acc loop vector private(jl_11)
               do jl_11 = 1, n_points, 1
                 s(t)%y(jl_11,js_6) = s(t)%f(jl_11,ifam_4)
               enddo
+              
             enddo
             istart_2 = nlmajmin(3)
             iend_2 = nlmajmin(4)
             do j_10 = istart_2, iend_2, 1
               js_6 = nlmajmin(j_10)
+              !$acc loop vector private(jl_11)
               do jl_11 = 1, n_points, 1
                 s(t)%y(jl_11,js_6) = peps10
               enddo
+              
             enddo
             do j_10 = 1, iss, 1
               js_6 = ilss(j_10)
+              !$acc loop vector private(jl_11)
               do jl_11 = 1, n_points, 1
                 s(t)%y(jl_11,js_6) = peps10
               enddo
+              
             enddo
             fco2 = fco2_default
             fch4 = fch4_default
@@ -1291,17 +1409,21 @@ module asad_spmjpdriv_full_mod
                 errcode_2 = -1
                 zcnst = 0.0
               end if
+              !$acc loop vector private(jl_11)
               do jl_11 = 1, n_points, 1
                 s(t)%y(jl_11,js_6) = zcnst * s(t)%tnd(jl_11)
               enddo
+              
             enddo
           end if
           do j_10 = 1, iftr, 1
             js_6 = ilftr(j_10)
             itr_5 = madvtr(js_6)
+            !$acc loop vector private(jl_11)
             do jl_11 = 1, n_points, 1
               s(t)%y(jl_11,js_6) = s(t)%f(jl_11,itr_5)
             enddo
+            
           enddo
           if (not_first_call_1) then
             do j_10 = 1, icf, 1
@@ -1310,50 +1432,68 @@ module asad_spmjpdriv_full_mod
               row_length = ukca_config%row_length
               rows = ukca_config%rows
               if (species_tmp(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) then
+                !$acc loop vector private(idx_56)
                 do idx_56 = 1, n_points, 1
-                  s(t)%y(idx_56,js_6) = s(t)%co2(idx_56 )
+                  s(t)%y(idx_56,js_6) = s(t)%co2(idx_56)
                 enddo
+                
               elseif (species_tmp(1:4) == 'H2O ') then
+                !$acc loop vector private(idx_57)
                 do idx_57 = 1, n_points, 1
-                  s(t)%y(idx_57,js_6) = s(t)%wp(idx_57 )
+                  s(t)%y(idx_57,js_6) = s(t)%wp(idx_57)
                 enddo
+                
               elseif (species_tmp(1:4) == 'RO2 ') then
                 if (ukca_config%l_ukca_ro2_perm) then
+                  !$acc loop vector private(idx_58)
                   do idx_58 = 1, UBOUND(fro2_2, dim=1), 1
                     fro2_2(idx_58) = 0.0
                   enddo
+                  
                   do j_21 = 1, jpro2, 1
                     iro2_2 = nlfro2(j_21)
+                    !$acc loop vector private(idx_59)
                     do idx_59 = 1, UBOUND(fro2_2, dim=1), 1
-                      fro2_2(idx_59) = fro2_2(idx_59) + s(t)%f(idx_59 ,iro2_2)
+                      fro2_2(idx_59) = fro2_2(idx_59) + s(t)%f(idx_59,iro2_2)
                     enddo
+                    
                   enddo
+                  !$acc loop vector private(idx_60)
                   do idx_60 = 1, n_points, 1
-                    s(t)%y(idx_60,js_6) = fro2_2(idx_60) / s(t)%tnd(idx_60 )
+                    s(t)%y(idx_60,js_6) = fro2_2(idx_60) / s(t)%tnd(idx_60)
                   enddo
+                  
                 else
                   errcode_4 = 126
                 end if
               else
                 errcode_4 = 124
               end if
+              !$acc loop vector private(idx_61)
               do idx_61 = 1, n_points, 1
-                s(t)%y(idx_61,js_6) = s(t)%y(idx_61,js_6) * s(t)%tnd(idx_61 )
+                s(t)%y(idx_61,js_6) = s(t)%y(idx_61,js_6) * s(t)%tnd(idx_61)
               enddo
+              
             enddo
           end if
           if (ukca_config%l_ukca_ro2_perm) then
+            !$acc loop vector private(idx_62)
             do idx_62 = 1, n_points, 1
               fro2_old(idx_62) = s(t)%y(idx_62,jsro2)
             enddo
+            
+            !$acc loop vector private(idx_63)
             do idx_63 = 1, n_points, 1
               fro2(idx_63) = 0.0
             enddo
+            
             do j_1 = 1, jpro2, 1
               iro2 = nlfro2(j_1)
+              !$acc loop vector private(idx_64)
               do idx_64 = 1, n_points, 1
                 fro2(idx_64) = fro2(idx_64) + s(t)%f(idx_64,iro2)
               enddo
+              
             enddo
             if (iter_1 <= 0) then
               damp_ro2 = 1.0
@@ -1364,9 +1504,11 @@ module asad_spmjpdriv_full_mod
             else
               damp_ro2 = 0.99
             end if
+            !$acc loop vector private(idx_65)
             do idx_65 = 1, n_points, 1
               s(t)%y(idx_65,jsro2) = fro2_old(idx_65) + damp_ro2 * (fro2(idx_65) - fro2_old(idx_65))
             enddo
+            
           end if
           if (nstst == 0) then
           end if
@@ -1377,16 +1519,20 @@ module asad_spmjpdriv_full_mod
           if (not_first_call_1) then
             do j_11 = 1, nstst, 1
               js_7 = nlstst(j_11)
+              !$acc loop vector private(jl_12)
               do jl_12 = 1, n_points, 1
                 s(t)%qa(jl_12,js_7) = 0.0
               enddo
+              
             enddo
             do jr_3 = 1, jpnr, 1
               isp = nspi(jr_3,1)
               if (isp == nspi(jr_3,2)) then
+                !$acc loop vector private(jl_12)
                 do jl_12 = 1, n_points, 1
                   s(t)%qa(jl_12,isp) = s(t)%qa(jl_12,isp) + 2.0 * s(t)%rk(jl_12,jr_3)
                 enddo
+                
               end if
             enddo
           end if
@@ -1396,9 +1542,11 @@ module asad_spmjpdriv_full_mod
             do j_12 = istart_3, iend_3, 1
               js_8 = nlmajmin(j_12)
               ifam_5 = moffam(js_8)
+              !$acc loop vector private(jl_13)
               do jl_13 = 1, n_points, 1
                 s(t)%y(jl_13,js_8) = s(t)%f(jl_13,ifam_5) * s(t)%ratio(jl_13,js_8)
               enddo
+              
             enddo
             istart_3 = nlmajmin(3)
             iend_3 = nlmajmin(4)
@@ -1407,16 +1555,20 @@ module asad_spmjpdriv_full_mod
               ifam_5 = moffam(js_8)
               imaj_2 = majors(ifam_5)
               if (ctype(js_8) /= jpif) then
+                !$acc loop vector private(jl_13)
                 do jl_13 = 1, n_points, 1
                   s(t)%y(jl_13,js_8) = s(t)%y(jl_13,imaj_2) * s(t)%ratio(jl_13,js_8)
                 enddo
+                
               else
                 itr_6 = madvtr(js_8)
+                !$acc loop vector private(jl_13)
                 do jl_13 = 1, n_points, 1
                   if (s(t)%linfam(jl_13,itr_6)) then
                     s(t)%y(jl_13,js_8) = s(t)%y(jl_13,imaj_2) * s(t)%ratio(jl_13,js_8)
                   end if
                 enddo
+                
               end if
             enddo
           end if
@@ -1424,32 +1576,40 @@ module asad_spmjpdriv_full_mod
             if (jit_2 > 1) then
               do j_1 = 1, nstst, 1
                 js_1 = nlstst(j_1)
+                !$acc loop vector private(jl_3)
                 do jl_3 = 1, n_points, 1
                   if (peps < s(t)%pd(jl_3,js_1) .AND. peps > ABS(s(t)%y(jl_3,js_1))) then
                     s(t)%y(jl_3,js_1) = peps
                   end if
                 enddo
+                
               enddo
             end if
             do js_9 = 1, jpspec, 1
+              !$acc loop vector private(jl_14)
               do jl_14 = 1, n_points, 1
                 s(t)%pd(jl_14,js_9) = 0.0
                 s(t)%pd(jl_14,js_9 + jpspec) = 0.0
               enddo
+              
             enddo
             do jr_4 = 1, nuni, 1
               ir1 = nspi(jr_4,1)
+              !$acc loop vector private(jl_14)
               do jl_14 = 1, n_points, 1
                 s(t)%prk(jl_14,jr_4) = s(t)%rk(jl_14,jr_4) * s(t)%y(jl_14,ir1)
               enddo
+              
             enddo
             iunip1 = nuni + 1
             do jr_4 = iunip1, jpnr, 1
               ir1 = nspi(jr_4,1)
               ir2 = nspi(jr_4,2)
+              !$acc loop vector private(jl_14)
               do jl_14 = 1, n_points, 1
                 s(t)%prk(jl_14,jr_4) = s(t)%rk(jl_14,jr_4) * s(t)%y(jl_14,ir1) * s(t)%y(jl_14,ir2)
               enddo
+              
             enddo
             do jskip = 0, jpspec, jpspec
               do j_13 = 1, istmin, 1
@@ -1461,22 +1621,28 @@ module asad_spmjpdriv_full_mod
                   i1 = nprdx3(1,j3_2,js_9)
                   i2 = nprdx3(2,j3_2,js_9)
                   i3 = nprdx3(3,j3_2,js_9)
+                  !$acc loop vector private(jl_14)
                   do jl_14 = 1, n_points, 1
                     s(t)%pd(jl_14,js_9) = s(t)%pd(jl_14,js_9) + s(t)%prk(jl_14,i1) + s(t)%prk(jl_14,i2) + s(t)%prk(jl_14,i3)
                   enddo
+                  
                 enddo
                 do j2 = 1, ip2, 1
                   i1 = nprdx2(1,js_9)
                   i2 = nprdx2(2,js_9)
+                  !$acc loop vector private(jl_14)
                   do jl_14 = 1, n_points, 1
                     s(t)%pd(jl_14,js_9) = s(t)%pd(jl_14,js_9) + s(t)%prk(jl_14,i1) + s(t)%prk(jl_14,i2)
                   enddo
+                  
                 enddo
                 do j1 = 1, ip1, 1
                   i1 = nprdx1(js_9)
+                  !$acc loop vector private(jl_14)
                   do jl_14 = 1, n_points, 1
                     s(t)%pd(jl_14,js_9) = s(t)%pd(jl_14,js_9) + s(t)%prk(jl_14,i1)
                   enddo
+                  
                 enddo
               enddo
             enddo
@@ -1485,44 +1651,55 @@ module asad_spmjpdriv_full_mod
               ir = ntabfp(jr_4,2)
               ix_4 = ntabfp(jr_4,3)
               fr = frpx(ix_4)
+              !$acc loop vector private(jl_14)
               do jl_14 = 1, n_points, 1
                 s(t)%pd(jl_14,iss_1) = s(t)%pd(jl_14,iss_1) + fr * s(t)%prk(jl_14,ir)
               enddo
+              
             enddo
             if (.false.) then
               istart_4 = nldepx(1)
               iend_4 = nldepx(2)
               do j_13 = istart_4, iend_4, 1
                 js_9 = nldepx(j_13)
+                !$acc loop vector private(jl_14)
                 do jl_14 = 1, n_points, 1
                   s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + (s(t)%dpd(jl_14,js_9) + s(t)%dpw(jl_14,js_9)) * s(t)%y(jl_14,js_9)
                 enddo
+                
               enddo
               istart_4 = nldepx(3)
               iend_4 = nldepx(4)
               do j_13 = istart_4, iend_4, 1
                 js_9 = nldepx(j_13)
+                !$acc loop vector private(jl_14)
                 do jl_14 = 1, n_points, 1
                   s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + s(t)%dpd(jl_14,js_9) * s(t)%y(jl_14,js_9)
                 enddo
+                
               enddo
               istart_4 = nldepx(5)
               iend_4 = nldepx(6)
               do j_13 = istart_4, iend_4, 1
                 js_9 = nldepx(j_13)
+                !$acc loop vector private(jl_14)
                 do jl_14 = 1, n_points, 1
                   s(t)%pd(jl_14,js_9 + jpspec) = s(t)%pd(jl_14,js_9 + jpspec) + s(t)%dpw(jl_14,js_9) * s(t)%y(jl_14,js_9)
                 enddo
+                
               enddo
             end if
             do j_1 = 1, nstst, 1
               js_1 = nlstst(j_1)
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 s(t)%ratio(jl_3,js_1) = 0.0
               enddo
+              
             enddo
             do j_1 = 1, istmin, 1
               js_1 = ilstmin(j_1)
+              !$acc loop vector private(jl_3) private(sl)
               do jl_3 = 1, n_points, 1
                 if (peps > s(t)%y(jl_3,js_1)) then
                   sl = 0.0
@@ -1547,6 +1724,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_3,js_1) = 0.0
                 end if
               enddo
+              
             enddo
             istart = nlmajmin(3)
             iend = nlmajmin(4)
@@ -1558,6 +1736,7 @@ module asad_spmjpdriv_full_mod
               if (ifam /= 0) then
                 imaj = majors(ifam)
               end if
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 if (peps < s(t)%y(jl_3,imaj)) then
                   s(t)%ratio(jl_3,js_1) = s(t)%y(jl_3,js_1) / s(t)%y(jl_3,imaj)
@@ -1566,6 +1745,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%ratio(jl_3,js_1) = 0.0
                 end if
               enddo
+              
             enddo
             do j_1 = 1, ift, 1
               js_1 = ilft(j_1)
@@ -1574,6 +1754,7 @@ module asad_spmjpdriv_full_mod
               itr_1 = madvtr(js_1)
               imaj = majors(ifam)
               if (not_first_call_1 .AND. jit_2 == 1) then
+                !$acc loop vector private(jl_3) private(sl)
                 do jl_3 = 1, n_points, 1
                   if (peps < s(t)%y(jl_3,js_1)) then
                     sl = s(t)%pd(jl_3,js_1 + jpspec) / s(t)%y(jl_3,js_1)
@@ -1585,7 +1766,9 @@ module asad_spmjpdriv_full_mod
                     s(t)%f(jl_3,ifam) = s(t)%f(jl_3,ifam) + iodd * s(t)%f(jl_3,itr_1)
                   end if
                 enddo
+                
               end if
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 if (s(t)%linfam(jl_3,itr_1)) then
                   if (peps < s(t)%y(jl_3,imaj)) then
@@ -1598,6 +1781,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_3,js_1) = s(t)%f(jl_3,itr_1)
                 end if
               enddo
+              
             enddo
             istart = nlmajmin(1)
             iend = nlmajmin(2)
@@ -1605,10 +1789,12 @@ module asad_spmjpdriv_full_mod
               js_1 = nlmajmin(j_1)
               iodd = nodd(js_1)
               ifam = moffam(js_1)
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 s(t)%ratio(jl_3,js_1) = 1.0 / (iodd + s(t)%ratio(jl_3,js_1))
                 s(t)%y(jl_3,js_1) = s(t)%f(jl_3,ifam) * s(t)%ratio(jl_3,js_1)
               enddo
+              
             enddo
             istart = nlmajmin(3)
             iend = nlmajmin(4)
@@ -1617,26 +1803,32 @@ module asad_spmjpdriv_full_mod
               ifam = moffam(js_1)
               imaj = majors(ifam)
               if (ctype(js_1) /= jpif) then
+                !$acc loop vector private(jl_3)
                 do jl_3 = 1, n_points, 1
                   s(t)%y(jl_3,js_1) = s(t)%y(jl_3,imaj) * s(t)%ratio(jl_3,js_1)
                 enddo
+                
               else
                 itr_1 = madvtr(js_1)
+                !$acc loop vector private(jl_3)
                 do jl_3 = 1, n_points, 1
                   if (s(t)%linfam(jl_3,itr_1)) then
                     s(t)%y(jl_3,js_1) = s(t)%y(jl_3,imaj) * s(t)%ratio(jl_3,js_1)
                   end if
                 enddo
+                
               end if
             enddo
             gconv = .true.
             do j_1 = 1, nstst, 1
               js_1 = nlstst(j_1)
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 if (s(t)%pmintnd(jl_3) < s(t)%y(jl_3,js_1) .AND. ftol * s(t)%y(jl_3,js_1) < ABS(s(t)%y(jl_3,js_1) - zy(jl_3,js_1))) then
                   gconv = .false.
                 end if
               enddo
+              
               if (.NOT.gconv) then
                 ! PSyclone CodeBlock (unsupported code) reason:
                 !  - Unsupported statement: Exit_Stmt
@@ -1650,136 +1842,188 @@ module asad_spmjpdriv_full_mod
             end if
             do j_1 = 1, nstst, 1
               js_1 = nlstst(j_1)
+              !$acc loop vector private(jl_3)
               do jl_3 = 1, n_points, 1
                 zy(jl_3,js_1) = s(t)%y(jl_3,js_1)
               enddo
+              
             enddo
           enddo
           if (nstst /= 0 .AND. ifi == 0) then
             do idx_66 = 1, UBOUND(s(t)%deriv, dim=3), 1
               do idx_67 = 1, UBOUND(s(t)%deriv, dim=2), 1
+                !$acc loop vector private(idx_68)
                 do idx_68 = 1, UBOUND(s(t)%deriv, dim=1), 1
                   s(t)%deriv(idx_68,idx_67,idx_66) = 1.0
                 enddo
+                
               enddo
             enddo
             do ix_2 = 1, nsst, 1
+              !$acc loop vector private(idx_69)
               do idx_69 = 1, n_points, 1
                 ssnum_1(idx_69) = 0.0
               enddo
+              
+              !$acc loop vector private(idx_70)
               do idx_70 = 1, n_points, 1
                 ssden_1(idx_70) = 0.0
               enddo
+              
               do idx_71 = 1, 4, 1
+                !$acc loop vector private(idx_72)
                 do idx_72 = 1, n_points, 1
                   dssden_1(idx_72,idx_71) = 0.0
                 enddo
+                
               enddo
               do idx_73 = 1, 4, 1
+                !$acc loop vector private(idx_74)
                 do idx_74 = 1, n_points, 1
                   dssnum_1(idx_74,idx_73) = 0.0
                 enddo
+                
               enddo
               do jr_1 = 1, nsspt(ix_2), 1
                 i_3 = nsspi(ix_2,jr_1)
                 if (i_3 <= nuni) then
+                  !$acc loop vector private(idx_75)
                   do idx_75 = 1, n_points, 1
                     ssnum_1(idx_75) = ssnum_1(idx_75) + s(t)%rk(idx_75,i_3) * s(t)%y(idx_75,nspi(i_3,1))
                   enddo
+                  
                   if (ix_2 < 5 .AND. nspo3 == nspi(i_3,1)) then
+                    !$acc loop vector private(idx_76)
                     do idx_76 = 1, n_points, 1
                       dssnum_1(idx_76,n_o3_1) = dssnum_1(idx_76,n_o3_1) + s(t)%rk(idx_76,i_3)
                     enddo
+                    
                   end if
                   if (ix_2 < 5 .AND. nspno == nspi(i_3,1)) then
+                    !$acc loop vector private(idx_77)
                     do idx_77 = 1, n_points, 1
                       dssnum_1(idx_77,n_no_1) = dssnum_1(idx_77,n_no_1) + s(t)%rk(idx_77,i_3)
                     enddo
+                    
                   end if
                 else
+                  !$acc loop vector private(idx_78)
                   do idx_78 = 1, n_points, 1
                     ssnum_1(idx_78) = ssnum_1(idx_78) + s(t)%rk(idx_78,i_3) * s(t)%y(idx_78,nspi(i_3,1)) * s(t)%y(idx_78,nspi(i_3,2))
                   enddo
+                  
                   if (ix_2 < 5) then
                     if (nspo1d == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_79)
                       do idx_79 = 1, n_points, 1
                         dssnum_1(idx_79,n_o3_1) = dssnum_1(idx_79,n_o3_1) + s(t)%rk(idx_79,i_3) * s(t)%y(idx_79,nspi(i_3,2)) * s(t)%deriv(idx_79,nss_o1d,n_o3_1)
                       enddo
+                      
                     end if
                     if (nspo1d == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_80)
                       do idx_80 = 1, n_points, 1
                         dssnum_1(idx_80,n_o3_1) = dssnum_1(idx_80,n_o3_1) + s(t)%rk(idx_80,i_3) * s(t)%y(idx_80,nspi(i_3,1)) * s(t)%deriv(idx_80,nss_o1d,n_o3_1)
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_81)
                       do idx_81 = 1, n_points, 1
                         dssnum_1(idx_81,n_o3_1) = dssnum_1(idx_81,n_o3_1) + s(t)%rk(idx_81,i_3) * s(t)%y(idx_81,nspi(i_3,2)) * s(t)%deriv(idx_81,nss_o3p,n_o3_1)
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_82)
                       do idx_82 = 1, n_points, 1
                         dssnum_1(idx_82,n_o3_1) = dssnum_1(idx_82,n_o3_1) + s(t)%rk(idx_82,i_3) * s(t)%y(idx_82,nspi(i_3,1)) * s(t)%deriv(idx_82,nss_o3p,n_o3_1)
                       enddo
+                      
                     end if
                     if (nspo3 == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_83)
                       do idx_83 = 1, n_points, 1
                         dssnum_1(idx_83,n_o3_1) = dssnum_1(idx_83,n_o3_1) + s(t)%rk(idx_83,i_3) * s(t)%y(idx_83,nspi(i_3,2))
                       enddo
+                      
                     end if
                     if (nspo3 == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_84)
                       do idx_84 = 1, n_points, 1
                         dssnum_1(idx_84,n_o3_1) = dssnum_1(idx_84,n_o3_1) + s(t)%rk(idx_84,i_3) * s(t)%y(idx_84,nspi(i_3,1))
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_85)
                       do idx_85 = 1, n_points, 1
                         dssnum_1(idx_85,n_oh_1) = dssnum_1(idx_85,n_oh_1) + s(t)%rk(idx_85,i_3) * s(t)%y(idx_85,nspi(i_3,2)) * s(t)%deriv(idx_85,nss_o3p,n_oh_1)
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_86)
                       do idx_86 = 1, n_points, 1
                         dssnum_1(idx_86,n_oh_1) = dssnum_1(idx_86,n_oh_1) + s(t)%rk(idx_86,i_3) * s(t)%y(idx_86,nspi(i_3,1)) * s(t)%deriv(idx_86,nss_o3p,n_oh_1)
                       enddo
+                      
                     end if
                     if (nspoh == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_87)
                       do idx_87 = 1, n_points, 1
                         dssnum_1(idx_87,n_oh_1) = dssnum_1(idx_87,n_oh_1) + s(t)%rk(idx_87,i_3) * s(t)%y(idx_87,nspi(i_3,2))
                       enddo
+                      
                     end if
                     if (nspoh == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_88)
                       do idx_88 = 1, n_points, 1
                         dssnum_1(idx_88,n_oh_1) = dssnum_1(idx_88,n_oh_1) + s(t)%rk(idx_88,i_3) * s(t)%y(idx_88,nspi(i_3,1))
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_89)
                       do idx_89 = 1, n_points, 1
                         dssnum_1(idx_89,n_ho2_1) = dssnum_1(idx_89,n_ho2_1) + s(t)%rk(idx_89,i_3) * s(t)%y(idx_89,nspi(i_3,2)) * s(t)%deriv(idx_89,nss_o3p,n_ho2_1)
                       enddo
+                      
                     end if
                     if (nspo3p == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_90)
                       do idx_90 = 1, n_points, 1
                         dssnum_1(idx_90,n_ho2_1) = dssnum_1(idx_90,n_ho2_1) + s(t)%rk(idx_90,i_3) * s(t)%y(idx_90,nspi(i_3,1)) * s(t)%deriv(idx_90,nss_o3p,n_ho2_1)
                       enddo
+                      
                     end if
                     if (nspho2 == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_91)
                       do idx_91 = 1, n_points, 1
                         dssnum_1(idx_91,n_ho2_1) = dssnum_1(idx_91,n_ho2_1) + s(t)%rk(idx_91,i_3) * s(t)%y(idx_91,nspi(i_3,2))
                       enddo
+                      
                     end if
                     if (nspho2 == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_92)
                       do idx_92 = 1, n_points, 1
                         dssnum_1(idx_92,n_ho2_1) = dssnum_1(idx_92,n_ho2_1) + s(t)%rk(idx_92,i_3) * s(t)%y(idx_92,nspi(i_3,1))
                       enddo
+                      
                     end if
                     if (nspno == nspi(i_3,1)) then
+                      !$acc loop vector private(idx_93)
                       do idx_93 = 1, n_points, 1
                         dssnum_1(idx_93,n_no_1) = dssnum_1(idx_93,n_no_1) + s(t)%rk(idx_93,i_3) * s(t)%y(idx_93,nspi(i_3,2))
                       enddo
+                      
                     end if
                     if (nspno == nspi(i_3,2)) then
+                      !$acc loop vector private(idx_94)
                       do idx_94 = 1, n_points, 1
                         dssnum_1(idx_94,n_no_1) = dssnum_1(idx_94,n_no_1) + s(t)%rk(idx_94,i_3) * s(t)%y(idx_94,nspi(i_3,1))
                       enddo
+                      
                     end if
                   end if
                 end if
@@ -1788,48 +2032,65 @@ module asad_spmjpdriv_full_mod
                 i_3 = nssri(ix_2,jr_1)
                 j_2 = nssrx(ix_2,jr_1)
                 if (i_3 <= nuni) then
+                  !$acc loop vector private(idx_95)
                   do idx_95 = 1, n_points, 1
                     ssden_1(idx_95) = ssden_1(idx_95) + s(t)%rk(idx_95,i_3)
                   enddo
+                  
                 else
+                  !$acc loop vector private(idx_96)
                   do idx_96 = 1, n_points, 1
                     ssden_1(idx_96) = ssden_1(idx_96) + s(t)%rk(idx_96,i_3) * s(t)%y(idx_96,nspi(i_3,j_2))
                   enddo
+                  
                   if (ix_2 < 5) then
                     if (nspo3 == nspi(i_3,j_2)) then
+                      !$acc loop vector private(idx_97)
                       do idx_97 = 1, n_points, 1
                         dssden_1(idx_97,n_o3_1) = dssden_1(idx_97,n_o3_1) + s(t)%rk(idx_97,i_3)
                       enddo
+                      
                     end if
                     if (nspoh == nspi(i_3,j_2)) then
+                      !$acc loop vector private(idx_98)
                       do idx_98 = 1, n_points, 1
                         dssden_1(idx_98,n_oh_1) = dssden_1(idx_98,n_oh_1) + s(t)%rk(idx_98,i_3)
                       enddo
+                      
                     end if
                     if (nspho2 == nspi(i_3,j_2)) then
+                      !$acc loop vector private(idx_99)
                       do idx_99 = 1, n_points, 1
                         dssden_1(idx_99,n_ho2_1) = dssden_1(idx_99,n_ho2_1) + s(t)%rk(idx_99,i_3)
                       enddo
+                      
                     end if
                     if (nspno == nspi(i_3,j_2)) then
+                      !$acc loop vector private(idx_100)
                       do idx_100 = 1, n_points, 1
                         dssden_1(idx_100,n_no_1) = dssden_1(idx_100,n_no_1) + s(t)%rk(idx_100,i_3)
                       enddo
+                      
                     end if
                   end if
                 end if
               enddo
+              !$acc loop vector private(idx_101)
               do idx_101 = 1, n_points, 1
                 s(t)%y(idx_101,nssi(ix_2)) = ssnum_1(idx_101) / ssden_1(idx_101)
               enddo
+              
               if (ix_2 < 5) then
                 do jr_1 = 1, 4, 1
+                  !$acc loop vector private(idx_102)
                   do idx_102 = 1, n_points, 1
                     s(t)%deriv(idx_102,ix_2,jr_1) = (ssden_1(idx_102) * dssnum_1(idx_102,jr_1) - ssnum_1(idx_102) * dssden_1(idx_102,jr_1)) / (ssden_1(idx_102) * ssden_1(idx_102))
                   enddo
+                  
                 enddo
               end if
             enddo
+            !$acc loop vector private(x_1)
             do x_1 = 1, n_points, 1
               if (peps < s(t)%y(x_1,nspo1d)) then
                 s(t)%deriv(x_1,nss_o1d,n_o3_1) = s(t)%deriv(x_1,nss_o1d,n_o3_1) * s(t)%y(x_1,nspo3) / s(t)%y(x_1,nspo1d)
@@ -1843,7 +2104,9 @@ module asad_spmjpdriv_full_mod
                 s(t)%deriv(x_1,nss_o1d,n_no_1) = 1.0
               end if
             enddo
+            
             if (o3p_in_ss) then
+              !$acc loop vector private(x_1)
               do x_1 = 1, n_points, 1
                 if (peps < s(t)%y(x_1,nspo3p)) then
                   s(t)%deriv(x_1,nss_o3p,n_o3_1) = s(t)%deriv(x_1,nss_o3p,n_o3_1) * s(t)%y(x_1,nspo3) / s(t)%y(x_1,nspo3p)
@@ -1857,8 +2120,10 @@ module asad_spmjpdriv_full_mod
                   s(t)%deriv(x_1,nss_o3p,n_no_1) = 1.0
                 end if
               enddo
+              
             end if
             if (n_in_ss) then
+              !$acc loop vector private(x_1)
               do x_1 = 1, n_points, 1
                 if (peps < s(t)%y(x_1,nspn)) then
                   s(t)%deriv(x_1,nss_n,n_o3_1) = s(t)%deriv(x_1,nss_n,n_o3_1) * s(t)%y(x_1,nspo3) / s(t)%y(x_1,nspn)
@@ -1872,8 +2137,10 @@ module asad_spmjpdriv_full_mod
                   s(t)%deriv(x_1,nss_n,n_no_1) = 1.0
                 end if
               enddo
+              
             end if
             if (h_in_ss) then
+              !$acc loop vector private(x_1)
               do x_1 = 1, n_points, 1
                 if (peps < s(t)%y(x_1,nsph)) then
                   s(t)%deriv(x_1,nss_h,n_o3_1) = s(t)%deriv(x_1,nss_h,n_o3_1) * s(t)%y(x_1,nspo3) / s(t)%y(x_1,nsph)
@@ -1887,32 +2154,41 @@ module asad_spmjpdriv_full_mod
                   s(t)%deriv(x_1,nss_h,n_no_1) = 1.0
                 end if
               enddo
+              
             end if
           end if
           do jtr_2 = 1, jpcspf, 1
+            !$acc loop vector private(jl_4)
             do jl_4 = 1, n_points, 1
               s(t)%fdot(jl_4,jtr_2) = 0.0
             enddo
+            
           enddo
           do js_10 = 1, jpspec, 1
+            !$acc loop vector private(jl_15)
             do jl_15 = 1, n_points, 1
               s(t)%pd(jl_15,js_10) = 0.0
               s(t)%pd(jl_15,js_10 + jpspec) = 0.0
             enddo
+            
           enddo
           do jr_5 = 1, nuni, 1
             ir1_1 = nspi(jr_5,1)
+            !$acc loop vector private(jl_15)
             do jl_15 = 1, n_points, 1
               s(t)%prk(jl_15,jr_5) = s(t)%rk(jl_15,jr_5) * s(t)%y(jl_15,ir1_1)
             enddo
+            
           enddo
           iunip1_1 = nuni + 1
           do jr_5 = iunip1_1, jpnr, 1
             ir1_1 = nspi(jr_5,1)
             ir2_1 = nspi(jr_5,2)
+            !$acc loop vector private(jl_15)
             do jl_15 = 1, n_points, 1
               s(t)%prk(jl_15,jr_5) = s(t)%rk(jl_15,jr_5) * s(t)%y(jl_15,ir1_1) * s(t)%y(jl_15,ir2_1)
             enddo
+            
           enddo
           do jskip_1 = 0, jpspec, jpspec
             do j_14 = 1, nf, 1
@@ -1924,22 +2200,28 @@ module asad_spmjpdriv_full_mod
                 i1_1 = nprdx3(1,j3_3,js_10)
                 i2_1 = nprdx3(2,j3_3,js_10)
                 i3_1 = nprdx3(3,j3_3,js_10)
+                !$acc loop vector private(jl_15)
                 do jl_15 = 1, n_points, 1
                   s(t)%pd(jl_15,js_10) = s(t)%pd(jl_15,js_10) + s(t)%prk(jl_15,i1_1) + s(t)%prk(jl_15,i2_1) + s(t)%prk(jl_15,i3_1)
                 enddo
+                
               enddo
               do j2_1 = 1, ip2_1, 1
                 i1_1 = nprdx2(1,js_10)
                 i2_1 = nprdx2(2,js_10)
+                !$acc loop vector private(jl_15)
                 do jl_15 = 1, n_points, 1
                   s(t)%pd(jl_15,js_10) = s(t)%pd(jl_15,js_10) + s(t)%prk(jl_15,i1_1) + s(t)%prk(jl_15,i2_1)
                 enddo
+                
               enddo
               do j1_1 = 1, ip1_1, 1
                 i1_1 = nprdx1(js_10)
+                !$acc loop vector private(jl_15)
                 do jl_15 = 1, n_points, 1
                   s(t)%pd(jl_15,js_10) = s(t)%pd(jl_15,js_10) + s(t)%prk(jl_15,i1_1)
                 enddo
+                
               enddo
             enddo
           enddo
@@ -1948,34 +2230,42 @@ module asad_spmjpdriv_full_mod
             ir_1 = ntabfp(jr_5,2)
             ix_5 = ntabfp(jr_5,3)
             fr_1 = frpx(ix_5)
+            !$acc loop vector private(jl_15)
             do jl_15 = 1, n_points, 1
               s(t)%pd(jl_15,iss_2) = s(t)%pd(jl_15,iss_2) + fr_1 * s(t)%prk(jl_15,ir_1)
             enddo
+            
           enddo
           if (.true.) then
             istart_5 = nldepx(1)
             iend_5 = nldepx(2)
             do j_14 = istart_5, iend_5, 1
               js_10 = nldepx(j_14)
+              !$acc loop vector private(jl_15)
               do jl_15 = 1, n_points, 1
                 s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + (s(t)%dpd(jl_15,js_10) + s(t)%dpw(jl_15,js_10)) * s(t)%y(jl_15,js_10)
               enddo
+              
             enddo
             istart_5 = nldepx(3)
             iend_5 = nldepx(4)
             do j_14 = istart_5, iend_5, 1
               js_10 = nldepx(j_14)
+              !$acc loop vector private(jl_15)
               do jl_15 = 1, n_points, 1
                 s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + s(t)%dpd(jl_15,js_10) * s(t)%y(jl_15,js_10)
               enddo
+              
             enddo
             istart_5 = nldepx(5)
             iend_5 = nldepx(6)
             do j_14 = istart_5, iend_5, 1
               js_10 = nldepx(j_14)
+              !$acc loop vector private(jl_15)
               do jl_15 = 1, n_points, 1
                 s(t)%pd(jl_15,js_10 + jpspec) = s(t)%pd(jl_15,js_10 + jpspec) + s(t)%dpw(jl_15,js_10) * s(t)%y(jl_15,js_10)
               enddo
+              
             enddo
           end if
           do j_3 = 1, nf, 1
@@ -1984,6 +2274,7 @@ module asad_spmjpdriv_full_mod
             itr_2 = madvtr(js_2)
             gfam = ifam_1 /= 0
             gtr = itr_2 /= 0
+            !$acc loop vector private(jl_4)
             do jl_4 = 1, n_points, 1
               s(t)%ydot(jl_4,js_2) = s(t)%pd(jl_4,js_2) - s(t)%pd(jl_4,js_2 + jpspec)
               if (gfam .AND. (.NOT.gtr .OR. gtr .AND. s(t)%linfam(jl_4,itr_2))) then
@@ -1993,6 +2284,7 @@ module asad_spmjpdriv_full_mod
                 s(t)%fdot(jl_4,itr_2) = s(t)%ydot(jl_4,js_2)
               end if
             enddo
+            
           enddo
           if (error_norm < reltol_error) then
             exit_code = 0
@@ -2010,16 +2302,20 @@ module asad_spmjpdriv_full_mod
             GO TO 9999
           end if
           do idx_103 = 1, jpcspf, 1
+            !$acc loop vector private(idx_104)
             do idx_104 = 1, n_points, 1
-              g_f(idx_104,idx_103) = (s(t)%f(idx_104 ,idx_103 ) - f_initial_1(idx_104,idx_103)) * deltt - s(t)%fdot(idx_104 ,idx_103 )
+              g_f(idx_104,idx_103) = (s(t)%f(idx_104,idx_103) - f_initial_1(idx_104,idx_103)) * deltt - s(t)%fdot(idx_104,idx_103)
             enddo
+            
           enddo
           residual_error = 0.0
           do jtr_3 = 1, jpcspf, 1
             j_4 = nlf(jtr_3)
+            !$acc loop vector private(idx_105)
             do idx_105 = 1, n_points, 1
               tmprc(idx_105,jtr_3) = s(t)%pd(idx_105,j_4) + s(t)%pd(idx_105,j_4 + jpspec)
             enddo
+            
           enddo
           do jtr_3 = 1, jpcspf, 1
             do jl_5 = 1, n_points, 1
@@ -2037,11 +2333,13 @@ module asad_spmjpdriv_full_mod
             GO TO 9999
           end if
           do jl = 1, n_points, 1
+            !$acc loop vector private(jtr)
             do jtr = 1, jpcspf, 1
               if (s(t)%f(jl,jtr) > f_max) then
                 exit_code = 3
               end if
             enddo
+            
           enddo
           if (exit_code == 3) then
             ! PSyclone CodeBlock (unsupported code) reason:
@@ -2049,38 +2347,50 @@ module asad_spmjpdriv_full_mod
             GO TO 9999
           end if
           do i_4 = 1, jpcspf, 1
+            !$acc loop vector private(jl_6)
             do jl_6 = 1, n_points, 1
               if (f_min > s(t)%f(jl_6,i_4)) then
                 s(t)%f(jl_6,i_4) = f_min
               end if
             enddo
+            
           enddo
           deltt_2 = 1.0 / s(t)%cdt
           do idx_106 = 1, UBOUND(s(t)%spfj, dim=2), 1
+            !$acc loop vector private(idx_107)
             do idx_107 = 1, UBOUND(s(t)%spfj, dim=1), 1
               s(t)%spfj(idx_107,idx_106) = 0.0
             enddo
+            
           enddo
           do i_4 = 1, jpcspf, 1
+            !$acc loop vector private(idx_108)
             do idx_108 = 1, UBOUND(s(t)%spfj, dim=1), 1
-              s(t)%spfj(idx_108,nonzero_map(i_4,i_4)) = -deltt_2 * s(t)%f(idx_108 ,i_4)
+              s(t)%spfj(idx_108,nonzero_map(i_4,i_4)) = -deltt_2 * s(t)%f(idx_108,i_4)
             enddo
+            
           enddo
           do p_1 = 1, total, 1
             do i_4 = nposterms(p_1), 1, -1
+              !$acc loop vector private(idx_109)
               do idx_109 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                s(t)%spfj(idx_109,p_1) = s(t)%spfj(idx_109,p_1) + s(t)%prk(idx_109 ,posterms(p_1,i_4))
+                s(t)%spfj(idx_109,p_1) = s(t)%spfj(idx_109,p_1) + s(t)%prk(idx_109,posterms(p_1,i_4))
               enddo
+              
             enddo
             do i_4 = nnegterms(p_1), 1, -1
+              !$acc loop vector private(idx_110)
               do idx_110 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                s(t)%spfj(idx_110,p_1) = s(t)%spfj(idx_110,p_1) - s(t)%prk(idx_110 ,negterms(p_1,i_4))
+                s(t)%spfj(idx_110,p_1) = s(t)%spfj(idx_110,p_1) - s(t)%prk(idx_110,negterms(p_1,i_4))
               enddo
+              
             enddo
             do i_4 = nfracterms(p_1), 1, -1
+              !$acc loop vector private(idx_111)
               do idx_111 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                s(t)%spfj(idx_111,p_1) = s(t)%spfj(idx_111,p_1) + ffrac(p_1,i_4) * s(t)%prk(idx_111 ,fracterms(p_1,i_4))
+                s(t)%spfj(idx_111,p_1) = s(t)%spfj(idx_111,p_1) + ffrac(p_1,i_4) * s(t)%prk(idx_111,fracterms(p_1,i_4))
               enddo
+              
             enddo
           enddo
           do jc_1 = 1, nstst, 1
@@ -2091,13 +2401,17 @@ module asad_spmjpdriv_full_mod
                 if (ij_1 /= 0) then
                   p_1 = nonzero_map(ij_1,ntro3)
                   if (jn_1 < 3) then
+                    !$acc loop vector private(idx_112)
                     do idx_112 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                      s(t)%spfj(idx_112,p_1) = s(t)%spfj(idx_112,p_1) - s(t)%prk(idx_112 ,irj_1) * s(t)%deriv(idx_112 ,jc_1,1)
+                      s(t)%spfj(idx_112,p_1) = s(t)%spfj(idx_112,p_1) - s(t)%prk(idx_112,irj_1) * s(t)%deriv(idx_112,jc_1,1)
                     enddo
+                    
                   else
+                    !$acc loop vector private(idx_113)
                     do idx_113 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                      s(t)%spfj(idx_113,p_1) = s(t)%spfj(idx_113,p_1) + s(t)%prk(idx_113 ,irj_1) * s(t)%deriv(idx_113 ,jc_1,1)
+                      s(t)%spfj(idx_113,p_1) = s(t)%spfj(idx_113,p_1) + s(t)%prk(idx_113,irj_1) * s(t)%deriv(idx_113,jc_1,1)
                     enddo
+                    
                   end if
                 end if
               enddo
@@ -2110,40 +2424,53 @@ module asad_spmjpdriv_full_mod
               ityped_1 = ctype(js_3)
               if (ifamd_1 /= 0) then
                 p_1 = nonzero_map(ifamd_1,ifamd_1)
+                !$acc loop vector private(jl_6)
                 do jl_6 = 1, n_points, 1
                   if (ityped_1 == jpfm .OR. ityped_1 == jpif .AND. s(t)%linfam(jl_6,itrd_1)) then
                     s(t)%spfj(jl_6,p_1) = s(t)%spfj(jl_6,p_1) - nodd(js_3) * (s(t)%dpd(jl_6,js_3) + s(t)%dpw(jl_6,js_3)) * s(t)%y(jl_6,js_3)
                   end if
                 enddo
+                
               end if
               if (itrd_1 /= 0) then
                 p_1 = nonzero_map(itrd_1,itrd_1)
+                !$acc loop vector private(idx_114)
                 do idx_114 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                  s(t)%spfj(idx_114,p_1) = s(t)%spfj(idx_114,p_1) - (s(t)%dpd(idx_114 ,js_3) + s(t)%dpw(idx_114 ,js_3)) * s(t)%y(idx_114 ,js_3)
+                  s(t)%spfj(idx_114,p_1) = s(t)%spfj(idx_114,p_1) - (s(t)%dpd(idx_114,js_3) + s(t)%dpw(idx_114,js_3)) * s(t)%y(idx_114,js_3)
                 enddo
+                
               end if
             enddo
           end if
           do p_1 = 1, total, 1
+            !$acc loop vector private(idx_115)
             do idx_115 = 1, UBOUND(s(t)%spfj, dim=1), 1
-              s(t)%spfj(idx_115,p_1) = s(t)%spfj(idx_115,p_1) / s(t)%f(idx_115 ,base_tracer(p_1))
+              s(t)%spfj(idx_115,p_1) = s(t)%spfj(idx_115,p_1) / s(t)%f(idx_115,base_tracer(p_1))
             enddo
+            
           enddo
           do j_5 = 1, total, 1
+            !$acc loop vector private(jl_7)
             do jl_7 = 1, n_points, 1
               s(t)%spfj(jl_7,j_5) = MIN(MAX(s(t)%spfj(jl_7,j_5), -f_max), f_max)
             enddo
+            
           enddo
           total1 = total
           do idx_116 = 1, UBOUND(s(t)%modified_map, dim=2), 1
+            !$acc loop vector private(idx_117)
             do idx_117 = 1, UBOUND(s(t)%modified_map, dim=1), 1
-              s(t)%modified_map(idx_117,idx_116) = nonzero_map_unordered(idx_117 ,idx_116 )
+              s(t)%modified_map(idx_117,idx_116) = nonzero_map_unordered(idx_117,idx_116)
             enddo
+            
           enddo
           do kr = 1, jpcspf, 1
+            !$acc loop vector private(idx_118)
             do idx_118 = 1, UBOUND(pivot, dim=1), 1
-              pivot(idx_118) = s(t)%spfj(idx_118 ,s(t)%modified_map(kr,kr))
+              pivot(idx_118) = s(t)%spfj(idx_118,s(t)%modified_map(kr,kr))
             enddo
+            
+            !$acc loop vector private(i_5)
             do i_5 = 1, n_points, 1
               if (f_min < ABS(pivot(i_5))) then
                 pivot(i_5) = 1.0 / pivot(i_5)
@@ -2151,29 +2478,38 @@ module asad_spmjpdriv_full_mod
                 pivot(i_5) = f_max
               end if
             enddo
+            
             do i_5 = kr + 1, jpcspf, 1
               ikr = s(t)%modified_map(i_5,kr)
               if (ikr > 0) then
+                !$acc loop vector private(idx_119)
                 do idx_119 = 1, n_points, 1
-                  kfact(idx_119) = s(t)%spfj(idx_119 ,ikr) * pivot(idx_119)
+                  kfact(idx_119) = s(t)%spfj(idx_119,ikr) * pivot(idx_119)
                 enddo
+                
+                !$acc loop vector private(idx_120)
                 do idx_120 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                  s(t)%spfj(idx_120,ikr) = kfact(idx_120 )
+                  s(t)%spfj(idx_120,ikr) = kfact(idx_120)
                 enddo
+                
                 do j_5 = kr + 1, jpcspf, 1
                   krj = s(t)%modified_map(kr,j_5)
                   if (krj > 0) then
                     ij_2 = s(t)%modified_map(i_5,j_5)
                     if (ij_2 > 0) then
+                      !$acc loop vector private(idx_121)
                       do idx_121 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                        s(t)%spfj(idx_121,ij_2) = s(t)%spfj(idx_121,ij_2) - kfact(idx_121 ) * s(t)%spfj(idx_121,krj)
+                        s(t)%spfj(idx_121,ij_2) = s(t)%spfj(idx_121,ij_2) - kfact(idx_121) * s(t)%spfj(idx_121,krj)
                       enddo
+                      
                     else
                       total1 = total1 + 1
                       s(t)%modified_map(i_5,j_5) = total1
+                      !$acc loop vector private(idx_122)
                       do idx_122 = 1, UBOUND(s(t)%spfj, dim=1), 1
-                        s(t)%spfj(idx_122,total1) = -kfact(idx_122 ) * s(t)%spfj(idx_122,krj)
+                        s(t)%spfj(idx_122,total1) = -kfact(idx_122) * s(t)%spfj(idx_122,krj)
                       enddo
+                      
                     end if
                   end if
                 enddo
@@ -2181,76 +2517,102 @@ module asad_spmjpdriv_full_mod
             enddo
           enddo
           do j_5 = 1, total1, 1
+            !$acc loop vector private(jl_7)
             do jl_7 = 1, n_points, 1
               s(t)%spfj(jl_7,j_5) = MIN(MAX(s(t)%spfj(jl_7,j_5), -f_max), f_max)
             enddo
+            
           enddo
           do i_8 = 1, jpcspf, 1
+            !$acc loop vector private(idx_123)
             do idx_123 = 1, UBOUND(bb1_2, dim=1), 1
               bb1_2(idx_123,i_8) = g_f(idx_123,reorder(i_8))
             enddo
+            
           enddo
           do kr_2 = 1, jpcspf - 1, 1
             do i_8 = kr_2 + 1, jpcspf, 1
               ikr_2 = s(t)%modified_map(i_8,kr_2)
               if (ikr_2 > 0) then
+                !$acc loop vector private(idx_124)
                 do idx_124 = 1, UBOUND(bb1_2, dim=1), 1
-                  bb1_2(idx_124,i_8) = bb1_2(idx_124,i_8) - s(t)%spfj(idx_124 ,ikr_2) * bb1_2(idx_124,kr_2)
+                  bb1_2(idx_124,i_8) = bb1_2(idx_124,i_8) - s(t)%spfj(idx_124,ikr_2) * bb1_2(idx_124,kr_2)
                 enddo
+                
               end if
             enddo
           enddo
           do kr_2 = jpcspf, 1, -1
+            !$acc loop vector private(idx_125)
             do idx_125 = 1, UBOUND(xx1_2, dim=1), 1
               xx1_2(idx_125,kr_2) = bb1_2(idx_125,kr_2)
             enddo
+            
             do j_15 = kr_2 + 1, jpcspf, 1
               krj_2 = s(t)%modified_map(kr_2,j_15)
               if (krj_2 > 0) then
+                !$acc loop vector private(idx_126)
                 do idx_126 = 1, UBOUND(xx1_2, dim=1), 1
-                  xx1_2(idx_126,kr_2) = xx1_2(idx_126,kr_2) - s(t)%spfj(idx_126 ,krj_2) * xx1_2(idx_126,j_15)
+                  xx1_2(idx_126,kr_2) = xx1_2(idx_126,kr_2) - s(t)%spfj(idx_126,krj_2) * xx1_2(idx_126,j_15)
                 enddo
+                
               end if
             enddo
+            !$acc loop vector private(idx_127)
             do idx_127 = 1, UBOUND(pivot_2, dim=1), 1
-              pivot_2(idx_127) = s(t)%spfj(idx_127 ,s(t)%modified_map(kr_2,kr_2))
+              pivot_2(idx_127) = s(t)%spfj(idx_127,s(t)%modified_map(kr_2,kr_2))
             enddo
+            
+            !$acc loop vector private(i_8)
             do i_8 = 1, n_points, 1
               if (f_min > ABS(pivot_2(i_8))) then
                 pivot_2(i_8) = f_min
               end if
             enddo
+            
             if (f_max > 0) then
+              !$acc loop vector private(idx_128)
               do idx_128 = 1, UBOUND(xx1_2, dim=1), 1
                 xx1_2(idx_128,kr_2) = MIN(MAX(xx1_2(idx_128,kr_2), -f_max), f_max) / pivot_2(idx_128)
               enddo
+              
             else
+              !$acc loop vector private(idx_129)
               do idx_129 = 1, UBOUND(xx1_2, dim=1), 1
                 xx1_2(idx_129,kr_2) = xx1_2(idx_129,kr_2) / pivot_2(idx_129)
               enddo
+              
             end if
           enddo
           do idx_130 = 1, UBOUND(f_incr, dim=2), 1
+            !$acc loop vector private(idx_131)
             do idx_131 = 1, UBOUND(f_incr, dim=1), 1
               f_incr(idx_131,idx_130) = 0.0
             enddo
+            
           enddo
           do i_8 = 1, jpcspf, 1
+            !$acc loop vector private(idx_132)
             do idx_132 = 1, UBOUND(f_incr, dim=1), 1
               f_incr(idx_132,reorder(i_8)) = xx1_2(idx_132,i_8)
             enddo
+            
           enddo
           if (iter_1 == 1) then
             do idx_133 = 1, jpcspf, 1
+              !$acc loop vector private(idx_134)
               do idx_134 = 1, n_points, 1
                 f_incr(idx_134,idx_133) = damp1 * f_incr(idx_134,idx_133)
               enddo
+              
             enddo
           end if
           do idx_135 = 1, jpcspf, 1
+            !$acc loop vector private(idx_136)
             do idx_136 = 1, n_points, 1
               f_incr(idx_136,idx_135) = MIN(MAX(f_incr(idx_136,idx_135), -f_max), f_max)
             enddo
+            
           enddo
           error_norm = 0.0
           do jtr_4 = 1, jpcspf, 1
@@ -2291,19 +2653,27 @@ module asad_spmjpdriv_full_mod
               sl_1 = 0.0
               zthresh_1 = 2.0 / s(t)%cdt
               do idx_137 = 1, jpspec, 1
+                !$acc loop vector private(idx_138)
                 do idx_138 = 1, n_points, 1
                   zy_1(idx_138,idx_137) = 0.0
                 enddo
+                
               enddo
+              !$acc loop vector private(idx_139)
               do idx_139 = 1, n_points, 1
                 zb_1(idx_139) = 0.0
               enddo
+              
+              !$acc loop vector private(idx_140)
               do idx_140 = 1, n_points, 1
                 zc_1(idx_140) = 0.0
               enddo
+              
+              !$acc loop vector private(idx_141)
               do idx_141 = 1, n_points, 1
                 zd_1(idx_141) = 0.0
               enddo
+              
               if (not_first_call_1) then
                 peps10_1 = 10.0 * peps
                 istart_6 = nlmajmin(1)
@@ -2311,23 +2681,29 @@ module asad_spmjpdriv_full_mod
                 do j_16 = istart_6, iend_6, 1
                   js_11 = nlmajmin(j_16)
                   ifam_6 = moffam(js_11)
+                  !$acc loop vector private(jl_16)
                   do jl_16 = 1, n_points, 1
                     s(t)%y(jl_16,js_11) = s(t)%f(jl_16,ifam_6)
                   enddo
+                  
                 enddo
                 istart_6 = nlmajmin(3)
                 iend_6 = nlmajmin(4)
                 do j_16 = istart_6, iend_6, 1
                   js_11 = nlmajmin(j_16)
+                  !$acc loop vector private(jl_16)
                   do jl_16 = 1, n_points, 1
                     s(t)%y(jl_16,js_11) = peps10_1
                   enddo
+                  
                 enddo
                 do j_16 = 1, iss, 1
                   js_11 = ilss(j_16)
+                  !$acc loop vector private(jl_16)
                   do jl_16 = 1, n_points, 1
                     s(t)%y(jl_16,js_11) = peps10_1
                   enddo
+                  
                 enddo
                 fco2_1 = fco2_default_1
                 fch4_1 = fch4_default_1
@@ -2368,17 +2744,21 @@ module asad_spmjpdriv_full_mod
                     errcode_3 = -1
                     zcnst_1 = 0.0
                   end if
+                  !$acc loop vector private(jl_16)
                   do jl_16 = 1, n_points, 1
                     s(t)%y(jl_16,js_11) = zcnst_1 * s(t)%tnd(jl_16)
                   enddo
+                  
                 enddo
               end if
               do j_16 = 1, iftr, 1
                 js_11 = ilftr(j_16)
                 itr_7 = madvtr(js_11)
+                !$acc loop vector private(jl_16)
                 do jl_16 = 1, n_points, 1
                   s(t)%y(jl_16,js_11) = s(t)%f(jl_16,itr_7)
                 enddo
+                
               enddo
               if (not_first_call_1) then
                 do j_16 = 1, icf, 1
@@ -2387,50 +2767,68 @@ module asad_spmjpdriv_full_mod
                   row_length_1 = ukca_config%row_length
                   rows_1 = ukca_config%rows
                   if (species_tmp_1(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) then
+                    !$acc loop vector private(idx_142)
                     do idx_142 = 1, n_points, 1
-                      s(t)%y(idx_142,js_11) = s(t)%co2(idx_142 )
+                      s(t)%y(idx_142,js_11) = s(t)%co2(idx_142)
                     enddo
+                    
                   elseif (species_tmp_1(1:4) == 'H2O ') then
+                    !$acc loop vector private(idx_143)
                     do idx_143 = 1, n_points, 1
-                      s(t)%y(idx_143,js_11) = s(t)%wp(idx_143 )
+                      s(t)%y(idx_143,js_11) = s(t)%wp(idx_143)
                     enddo
+                    
                   elseif (species_tmp_1(1:4) == 'RO2 ') then
                     if (ukca_config%l_ukca_ro2_perm) then
+                      !$acc loop vector private(idx_144)
                       do idx_144 = 1, UBOUND(fro2_3, dim=1), 1
                         fro2_3(idx_144) = 0.0
                       enddo
+                      
                       do j_22 = 1, jpro2, 1
                         iro2_3 = nlfro2(j_22)
+                        !$acc loop vector private(idx_145)
                         do idx_145 = 1, UBOUND(fro2_3, dim=1), 1
-                          fro2_3(idx_145) = fro2_3(idx_145) + s(t)%f(idx_145 ,iro2_3)
+                          fro2_3(idx_145) = fro2_3(idx_145) + s(t)%f(idx_145,iro2_3)
                         enddo
+                        
                       enddo
+                      !$acc loop vector private(idx_146)
                       do idx_146 = 1, n_points, 1
-                        s(t)%y(idx_146,js_11) = fro2_3(idx_146) / s(t)%tnd(idx_146 )
+                        s(t)%y(idx_146,js_11) = fro2_3(idx_146) / s(t)%tnd(idx_146)
                       enddo
+                      
                     else
                       errcode_5 = 126
                     end if
                   else
                     errcode_5 = 124
                   end if
+                  !$acc loop vector private(idx_147)
                   do idx_147 = 1, n_points, 1
-                    s(t)%y(idx_147,js_11) = s(t)%y(idx_147,js_11) * s(t)%tnd(idx_147 )
+                    s(t)%y(idx_147,js_11) = s(t)%y(idx_147,js_11) * s(t)%tnd(idx_147)
                   enddo
+                  
                 enddo
               end if
               if (ukca_config%l_ukca_ro2_perm) then
+                !$acc loop vector private(idx_148)
                 do idx_148 = 1, n_points, 1
                   fro2_old_1(idx_148) = s(t)%y(idx_148,jsro2)
                 enddo
+                
+                !$acc loop vector private(idx_149)
                 do idx_149 = 1, n_points, 1
                   fro2_1(idx_149) = 0.0
                 enddo
+                
                 do j_6 = 1, jpro2, 1
                   iro2_1 = nlfro2(j_6)
+                  !$acc loop vector private(idx_150)
                   do idx_150 = 1, n_points, 1
                     fro2_1(idx_150) = fro2_1(idx_150) + s(t)%f(idx_150,iro2_1)
                   enddo
+                  
                 enddo
                 if (iter_1 <= 0) then
                   damp_ro2_1 = 1.0
@@ -2441,9 +2839,11 @@ module asad_spmjpdriv_full_mod
                 else
                   damp_ro2_1 = 0.99
                 end if
+                !$acc loop vector private(idx_151)
                 do idx_151 = 1, n_points, 1
                   s(t)%y(idx_151,jsro2) = fro2_old_1(idx_151) + damp_ro2_1 * (fro2_1(idx_151) - fro2_old_1(idx_151))
                 enddo
+                
               end if
               if (nstst == 0) then
               end if
@@ -2454,16 +2854,20 @@ module asad_spmjpdriv_full_mod
               if (not_first_call_1) then
                 do j_17 = 1, nstst, 1
                   js_12 = nlstst(j_17)
+                  !$acc loop vector private(jl_17)
                   do jl_17 = 1, n_points, 1
                     s(t)%qa(jl_17,js_12) = 0.0
                   enddo
+                  
                 enddo
                 do jr_6 = 1, jpnr, 1
                   isp_1 = nspi(jr_6,1)
                   if (isp_1 == nspi(jr_6,2)) then
+                    !$acc loop vector private(jl_17)
                     do jl_17 = 1, n_points, 1
                       s(t)%qa(jl_17,isp_1) = s(t)%qa(jl_17,isp_1) + 2.0 * s(t)%rk(jl_17,jr_6)
                     enddo
+                    
                   end if
                 enddo
               end if
@@ -2473,9 +2877,11 @@ module asad_spmjpdriv_full_mod
                 do j_18 = istart_7, iend_7, 1
                   js_13 = nlmajmin(j_18)
                   ifam_7 = moffam(js_13)
+                  !$acc loop vector private(jl_18)
                   do jl_18 = 1, n_points, 1
                     s(t)%y(jl_18,js_13) = s(t)%f(jl_18,ifam_7) * s(t)%ratio(jl_18,js_13)
                   enddo
+                  
                 enddo
                 istart_7 = nlmajmin(3)
                 iend_7 = nlmajmin(4)
@@ -2484,16 +2890,20 @@ module asad_spmjpdriv_full_mod
                   ifam_7 = moffam(js_13)
                   imaj_3 = majors(ifam_7)
                   if (ctype(js_13) /= jpif) then
+                    !$acc loop vector private(jl_18)
                     do jl_18 = 1, n_points, 1
                       s(t)%y(jl_18,js_13) = s(t)%y(jl_18,imaj_3) * s(t)%ratio(jl_18,js_13)
                     enddo
+                    
                   else
                     itr_8 = madvtr(js_13)
+                    !$acc loop vector private(jl_18)
                     do jl_18 = 1, n_points, 1
                       if (s(t)%linfam(jl_18,itr_8)) then
                         s(t)%y(jl_18,js_13) = s(t)%y(jl_18,imaj_3) * s(t)%ratio(jl_18,js_13)
                       end if
                     enddo
+                    
                   end if
                 enddo
               end if
@@ -2501,32 +2911,40 @@ module asad_spmjpdriv_full_mod
                 if (jit_1 > 1) then
                   do j_6 = 1, nstst, 1
                     js_4 = nlstst(j_6)
+                    !$acc loop vector private(jl_9)
                     do jl_9 = 1, n_points, 1
                       if (peps < s(t)%pd(jl_9,js_4) .AND. peps > ABS(s(t)%y(jl_9,js_4))) then
                         s(t)%y(jl_9,js_4) = peps
                       end if
                     enddo
+                    
                   enddo
                 end if
                 do js_14 = 1, jpspec, 1
+                  !$acc loop vector private(jl_19)
                   do jl_19 = 1, n_points, 1
                     s(t)%pd(jl_19,js_14) = 0.0
                     s(t)%pd(jl_19,js_14 + jpspec) = 0.0
                   enddo
+                  
                 enddo
                 do jr_7 = 1, nuni, 1
                   ir1_2 = nspi(jr_7,1)
+                  !$acc loop vector private(jl_19)
                   do jl_19 = 1, n_points, 1
                     s(t)%prk(jl_19,jr_7) = s(t)%rk(jl_19,jr_7) * s(t)%y(jl_19,ir1_2)
                   enddo
+                  
                 enddo
                 iunip1_2 = nuni + 1
                 do jr_7 = iunip1_2, jpnr, 1
                   ir1_2 = nspi(jr_7,1)
                   ir2_2 = nspi(jr_7,2)
+                  !$acc loop vector private(jl_19)
                   do jl_19 = 1, n_points, 1
                     s(t)%prk(jl_19,jr_7) = s(t)%rk(jl_19,jr_7) * s(t)%y(jl_19,ir1_2) * s(t)%y(jl_19,ir2_2)
                   enddo
+                  
                 enddo
                 do jskip_2 = 0, jpspec, jpspec
                   do j_19 = 1, istmin, 1
@@ -2538,22 +2956,28 @@ module asad_spmjpdriv_full_mod
                       i1_2 = nprdx3(1,j3_4,js_14)
                       i2_2 = nprdx3(2,j3_4,js_14)
                       i3_2 = nprdx3(3,j3_4,js_14)
+                      !$acc loop vector private(jl_19)
                       do jl_19 = 1, n_points, 1
                         s(t)%pd(jl_19,js_14) = s(t)%pd(jl_19,js_14) + s(t)%prk(jl_19,i1_2) + s(t)%prk(jl_19,i2_2) + s(t)%prk(jl_19,i3_2)
                       enddo
+                      
                     enddo
                     do j2_2 = 1, ip2_2, 1
                       i1_2 = nprdx2(1,js_14)
                       i2_2 = nprdx2(2,js_14)
+                      !$acc loop vector private(jl_19)
                       do jl_19 = 1, n_points, 1
                         s(t)%pd(jl_19,js_14) = s(t)%pd(jl_19,js_14) + s(t)%prk(jl_19,i1_2) + s(t)%prk(jl_19,i2_2)
                       enddo
+                      
                     enddo
                     do j1_2 = 1, ip1_2, 1
                       i1_2 = nprdx1(js_14)
+                      !$acc loop vector private(jl_19)
                       do jl_19 = 1, n_points, 1
                         s(t)%pd(jl_19,js_14) = s(t)%pd(jl_19,js_14) + s(t)%prk(jl_19,i1_2)
                       enddo
+                      
                     enddo
                   enddo
                 enddo
@@ -2562,44 +2986,55 @@ module asad_spmjpdriv_full_mod
                   ir_2 = ntabfp(jr_7,2)
                   ix_6 = ntabfp(jr_7,3)
                   fr_2 = frpx(ix_6)
+                  !$acc loop vector private(jl_19)
                   do jl_19 = 1, n_points, 1
                     s(t)%pd(jl_19,iss_3) = s(t)%pd(jl_19,iss_3) + fr_2 * s(t)%prk(jl_19,ir_2)
                   enddo
+                  
                 enddo
                 if (.false.) then
                   istart_8 = nldepx(1)
                   iend_8 = nldepx(2)
                   do j_19 = istart_8, iend_8, 1
                     js_14 = nldepx(j_19)
+                    !$acc loop vector private(jl_19)
                     do jl_19 = 1, n_points, 1
                       s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + (s(t)%dpd(jl_19,js_14) + s(t)%dpw(jl_19,js_14)) * s(t)%y(jl_19,js_14)
                     enddo
+                    
                   enddo
                   istart_8 = nldepx(3)
                   iend_8 = nldepx(4)
                   do j_19 = istart_8, iend_8, 1
                     js_14 = nldepx(j_19)
+                    !$acc loop vector private(jl_19)
                     do jl_19 = 1, n_points, 1
                       s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + s(t)%dpd(jl_19,js_14) * s(t)%y(jl_19,js_14)
                     enddo
+                    
                   enddo
                   istart_8 = nldepx(5)
                   iend_8 = nldepx(6)
                   do j_19 = istart_8, iend_8, 1
                     js_14 = nldepx(j_19)
+                    !$acc loop vector private(jl_19)
                     do jl_19 = 1, n_points, 1
                       s(t)%pd(jl_19,js_14 + jpspec) = s(t)%pd(jl_19,js_14 + jpspec) + s(t)%dpw(jl_19,js_14) * s(t)%y(jl_19,js_14)
                     enddo
+                    
                   enddo
                 end if
                 do j_6 = 1, nstst, 1
                   js_4 = nlstst(j_6)
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     s(t)%ratio(jl_9,js_4) = 0.0
                   enddo
+                  
                 enddo
                 do j_6 = 1, istmin, 1
                   js_4 = ilstmin(j_6)
+                  !$acc loop vector private(jl_9) private(sl_1)
                   do jl_9 = 1, n_points, 1
                     if (peps > s(t)%y(jl_9,js_4)) then
                       sl_1 = 0.0
@@ -2624,6 +3059,7 @@ module asad_spmjpdriv_full_mod
                       s(t)%y(jl_9,js_4) = 0.0
                     end if
                   enddo
+                  
                 enddo
                 istart_1 = nlmajmin(3)
                 iend_1 = nlmajmin(4)
@@ -2635,6 +3071,7 @@ module asad_spmjpdriv_full_mod
                   if (ifam_2 /= 0) then
                     imaj_1 = majors(ifam_2)
                   end if
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     if (peps < s(t)%y(jl_9,imaj_1)) then
                       s(t)%ratio(jl_9,js_4) = s(t)%y(jl_9,js_4) / s(t)%y(jl_9,imaj_1)
@@ -2643,6 +3080,7 @@ module asad_spmjpdriv_full_mod
                       s(t)%ratio(jl_9,js_4) = 0.0
                     end if
                   enddo
+                  
                 enddo
                 do j_6 = 1, ift, 1
                   js_4 = ilft(j_6)
@@ -2651,6 +3089,7 @@ module asad_spmjpdriv_full_mod
                   itr_3 = madvtr(js_4)
                   imaj_1 = majors(ifam_2)
                   if (not_first_call_1 .AND. jit_1 == 1) then
+                    !$acc loop vector private(jl_9) private(sl_1)
                     do jl_9 = 1, n_points, 1
                       if (peps < s(t)%y(jl_9,js_4)) then
                         sl_1 = s(t)%pd(jl_9,js_4 + jpspec) / s(t)%y(jl_9,js_4)
@@ -2662,7 +3101,9 @@ module asad_spmjpdriv_full_mod
                         s(t)%f(jl_9,ifam_2) = s(t)%f(jl_9,ifam_2) + iodd_1 * s(t)%f(jl_9,itr_3)
                       end if
                     enddo
+                    
                   end if
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     if (s(t)%linfam(jl_9,itr_3)) then
                       if (peps < s(t)%y(jl_9,imaj_1)) then
@@ -2675,6 +3116,7 @@ module asad_spmjpdriv_full_mod
                       s(t)%y(jl_9,js_4) = s(t)%f(jl_9,itr_3)
                     end if
                   enddo
+                  
                 enddo
                 istart_1 = nlmajmin(1)
                 iend_1 = nlmajmin(2)
@@ -2682,10 +3124,12 @@ module asad_spmjpdriv_full_mod
                   js_4 = nlmajmin(j_6)
                   iodd_1 = nodd(js_4)
                   ifam_2 = moffam(js_4)
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     s(t)%ratio(jl_9,js_4) = 1.0 / (iodd_1 + s(t)%ratio(jl_9,js_4))
                     s(t)%y(jl_9,js_4) = s(t)%f(jl_9,ifam_2) * s(t)%ratio(jl_9,js_4)
                   enddo
+                  
                 enddo
                 istart_1 = nlmajmin(3)
                 iend_1 = nlmajmin(4)
@@ -2694,26 +3138,32 @@ module asad_spmjpdriv_full_mod
                   ifam_2 = moffam(js_4)
                   imaj_1 = majors(ifam_2)
                   if (ctype(js_4) /= jpif) then
+                    !$acc loop vector private(jl_9)
                     do jl_9 = 1, n_points, 1
                       s(t)%y(jl_9,js_4) = s(t)%y(jl_9,imaj_1) * s(t)%ratio(jl_9,js_4)
                     enddo
+                    
                   else
                     itr_3 = madvtr(js_4)
+                    !$acc loop vector private(jl_9)
                     do jl_9 = 1, n_points, 1
                       if (s(t)%linfam(jl_9,itr_3)) then
                         s(t)%y(jl_9,js_4) = s(t)%y(jl_9,imaj_1) * s(t)%ratio(jl_9,js_4)
                       end if
                     enddo
+                    
                   end if
                 enddo
                 gconv_1 = .true.
                 do j_6 = 1, nstst, 1
                   js_4 = nlstst(j_6)
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     if (s(t)%pmintnd(jl_9) < s(t)%y(jl_9,js_4) .AND. ftol * s(t)%y(jl_9,js_4) < ABS(s(t)%y(jl_9,js_4) - zy_1(jl_9,js_4))) then
                       gconv_1 = .false.
                     end if
                   enddo
+                  
                   if (.NOT.gconv_1) then
                     ! PSyclone CodeBlock (unsupported code) reason:
                     !  - Unsupported statement: Exit_Stmt
@@ -2727,135 +3177,187 @@ module asad_spmjpdriv_full_mod
                 end if
                 do j_6 = 1, nstst, 1
                   js_4 = nlstst(j_6)
+                  !$acc loop vector private(jl_9)
                   do jl_9 = 1, n_points, 1
                     zy_1(jl_9,js_4) = s(t)%y(jl_9,js_4)
                   enddo
+                  
                 enddo
               enddo
               do idx_152 = 1, UBOUND(s(t)%deriv, dim=3), 1
                 do idx_153 = 1, UBOUND(s(t)%deriv, dim=2), 1
+                  !$acc loop vector private(idx_154)
                   do idx_154 = 1, UBOUND(s(t)%deriv, dim=1), 1
                     s(t)%deriv(idx_154,idx_153,idx_152) = 1.0
                   enddo
+                  
                 enddo
               enddo
               do ix_3 = 1, nsst, 1
+                !$acc loop vector private(idx_155)
                 do idx_155 = 1, n_points, 1
                   ssnum_2(idx_155) = 0.0
                 enddo
+                
+                !$acc loop vector private(idx_156)
                 do idx_156 = 1, n_points, 1
                   ssden_2(idx_156) = 0.0
                 enddo
+                
                 do idx_157 = 1, 4, 1
+                  !$acc loop vector private(idx_158)
                   do idx_158 = 1, n_points, 1
                     dssden_2(idx_158,idx_157) = 0.0
                   enddo
+                  
                 enddo
                 do idx_159 = 1, 4, 1
+                  !$acc loop vector private(idx_160)
                   do idx_160 = 1, n_points, 1
                     dssnum_2(idx_160,idx_159) = 0.0
                   enddo
+                  
                 enddo
                 do jr_2 = 1, nsspt(ix_3), 1
                   i_6 = nsspi(ix_3,jr_2)
                   if (i_6 <= nuni) then
+                    !$acc loop vector private(idx_161)
                     do idx_161 = 1, n_points, 1
                       ssnum_2(idx_161) = ssnum_2(idx_161) + s(t)%rk(idx_161,i_6) * s(t)%y(idx_161,nspi(i_6,1))
                     enddo
+                    
                     if (ix_3 < 5 .AND. nspo3 == nspi(i_6,1)) then
+                      !$acc loop vector private(idx_162)
                       do idx_162 = 1, n_points, 1
                         dssnum_2(idx_162,n_o3_2) = dssnum_2(idx_162,n_o3_2) + s(t)%rk(idx_162,i_6)
                       enddo
+                      
                     end if
                     if (ix_3 < 5 .AND. nspno == nspi(i_6,1)) then
+                      !$acc loop vector private(idx_163)
                       do idx_163 = 1, n_points, 1
                         dssnum_2(idx_163,n_no_2) = dssnum_2(idx_163,n_no_2) + s(t)%rk(idx_163,i_6)
                       enddo
+                      
                     end if
                   else
+                    !$acc loop vector private(idx_164)
                     do idx_164 = 1, n_points, 1
                       ssnum_2(idx_164) = ssnum_2(idx_164) + s(t)%rk(idx_164,i_6) * s(t)%y(idx_164,nspi(i_6,1)) * s(t)%y(idx_164,nspi(i_6,2))
                     enddo
+                    
                     if (ix_3 < 5) then
                       if (nspo1d == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_165)
                         do idx_165 = 1, n_points, 1
                           dssnum_2(idx_165,n_o3_2) = dssnum_2(idx_165,n_o3_2) + s(t)%rk(idx_165,i_6) * s(t)%y(idx_165,nspi(i_6,2)) * s(t)%deriv(idx_165,nss_o1d,n_o3_2)
                         enddo
+                        
                       end if
                       if (nspo1d == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_166)
                         do idx_166 = 1, n_points, 1
                           dssnum_2(idx_166,n_o3_2) = dssnum_2(idx_166,n_o3_2) + s(t)%rk(idx_166,i_6) * s(t)%y(idx_166,nspi(i_6,1)) * s(t)%deriv(idx_166,nss_o1d,n_o3_2)
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_167)
                         do idx_167 = 1, n_points, 1
                           dssnum_2(idx_167,n_o3_2) = dssnum_2(idx_167,n_o3_2) + s(t)%rk(idx_167,i_6) * s(t)%y(idx_167,nspi(i_6,2)) * s(t)%deriv(idx_167,nss_o3p,n_o3_2)
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_168)
                         do idx_168 = 1, n_points, 1
                           dssnum_2(idx_168,n_o3_2) = dssnum_2(idx_168,n_o3_2) + s(t)%rk(idx_168,i_6) * s(t)%y(idx_168,nspi(i_6,1)) * s(t)%deriv(idx_168,nss_o3p,n_o3_2)
                         enddo
+                        
                       end if
                       if (nspo3 == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_169)
                         do idx_169 = 1, n_points, 1
                           dssnum_2(idx_169,n_o3_2) = dssnum_2(idx_169,n_o3_2) + s(t)%rk(idx_169,i_6) * s(t)%y(idx_169,nspi(i_6,2))
                         enddo
+                        
                       end if
                       if (nspo3 == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_170)
                         do idx_170 = 1, n_points, 1
                           dssnum_2(idx_170,n_o3_2) = dssnum_2(idx_170,n_o3_2) + s(t)%rk(idx_170,i_6) * s(t)%y(idx_170,nspi(i_6,1))
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_171)
                         do idx_171 = 1, n_points, 1
                           dssnum_2(idx_171,n_oh_2) = dssnum_2(idx_171,n_oh_2) + s(t)%rk(idx_171,i_6) * s(t)%y(idx_171,nspi(i_6,2)) * s(t)%deriv(idx_171,nss_o3p,n_oh_2)
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_172)
                         do idx_172 = 1, n_points, 1
                           dssnum_2(idx_172,n_oh_2) = dssnum_2(idx_172,n_oh_2) + s(t)%rk(idx_172,i_6) * s(t)%y(idx_172,nspi(i_6,1)) * s(t)%deriv(idx_172,nss_o3p,n_oh_2)
                         enddo
+                        
                       end if
                       if (nspoh == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_173)
                         do idx_173 = 1, n_points, 1
                           dssnum_2(idx_173,n_oh_2) = dssnum_2(idx_173,n_oh_2) + s(t)%rk(idx_173,i_6) * s(t)%y(idx_173,nspi(i_6,2))
                         enddo
+                        
                       end if
                       if (nspoh == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_174)
                         do idx_174 = 1, n_points, 1
                           dssnum_2(idx_174,n_oh_2) = dssnum_2(idx_174,n_oh_2) + s(t)%rk(idx_174,i_6) * s(t)%y(idx_174,nspi(i_6,1))
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_175)
                         do idx_175 = 1, n_points, 1
                           dssnum_2(idx_175,n_ho2_2) = dssnum_2(idx_175,n_ho2_2) + s(t)%rk(idx_175,i_6) * s(t)%y(idx_175,nspi(i_6,2)) * s(t)%deriv(idx_175,nss_o3p,n_ho2_2)
                         enddo
+                        
                       end if
                       if (nspo3p == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_176)
                         do idx_176 = 1, n_points, 1
                           dssnum_2(idx_176,n_ho2_2) = dssnum_2(idx_176,n_ho2_2) + s(t)%rk(idx_176,i_6) * s(t)%y(idx_176,nspi(i_6,1)) * s(t)%deriv(idx_176,nss_o3p,n_ho2_2)
                         enddo
+                        
                       end if
                       if (nspho2 == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_177)
                         do idx_177 = 1, n_points, 1
                           dssnum_2(idx_177,n_ho2_2) = dssnum_2(idx_177,n_ho2_2) + s(t)%rk(idx_177,i_6) * s(t)%y(idx_177,nspi(i_6,2))
                         enddo
+                        
                       end if
                       if (nspho2 == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_178)
                         do idx_178 = 1, n_points, 1
                           dssnum_2(idx_178,n_ho2_2) = dssnum_2(idx_178,n_ho2_2) + s(t)%rk(idx_178,i_6) * s(t)%y(idx_178,nspi(i_6,1))
                         enddo
+                        
                       end if
                       if (nspno == nspi(i_6,1)) then
+                        !$acc loop vector private(idx_179)
                         do idx_179 = 1, n_points, 1
                           dssnum_2(idx_179,n_no_2) = dssnum_2(idx_179,n_no_2) + s(t)%rk(idx_179,i_6) * s(t)%y(idx_179,nspi(i_6,2))
                         enddo
+                        
                       end if
                       if (nspno == nspi(i_6,2)) then
+                        !$acc loop vector private(idx_180)
                         do idx_180 = 1, n_points, 1
                           dssnum_2(idx_180,n_no_2) = dssnum_2(idx_180,n_no_2) + s(t)%rk(idx_180,i_6) * s(t)%y(idx_180,nspi(i_6,1))
                         enddo
+                        
                       end if
                     end if
                   end if
@@ -2864,48 +3366,65 @@ module asad_spmjpdriv_full_mod
                   i_6 = nssri(ix_3,jr_2)
                   j_7 = nssrx(ix_3,jr_2)
                   if (i_6 <= nuni) then
+                    !$acc loop vector private(idx_181)
                     do idx_181 = 1, n_points, 1
                       ssden_2(idx_181) = ssden_2(idx_181) + s(t)%rk(idx_181,i_6)
                     enddo
+                    
                   else
+                    !$acc loop vector private(idx_182)
                     do idx_182 = 1, n_points, 1
                       ssden_2(idx_182) = ssden_2(idx_182) + s(t)%rk(idx_182,i_6) * s(t)%y(idx_182,nspi(i_6,j_7))
                     enddo
+                    
                     if (ix_3 < 5) then
                       if (nspo3 == nspi(i_6,j_7)) then
+                        !$acc loop vector private(idx_183)
                         do idx_183 = 1, n_points, 1
                           dssden_2(idx_183,n_o3_2) = dssden_2(idx_183,n_o3_2) + s(t)%rk(idx_183,i_6)
                         enddo
+                        
                       end if
                       if (nspoh == nspi(i_6,j_7)) then
+                        !$acc loop vector private(idx_184)
                         do idx_184 = 1, n_points, 1
                           dssden_2(idx_184,n_oh_2) = dssden_2(idx_184,n_oh_2) + s(t)%rk(idx_184,i_6)
                         enddo
+                        
                       end if
                       if (nspho2 == nspi(i_6,j_7)) then
+                        !$acc loop vector private(idx_185)
                         do idx_185 = 1, n_points, 1
                           dssden_2(idx_185,n_ho2_2) = dssden_2(idx_185,n_ho2_2) + s(t)%rk(idx_185,i_6)
                         enddo
+                        
                       end if
                       if (nspno == nspi(i_6,j_7)) then
+                        !$acc loop vector private(idx_186)
                         do idx_186 = 1, n_points, 1
                           dssden_2(idx_186,n_no_2) = dssden_2(idx_186,n_no_2) + s(t)%rk(idx_186,i_6)
                         enddo
+                        
                       end if
                     end if
                   end if
                 enddo
+                !$acc loop vector private(idx_187)
                 do idx_187 = 1, n_points, 1
                   s(t)%y(idx_187,nssi(ix_3)) = ssnum_2(idx_187) / ssden_2(idx_187)
                 enddo
+                
                 if (ix_3 < 5) then
                   do jr_2 = 1, 4, 1
+                    !$acc loop vector private(idx_188)
                     do idx_188 = 1, n_points, 1
                       s(t)%deriv(idx_188,ix_3,jr_2) = (ssden_2(idx_188) * dssnum_2(idx_188,jr_2) - ssnum_2(idx_188) * dssden_2(idx_188,jr_2)) / (ssden_2(idx_188) * ssden_2(idx_188))
                     enddo
+                    
                   enddo
                 end if
               enddo
+              !$acc loop vector private(x_2)
               do x_2 = 1, n_points, 1
                 if (peps < s(t)%y(x_2,nspo1d)) then
                   s(t)%deriv(x_2,nss_o1d,n_o3_2) = s(t)%deriv(x_2,nss_o1d,n_o3_2) * s(t)%y(x_2,nspo3) / s(t)%y(x_2,nspo1d)
@@ -2919,7 +3438,9 @@ module asad_spmjpdriv_full_mod
                   s(t)%deriv(x_2,nss_o1d,n_no_2) = 1.0
                 end if
               enddo
+              
               if (o3p_in_ss) then
+                !$acc loop vector private(x_2)
                 do x_2 = 1, n_points, 1
                   if (peps < s(t)%y(x_2,nspo3p)) then
                     s(t)%deriv(x_2,nss_o3p,n_o3_2) = s(t)%deriv(x_2,nss_o3p,n_o3_2) * s(t)%y(x_2,nspo3) / s(t)%y(x_2,nspo3p)
@@ -2933,8 +3454,10 @@ module asad_spmjpdriv_full_mod
                     s(t)%deriv(x_2,nss_o3p,n_no_2) = 1.0
                   end if
                 enddo
+                
               end if
               if (n_in_ss) then
+                !$acc loop vector private(x_2)
                 do x_2 = 1, n_points, 1
                   if (peps < s(t)%y(x_2,nspn)) then
                     s(t)%deriv(x_2,nss_n,n_o3_2) = s(t)%deriv(x_2,nss_n,n_o3_2) * s(t)%y(x_2,nspo3) / s(t)%y(x_2,nspn)
@@ -2948,8 +3471,10 @@ module asad_spmjpdriv_full_mod
                     s(t)%deriv(x_2,nss_n,n_no_2) = 1.0
                   end if
                 enddo
+                
               end if
               if (h_in_ss) then
+                !$acc loop vector private(x_2)
                 do x_2 = 1, n_points, 1
                   if (peps < s(t)%y(x_2,nsph)) then
                     s(t)%deriv(x_2,nss_h,n_o3_2) = s(t)%deriv(x_2,nss_h,n_o3_2) * s(t)%y(x_2,nspo3) / s(t)%y(x_2,nsph)
@@ -2963,31 +3488,40 @@ module asad_spmjpdriv_full_mod
                     s(t)%deriv(x_2,nss_h,n_no_2) = 1.0
                   end if
                 enddo
+                
               end if
               do jtr_5 = 1, jpcspf, 1
+                !$acc loop vector private(jl_10)
                 do jl_10 = 1, n_points, 1
                   s(t)%fdot(jl_10,jtr_5) = 0.0
                 enddo
+                
               enddo
               do js_15 = 1, jpspec, 1
+                !$acc loop vector private(jl_20)
                 do jl_20 = 1, n_points, 1
                   s(t)%pd(jl_20,js_15) = 0.0
                   s(t)%pd(jl_20,js_15 + jpspec) = 0.0
                 enddo
+                
               enddo
               do jr_8 = 1, nuni, 1
                 ir1_3 = nspi(jr_8,1)
+                !$acc loop vector private(jl_20)
                 do jl_20 = 1, n_points, 1
                   s(t)%prk(jl_20,jr_8) = s(t)%rk(jl_20,jr_8) * s(t)%y(jl_20,ir1_3)
                 enddo
+                
               enddo
               iunip1_3 = nuni + 1
               do jr_8 = iunip1_3, jpnr, 1
                 ir1_3 = nspi(jr_8,1)
                 ir2_3 = nspi(jr_8,2)
+                !$acc loop vector private(jl_20)
                 do jl_20 = 1, n_points, 1
                   s(t)%prk(jl_20,jr_8) = s(t)%rk(jl_20,jr_8) * s(t)%y(jl_20,ir1_3) * s(t)%y(jl_20,ir2_3)
                 enddo
+                
               enddo
               do jskip_3 = 0, jpspec, jpspec
                 do j_20 = 1, nf, 1
@@ -2999,22 +3533,28 @@ module asad_spmjpdriv_full_mod
                     i1_3 = nprdx3(1,j3_5,js_15)
                     i2_3 = nprdx3(2,j3_5,js_15)
                     i3_3 = nprdx3(3,j3_5,js_15)
+                    !$acc loop vector private(jl_20)
                     do jl_20 = 1, n_points, 1
                       s(t)%pd(jl_20,js_15) = s(t)%pd(jl_20,js_15) + s(t)%prk(jl_20,i1_3) + s(t)%prk(jl_20,i2_3) + s(t)%prk(jl_20,i3_3)
                     enddo
+                    
                   enddo
                   do j2_3 = 1, ip2_3, 1
                     i1_3 = nprdx2(1,js_15)
                     i2_3 = nprdx2(2,js_15)
+                    !$acc loop vector private(jl_20)
                     do jl_20 = 1, n_points, 1
                       s(t)%pd(jl_20,js_15) = s(t)%pd(jl_20,js_15) + s(t)%prk(jl_20,i1_3) + s(t)%prk(jl_20,i2_3)
                     enddo
+                    
                   enddo
                   do j1_3 = 1, ip1_3, 1
                     i1_3 = nprdx1(js_15)
+                    !$acc loop vector private(jl_20)
                     do jl_20 = 1, n_points, 1
                       s(t)%pd(jl_20,js_15) = s(t)%pd(jl_20,js_15) + s(t)%prk(jl_20,i1_3)
                     enddo
+                    
                   enddo
                 enddo
               enddo
@@ -3023,34 +3563,42 @@ module asad_spmjpdriv_full_mod
                 ir_3 = ntabfp(jr_8,2)
                 ix_7 = ntabfp(jr_8,3)
                 fr_3 = frpx(ix_7)
+                !$acc loop vector private(jl_20)
                 do jl_20 = 1, n_points, 1
                   s(t)%pd(jl_20,iss_4) = s(t)%pd(jl_20,iss_4) + fr_3 * s(t)%prk(jl_20,ir_3)
                 enddo
+                
               enddo
               if (.true.) then
                 istart_9 = nldepx(1)
                 iend_9 = nldepx(2)
                 do j_20 = istart_9, iend_9, 1
                   js_15 = nldepx(j_20)
+                  !$acc loop vector private(jl_20)
                   do jl_20 = 1, n_points, 1
                     s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + (s(t)%dpd(jl_20,js_15) + s(t)%dpw(jl_20,js_15)) * s(t)%y(jl_20,js_15)
                   enddo
+                  
                 enddo
                 istart_9 = nldepx(3)
                 iend_9 = nldepx(4)
                 do j_20 = istart_9, iend_9, 1
                   js_15 = nldepx(j_20)
+                  !$acc loop vector private(jl_20)
                   do jl_20 = 1, n_points, 1
                     s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + s(t)%dpd(jl_20,js_15) * s(t)%y(jl_20,js_15)
                   enddo
+                  
                 enddo
                 istart_9 = nldepx(5)
                 iend_9 = nldepx(6)
                 do j_20 = istart_9, iend_9, 1
                   js_15 = nldepx(j_20)
+                  !$acc loop vector private(jl_20)
                   do jl_20 = 1, n_points, 1
                     s(t)%pd(jl_20,js_15 + jpspec) = s(t)%pd(jl_20,js_15 + jpspec) + s(t)%dpw(jl_20,js_15) * s(t)%y(jl_20,js_15)
                   enddo
+                  
                 enddo
               end if
               do j_8 = 1, nf, 1
@@ -3059,6 +3607,7 @@ module asad_spmjpdriv_full_mod
                 itr_4 = madvtr(js_5)
                 gfam_1 = ifam_3 /= 0
                 gtr_1 = itr_4 /= 0
+                !$acc loop vector private(jl_10)
                 do jl_10 = 1, n_points, 1
                   s(t)%ydot(jl_10,js_5) = s(t)%pd(jl_10,js_5) - s(t)%pd(jl_10,js_5 + jpspec)
                   if (gfam_1 .AND. (.NOT.gtr_1 .OR. gtr_1 .AND. s(t)%linfam(jl_10,itr_4))) then
@@ -3068,92 +3617,125 @@ module asad_spmjpdriv_full_mod
                     s(t)%fdot(jl_10,itr_4) = s(t)%ydot(jl_10,js_5)
                   end if
                 enddo
+                
               enddo
               do idx_189 = 1, jpcspf, 1
+                !$acc loop vector private(idx_190)
                 do idx_190 = 1, n_points, 1
                   g_f_old(idx_190,idx_189) = g_f(idx_190,idx_189)
                 enddo
+                
               enddo
               do idx_191 = 1, jpcspf, 1
+                !$acc loop vector private(idx_192)
                 do idx_192 = 1, n_points, 1
-                  g_f(idx_192,idx_191) = (s(t)%f(idx_192 ,idx_191 ) - f_initial_1(idx_192,idx_191)) * deltt - s(t)%fdot(idx_192 ,idx_191 )
+                  g_f(idx_192,idx_191) = (s(t)%f(idx_192,idx_191) - f_initial_1(idx_192,idx_191)) * deltt - s(t)%fdot(idx_192,idx_191)
                 enddo
+                
               enddo
               do idx_193 = 1, jpcspf, 1
+                !$acc loop vector private(idx_194)
                 do idx_194 = 1, n_points, 1
                   delta_g(idx_194,idx_193) = g_f(idx_194,idx_193) - g_f_old(idx_194,idx_193)
                 enddo
+                
               enddo
               do jl = 1, n_points, 1
                 coeff = DOT_PRODUCT(g_f(jl,:), delta_g(jl,:)) / DOT_PRODUCT(delta_g(jl,:), delta_g(jl,:))
+                !$acc loop vector private(idx_195)
                 do idx_195 = 1, UBOUND(g_ftmp, dim=2), 1
                   g_ftmp(jl,idx_195) = g_f(jl,idx_195) * (1.0 - coeff)
                 enddo
+                
               enddo
               do i_7 = 1, jpcspf, 1
+                !$acc loop vector private(idx_196)
                 do idx_196 = 1, UBOUND(bb1_1, dim=1), 1
                   bb1_1(idx_196,i_7) = g_ftmp(idx_196,reorder(i_7))
                 enddo
+                
               enddo
               do kr_1 = 1, jpcspf - 1, 1
                 do i_7 = kr_1 + 1, jpcspf, 1
                   ikr_1 = s(t)%modified_map(i_7,kr_1)
                   if (ikr_1 > 0) then
+                    !$acc loop vector private(idx_197)
                     do idx_197 = 1, UBOUND(bb1_1, dim=1), 1
-                      bb1_1(idx_197,i_7) = bb1_1(idx_197,i_7) - s(t)%spfj(idx_197 ,ikr_1) * bb1_1(idx_197,kr_1)
+                      bb1_1(idx_197,i_7) = bb1_1(idx_197,i_7) - s(t)%spfj(idx_197,ikr_1) * bb1_1(idx_197,kr_1)
                     enddo
+                    
                   end if
                 enddo
               enddo
               do kr_1 = jpcspf, 1, -1
+                !$acc loop vector private(idx_198)
                 do idx_198 = 1, UBOUND(xx1_1, dim=1), 1
                   xx1_1(idx_198,kr_1) = bb1_1(idx_198,kr_1)
                 enddo
+                
                 do j_9 = kr_1 + 1, jpcspf, 1
                   krj_1 = s(t)%modified_map(kr_1,j_9)
                   if (krj_1 > 0) then
+                    !$acc loop vector private(idx_199)
                     do idx_199 = 1, UBOUND(xx1_1, dim=1), 1
-                      xx1_1(idx_199,kr_1) = xx1_1(idx_199,kr_1) - s(t)%spfj(idx_199 ,krj_1) * xx1_1(idx_199,j_9)
+                      xx1_1(idx_199,kr_1) = xx1_1(idx_199,kr_1) - s(t)%spfj(idx_199,krj_1) * xx1_1(idx_199,j_9)
                     enddo
+                    
                   end if
                 enddo
+                !$acc loop vector private(idx_200)
                 do idx_200 = 1, UBOUND(pivot_1, dim=1), 1
-                  pivot_1(idx_200) = s(t)%spfj(idx_200 ,s(t)%modified_map(kr_1,kr_1))
+                  pivot_1(idx_200) = s(t)%spfj(idx_200,s(t)%modified_map(kr_1,kr_1))
                 enddo
+                
+                !$acc loop vector private(i_7)
                 do i_7 = 1, n_points, 1
                   if (f_min > ABS(pivot_1(i_7))) then
                     pivot_1(i_7) = f_min
                   end if
                 enddo
+                
                 if (max_val > 0) then
+                  !$acc loop vector private(idx_201)
                   do idx_201 = 1, UBOUND(xx1_1, dim=1), 1
                     xx1_1(idx_201,kr_1) = MIN(MAX(xx1_1(idx_201,kr_1), -max_val), max_val) / pivot_1(idx_201)
                   enddo
+                  
                 else
+                  !$acc loop vector private(idx_202)
                   do idx_202 = 1, UBOUND(xx1_1, dim=1), 1
                     xx1_1(idx_202,kr_1) = xx1_1(idx_202,kr_1) / pivot_1(idx_202)
                   enddo
+                  
                 end if
               enddo
               do idx_203 = 1, UBOUND(f_incr, dim=2), 1
+                !$acc loop vector private(idx_204)
                 do idx_204 = 1, UBOUND(f_incr, dim=1), 1
                   f_incr(idx_204,idx_203) = 0.0
                 enddo
+                
               enddo
               do i_7 = 1, jpcspf, 1
+                !$acc loop vector private(idx_205)
                 do idx_205 = 1, UBOUND(f_incr, dim=1), 1
                   f_incr(idx_205,reorder(i_7)) = xx1_1(idx_205,i_7)
                 enddo
+                
               enddo
               do idx_206 = 1, UBOUND(s(t)%f, dim=2), 1
+                !$acc loop vector private(idx_207)
                 do idx_207 = 1, UBOUND(s(t)%f, dim=1), 1
-                  s(t)%f(idx_207,idx_206) = s(t)%f(idx_207,idx_206) + f_incr(idx_207 ,idx_206 )
+                  s(t)%f(idx_207,idx_206) = s(t)%f(idx_207,idx_206) + f_incr(idx_207,idx_206)
                 enddo
+                
               enddo
               do idx_208 = 1, UBOUND(s(t)%f, dim=2), 1
+                !$acc loop vector private(idx_209)
                 do idx_209 = 1, UBOUND(s(t)%f, dim=1), 1
                   s(t)%f(idx_209,idx_208) = ABS(s(t)%f(idx_209,idx_208))
                 enddo
+                
               enddo
             end if
           end if
@@ -3164,9 +3746,11 @@ module asad_spmjpdriv_full_mod
         9999 CONTINUE
         if (exit_code /= 0) then
           do idx_210 = 1, UBOUND(s(t)%f, dim=2), 1
+            !$acc loop vector private(idx_211)
             do idx_211 = 1, UBOUND(s(t)%f, dim=1), 1
-              s(t)%f(idx_211,idx_210) = f_initial_1(idx_211 ,idx_210 )
+              s(t)%f(idx_211,idx_210) = f_initial_1(idx_211,idx_210)
             enddo
+            
           enddo
           solver_iter = iter_1
           if (iter_1 >= ltrig_iter) then
@@ -3178,9 +3762,11 @@ module asad_spmjpdriv_full_mod
           iter = iter + 1
         else
           do idx_212 = 1, UBOUND(s(t)%f, dim=2), 1
+            !$acc loop vector private(idx_213)
             do idx_213 = 1, n_points, 1
-              s(t)%f(idx_213,idx_212) = f_initial(idx_213,idx_212 )
+              s(t)%f(idx_213,idx_212) = f_initial(idx_213,idx_212)
             enddo
+            
           enddo
           if (exit_code == 4) then
             s(t)%ltrig = .true.
@@ -3188,11 +3774,12 @@ module asad_spmjpdriv_full_mod
             s(t)%ncsteps = s(t)%ncsteps * 2
             s(t)%cdt = s(t)%cdt / 2.0
             iredo = iredo * 2
-            if (iredo >= max_redo) then
-              ! PSyclone CodeBlock (unsupported code) reason:
-              !  - Unsupported statement: Exit_Stmt
-              EXIT
-            end if
+! XXX: breaks parallelisation
+!            if (iredo >= max_redo) then
+!              ! PSyclone CodeBlock (unsupported code) reason:
+!              !  - Unsupported statement: Exit_Stmt
+!              EXIT
+!            end if
           end if
           jit = 0
           ifam_8 = 0
@@ -3200,19 +3787,27 @@ module asad_spmjpdriv_full_mod
           sl_2 = 0.0
           zthresh_2 = 2.0 / s(t)%cdt
           do idx_214 = 1, jpspec, 1
+            !$acc loop vector private(idx_215)
             do idx_215 = 1, n_points, 1
               zy_2(idx_215,idx_214) = 0.0
             enddo
+            
           enddo
+          !$acc loop vector private(idx_216)
           do idx_216 = 1, n_points, 1
             zb_2(idx_216) = 0.0
           enddo
+          
+          !$acc loop vector private(idx_217)
           do idx_217 = 1, n_points, 1
             zc_2(idx_217) = 0.0
           enddo
+          
+          !$acc loop vector private(idx_218)
           do idx_218 = 1, n_points, 1
             zd_2(idx_218) = 0.0
           enddo
+          
           if (not_first_call) then
             peps10_2 = 10.0 * peps
             istart_11 = nlmajmin(1)
@@ -3220,23 +3815,29 @@ module asad_spmjpdriv_full_mod
             do j_25 = istart_11, iend_11, 1
               js_19 = nlmajmin(j_25)
               ifam_10 = moffam(js_19)
+              !$acc loop vector private(jl_23)
               do jl_23 = 1, n_points, 1
                 s(t)%y(jl_23,js_19) = s(t)%f(jl_23,ifam_10)
               enddo
+              
             enddo
             istart_11 = nlmajmin(3)
             iend_11 = nlmajmin(4)
             do j_25 = istart_11, iend_11, 1
               js_19 = nlmajmin(j_25)
+              !$acc loop vector private(jl_23)
               do jl_23 = 1, n_points, 1
                 s(t)%y(jl_23,js_19) = peps10_2
               enddo
+              
             enddo
             do j_25 = 1, iss, 1
               js_19 = ilss(j_25)
+              !$acc loop vector private(jl_23)
               do jl_23 = 1, n_points, 1
                 s(t)%y(jl_23,js_19) = peps10_2
               enddo
+              
             enddo
             fco2_2 = fco2_default_2
             fch4_2 = fch4_default_2
@@ -3277,17 +3878,21 @@ module asad_spmjpdriv_full_mod
                 errcode_8 = -1
                 zcnst_2 = 0.0
               end if
+              !$acc loop vector private(jl_23)
               do jl_23 = 1, n_points, 1
                 s(t)%y(jl_23,js_19) = zcnst_2 * s(t)%tnd(jl_23)
               enddo
+              
             enddo
           end if
           do j_25 = 1, iftr, 1
             js_19 = ilftr(j_25)
             itr_11 = madvtr(js_19)
+            !$acc loop vector private(jl_23)
             do jl_23 = 1, n_points, 1
               s(t)%y(jl_23,js_19) = s(t)%f(jl_23,itr_11)
             enddo
+            
           enddo
           if (not_first_call) then
             do j_25 = 1, icf, 1
@@ -3296,50 +3901,68 @@ module asad_spmjpdriv_full_mod
               row_length_2 = ukca_config%row_length
               rows_2 = ukca_config%rows
               if (species_tmp_2(1:4) == 'CO2 ' .AND. ukca_config%l_chem_environ_co2_fld) then
+                !$acc loop vector private(idx_219)
                 do idx_219 = 1, n_points, 1
-                  s(t)%y(idx_219,js_19) = s(t)%co2(idx_219 )
+                  s(t)%y(idx_219,js_19) = s(t)%co2(idx_219)
                 enddo
+                
               elseif (species_tmp_2(1:4) == 'H2O ') then
+                !$acc loop vector private(idx_220)
                 do idx_220 = 1, n_points, 1
-                  s(t)%y(idx_220,js_19) = s(t)%wp(idx_220 )
+                  s(t)%y(idx_220,js_19) = s(t)%wp(idx_220)
                 enddo
+                
               elseif (species_tmp_2(1:4) == 'RO2 ') then
                 if (ukca_config%l_ukca_ro2_perm) then
+                  !$acc loop vector private(idx_221)
                   do idx_221 = 1, UBOUND(fro2_5, dim=1), 1
                     fro2_5(idx_221) = 0.0
                   enddo
+                  
                   do j_30 = 1, jpro2, 1
                     iro2_5 = nlfro2(j_30)
+                    !$acc loop vector private(idx_222)
                     do idx_222 = 1, UBOUND(fro2_5, dim=1), 1
-                      fro2_5(idx_222) = fro2_5(idx_222) + s(t)%f(idx_222 ,iro2_5)
+                      fro2_5(idx_222) = fro2_5(idx_222) + s(t)%f(idx_222,iro2_5)
                     enddo
+                    
                   enddo
+                  !$acc loop vector private(idx_223)
                   do idx_223 = 1, n_points, 1
-                    s(t)%y(idx_223,js_19) = fro2_5(idx_223) / s(t)%tnd(idx_223 )
+                    s(t)%y(idx_223,js_19) = fro2_5(idx_223) / s(t)%tnd(idx_223)
                   enddo
+                  
                 else
                   errcode_9 = 126
                 end if
               else
                 errcode_9 = 124
               end if
+              !$acc loop vector private(idx_224)
               do idx_224 = 1, n_points, 1
-                s(t)%y(idx_224,js_19) = s(t)%y(idx_224,js_19) * s(t)%tnd(idx_224 )
+                s(t)%y(idx_224,js_19) = s(t)%y(idx_224,js_19) * s(t)%tnd(idx_224)
               enddo
+              
             enddo
           end if
           if (ukca_config%l_ukca_ro2_perm) then
+            !$acc loop vector private(idx_225)
             do idx_225 = 1, n_points, 1
               fro2_old_2(idx_225) = s(t)%y(idx_225,jsro2)
             enddo
+            
+            !$acc loop vector private(idx_226)
             do idx_226 = 1, n_points, 1
               fro2_4(idx_226) = 0.0
             enddo
+            
             do j_23 = 1, jpro2, 1
               iro2_4 = nlfro2(j_23)
+              !$acc loop vector private(idx_227)
               do idx_227 = 1, n_points, 1
                 fro2_4(idx_227) = fro2_4(idx_227) + s(t)%f(idx_227,iro2_4)
               enddo
+              
             enddo
             if (jit <= 0) then
               damp_ro2_2 = 1.0
@@ -3350,9 +3973,11 @@ module asad_spmjpdriv_full_mod
             else
               damp_ro2_2 = 0.99
             end if
+            !$acc loop vector private(idx_228)
             do idx_228 = 1, n_points, 1
               s(t)%y(idx_228,jsro2) = fro2_old_2(idx_228) + damp_ro2_2 * (fro2_4(idx_228) - fro2_old_2(idx_228))
             enddo
+            
           end if
           if (nstst == 0) then
           end if
@@ -3363,16 +3988,20 @@ module asad_spmjpdriv_full_mod
           if (not_first_call) then
             do j_26 = 1, nstst, 1
               js_20 = nlstst(j_26)
+              !$acc loop vector private(jl_24)
               do jl_24 = 1, n_points, 1
                 s(t)%qa(jl_24,js_20) = 0.0
               enddo
+              
             enddo
             do jr_9 = 1, jpnr, 1
               isp_2 = nspi(jr_9,1)
               if (isp_2 == nspi(jr_9,2)) then
+                !$acc loop vector private(jl_24)
                 do jl_24 = 1, n_points, 1
                   s(t)%qa(jl_24,isp_2) = s(t)%qa(jl_24,isp_2) + 2.0 * s(t)%rk(jl_24,jr_9)
                 enddo
+                
               end if
             enddo
           end if
@@ -3382,9 +4011,11 @@ module asad_spmjpdriv_full_mod
             do j_27 = istart_12, iend_12, 1
               js_21 = nlmajmin(j_27)
               ifam_11 = moffam(js_21)
+              !$acc loop vector private(jl_25)
               do jl_25 = 1, n_points, 1
                 s(t)%y(jl_25,js_21) = s(t)%f(jl_25,ifam_11) * s(t)%ratio(jl_25,js_21)
               enddo
+              
             enddo
             istart_12 = nlmajmin(3)
             iend_12 = nlmajmin(4)
@@ -3393,16 +4024,20 @@ module asad_spmjpdriv_full_mod
               ifam_11 = moffam(js_21)
               imaj_5 = majors(ifam_11)
               if (ctype(js_21) /= jpif) then
+                !$acc loop vector private(jl_25)
                 do jl_25 = 1, n_points, 1
                   s(t)%y(jl_25,js_21) = s(t)%y(jl_25,imaj_5) * s(t)%ratio(jl_25,js_21)
                 enddo
+                
               else
                 itr_12 = madvtr(js_21)
+                !$acc loop vector private(jl_25)
                 do jl_25 = 1, n_points, 1
                   if (s(t)%linfam(jl_25,itr_12)) then
                     s(t)%y(jl_25,js_21) = s(t)%y(jl_25,imaj_5) * s(t)%ratio(jl_25,js_21)
                   end if
                 enddo
+                
               end if
             enddo
           end if
@@ -3410,32 +4045,40 @@ module asad_spmjpdriv_full_mod
             if (jit_3 > 1) then
               do j_23 = 1, nstst, 1
                 js_17 = nlstst(j_23)
+                !$acc loop vector private(jl_21)
                 do jl_21 = 1, n_points, 1
                   if (ABS(s(t)%y(jl_21,js_17)) < peps .AND. s(t)%pd(jl_21,js_17) > peps) then
                     s(t)%y(jl_21,js_17) = peps
                   end if
                 enddo
+                
               enddo
             end if
             do js_22 = 1, jpspec, 1
+              !$acc loop vector private(jl_26)
               do jl_26 = 1, n_points, 1
                 s(t)%pd(jl_26,js_22) = 0.0
                 s(t)%pd(jl_26,js_22 + jpspec) = 0.0
               enddo
+              
             enddo
             do jr_10 = 1, nuni, 1
               ir1_4 = nspi(jr_10,1)
+              !$acc loop vector private(jl_26)
               do jl_26 = 1, n_points, 1
                 s(t)%prk(jl_26,jr_10) = s(t)%rk(jl_26,jr_10) * s(t)%y(jl_26,ir1_4)
               enddo
+              
             enddo
             iunip1_4 = nuni + 1
             do jr_10 = iunip1_4, jpnr, 1
               ir1_4 = nspi(jr_10,1)
               ir2_4 = nspi(jr_10,2)
+              !$acc loop vector private(jl_26)
               do jl_26 = 1, n_points, 1
                 s(t)%prk(jl_26,jr_10) = s(t)%rk(jl_26,jr_10) * s(t)%y(jl_26,ir1_4) * s(t)%y(jl_26,ir2_4)
               enddo
+              
             enddo
             do jskip_4 = 0, jpspec, jpspec
               do j_28 = 1, istmin, 1
@@ -3447,22 +4090,28 @@ module asad_spmjpdriv_full_mod
                   i1_4 = nprdx3(1,j3_6,js_22)
                   i2_4 = nprdx3(2,j3_6,js_22)
                   i3_4 = nprdx3(3,j3_6,js_22)
+                  !$acc loop vector private(jl_26)
                   do jl_26 = 1, n_points, 1
                     s(t)%pd(jl_26,js_22) = s(t)%pd(jl_26,js_22) + s(t)%prk(jl_26,i1_4) + s(t)%prk(jl_26,i2_4) + s(t)%prk(jl_26,i3_4)
                   enddo
+                  
                 enddo
                 do j2_4 = 1, ip2_4, 1
                   i1_4 = nprdx2(1,js_22)
                   i2_4 = nprdx2(2,js_22)
+                  !$acc loop vector private(jl_26)
                   do jl_26 = 1, n_points, 1
                     s(t)%pd(jl_26,js_22) = s(t)%pd(jl_26,js_22) + s(t)%prk(jl_26,i1_4) + s(t)%prk(jl_26,i2_4)
                   enddo
+                  
                 enddo
                 do j1_4 = 1, ip1_4, 1
                   i1_4 = nprdx1(js_22)
+                  !$acc loop vector private(jl_26)
                   do jl_26 = 1, n_points, 1
                     s(t)%pd(jl_26,js_22) = s(t)%pd(jl_26,js_22) + s(t)%prk(jl_26,i1_4)
                   enddo
+                  
                 enddo
               enddo
             enddo
@@ -3471,44 +4120,55 @@ module asad_spmjpdriv_full_mod
               ir_4 = ntabfp(jr_10,2)
               ix_8 = ntabfp(jr_10,3)
               fr_4 = frpx(ix_8)
+              !$acc loop vector private(jl_26)
               do jl_26 = 1, n_points, 1
                 s(t)%pd(jl_26,iss_5) = s(t)%pd(jl_26,iss_5) + fr_4 * s(t)%prk(jl_26,ir_4)
               enddo
+              
             enddo
             if (.false.) then
               istart_13 = nldepx(1)
               iend_13 = nldepx(2)
               do j_28 = istart_13, iend_13, 1
                 js_22 = nldepx(j_28)
+                !$acc loop vector private(jl_26)
                 do jl_26 = 1, n_points, 1
                   s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + (s(t)%dpd(jl_26,js_22) + s(t)%dpw(jl_26,js_22)) * s(t)%y(jl_26,js_22)
                 enddo
+                
               enddo
               istart_13 = nldepx(3)
               iend_13 = nldepx(4)
               do j_28 = istart_13, iend_13, 1
                 js_22 = nldepx(j_28)
+                !$acc loop vector private(jl_26)
                 do jl_26 = 1, n_points, 1
                   s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + s(t)%dpd(jl_26,js_22) * s(t)%y(jl_26,js_22)
                 enddo
+                
               enddo
               istart_13 = nldepx(5)
               iend_13 = nldepx(6)
               do j_28 = istart_13, iend_13, 1
                 js_22 = nldepx(j_28)
+                !$acc loop vector private(jl_26)
                 do jl_26 = 1, n_points, 1
                   s(t)%pd(jl_26,js_22 + jpspec) = s(t)%pd(jl_26,js_22 + jpspec) + s(t)%dpw(jl_26,js_22) * s(t)%y(jl_26,js_22)
                 enddo
+                
               enddo
             end if
             do j_23 = 1, nstst, 1
               js_17 = nlstst(j_23)
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 s(t)%ratio(jl_21,js_17) = 0.0
               enddo
+              
             enddo
             do j_23 = 1, istmin, 1
               js_17 = ilstmin(j_23)
+              !$acc loop vector private(jl_21) private(sl_2)
               do jl_21 = 1, n_points, 1
                 if (s(t)%y(jl_21,js_17) < peps) then
                   sl_2 = 0.0
@@ -3533,6 +4193,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_21,js_17) = 0.0
                 end if
               enddo
+              
             enddo
             istart_10 = nlmajmin(3)
             iend_10 = nlmajmin(4)
@@ -3544,6 +4205,7 @@ module asad_spmjpdriv_full_mod
               if (ifam_8 /= 0) then
                 imaj_4 = majors(ifam_8)
               end if
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 if (s(t)%y(jl_21,imaj_4) > peps) then
                   s(t)%ratio(jl_21,js_17) = s(t)%y(jl_21,js_17) / s(t)%y(jl_21,imaj_4)
@@ -3552,6 +4214,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%ratio(jl_21,js_17) = 0.0
                 end if
               enddo
+              
             enddo
             do j_23 = 1, ift, 1
               js_17 = ilft(j_23)
@@ -3560,6 +4223,7 @@ module asad_spmjpdriv_full_mod
               itr_9 = madvtr(js_17)
               imaj_4 = majors(ifam_8)
               if (not_first_call .AND. jit_3 == 1) then
+                !$acc loop vector private(jl_21) private(sl_2)
                 do jl_21 = 1, n_points, 1
                   if (s(t)%y(jl_21,js_17) > peps) then
                     sl_2 = s(t)%pd(jl_21,js_17 + jpspec) / s(t)%y(jl_21,js_17)
@@ -3571,7 +4235,9 @@ module asad_spmjpdriv_full_mod
                     s(t)%f(jl_21,ifam_8) = s(t)%f(jl_21,ifam_8) + iodd_2 * s(t)%f(jl_21,itr_9)
                   end if
                 enddo
+                
               end if
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 if (s(t)%linfam(jl_21,itr_9)) then
                   if (s(t)%y(jl_21,imaj_4) > peps) then
@@ -3584,6 +4250,7 @@ module asad_spmjpdriv_full_mod
                   s(t)%y(jl_21,js_17) = s(t)%f(jl_21,itr_9)
                 end if
               enddo
+              
             enddo
             istart_10 = nlmajmin(1)
             iend_10 = nlmajmin(2)
@@ -3591,10 +4258,12 @@ module asad_spmjpdriv_full_mod
               js_17 = nlmajmin(j_23)
               iodd_2 = nodd(js_17)
               ifam_8 = moffam(js_17)
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 s(t)%ratio(jl_21,js_17) = 1.0 / (iodd_2 + s(t)%ratio(jl_21,js_17))
                 s(t)%y(jl_21,js_17) = s(t)%f(jl_21,ifam_8) * s(t)%ratio(jl_21,js_17)
               enddo
+              
             enddo
             istart_10 = nlmajmin(3)
             iend_10 = nlmajmin(4)
@@ -3603,26 +4272,32 @@ module asad_spmjpdriv_full_mod
               ifam_8 = moffam(js_17)
               imaj_4 = majors(ifam_8)
               if (ctype(js_17) /= jpif) then
+                !$acc loop vector private(jl_21)
                 do jl_21 = 1, n_points, 1
                   s(t)%y(jl_21,js_17) = s(t)%y(jl_21,imaj_4) * s(t)%ratio(jl_21,js_17)
                 enddo
+                
               else
                 itr_9 = madvtr(js_17)
+                !$acc loop vector private(jl_21)
                 do jl_21 = 1, n_points, 1
                   if (s(t)%linfam(jl_21,itr_9)) then
                     s(t)%y(jl_21,js_17) = s(t)%y(jl_21,imaj_4) * s(t)%ratio(jl_21,js_17)
                   end if
                 enddo
+                
               end if
             enddo
             gconv_2 = .true.
             do j_23 = 1, nstst, 1
               js_17 = nlstst(j_23)
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 if (ABS(s(t)%y(jl_21,js_17) - zy_2(jl_21,js_17)) > ftol * s(t)%y(jl_21,js_17) .AND. s(t)%y(jl_21,js_17) > s(t)%pmintnd(jl_21)) then
                   gconv_2 = .false.
                 end if
               enddo
+              
               if (.NOT.gconv_2) then
                 ! PSyclone CodeBlock (unsupported code) reason:
                 !  - Unsupported statement: Exit_Stmt
@@ -3636,35 +4311,45 @@ module asad_spmjpdriv_full_mod
             end if
             do j_23 = 1, nstst, 1
               js_17 = nlstst(j_23)
+              !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 zy_2(jl_21,js_17) = s(t)%y(jl_21,js_17)
               enddo
+              
             enddo
           enddo
           do jtr_6 = 1, jpcspf, 1
+            !$acc loop vector private(jl_22)
             do jl_22 = 1, n_points, 1
               s(t)%fdot(jl_22,jtr_6) = 0.0
             enddo
+            
           enddo
           do js_23 = 1, jpspec, 1
+            !$acc loop vector private(jl_27)
             do jl_27 = 1, n_points, 1
               s(t)%pd(jl_27,js_23) = 0.0
               s(t)%pd(jl_27,js_23 + jpspec) = 0.0
             enddo
+            
           enddo
           do jr_11 = 1, nuni, 1
             ir1_5 = nspi(jr_11,1)
+            !$acc loop vector private(jl_27)
             do jl_27 = 1, n_points, 1
               s(t)%prk(jl_27,jr_11) = s(t)%rk(jl_27,jr_11) * s(t)%y(jl_27,ir1_5)
             enddo
+            
           enddo
           iunip1_5 = nuni + 1
           do jr_11 = iunip1_5, jpnr, 1
             ir1_5 = nspi(jr_11,1)
             ir2_5 = nspi(jr_11,2)
+            !$acc loop vector private(jl_27)
             do jl_27 = 1, n_points, 1
               s(t)%prk(jl_27,jr_11) = s(t)%rk(jl_27,jr_11) * s(t)%y(jl_27,ir1_5) * s(t)%y(jl_27,ir2_5)
             enddo
+            
           enddo
           do jskip_5 = 0, jpspec, jpspec
             do j_29 = 1, nf, 1
@@ -3676,22 +4361,28 @@ module asad_spmjpdriv_full_mod
                 i1_5 = nprdx3(1,j3_7,js_23)
                 i2_5 = nprdx3(2,j3_7,js_23)
                 i3_5 = nprdx3(3,j3_7,js_23)
+                !$acc loop vector private(jl_27)
                 do jl_27 = 1, n_points, 1
                   s(t)%pd(jl_27,js_23) = s(t)%pd(jl_27,js_23) + s(t)%prk(jl_27,i1_5) + s(t)%prk(jl_27,i2_5) + s(t)%prk(jl_27,i3_5)
                 enddo
+                
               enddo
               do j2_5 = 1, ip2_5, 1
                 i1_5 = nprdx2(1,js_23)
                 i2_5 = nprdx2(2,js_23)
+                !$acc loop vector private(jl_27)
                 do jl_27 = 1, n_points, 1
                   s(t)%pd(jl_27,js_23) = s(t)%pd(jl_27,js_23) + s(t)%prk(jl_27,i1_5) + s(t)%prk(jl_27,i2_5)
                 enddo
+                
               enddo
               do j1_5 = 1, ip1_5, 1
                 i1_5 = nprdx1(js_23)
+                !$acc loop vector private(jl_27)
                 do jl_27 = 1, n_points, 1
                   s(t)%pd(jl_27,js_23) = s(t)%pd(jl_27,js_23) + s(t)%prk(jl_27,i1_5)
                 enddo
+                
               enddo
             enddo
           enddo
@@ -3700,34 +4391,42 @@ module asad_spmjpdriv_full_mod
             ir_5 = ntabfp(jr_11,2)
             ix_9 = ntabfp(jr_11,3)
             fr_5 = frpx(ix_9)
+            !$acc loop vector private(jl_27)
             do jl_27 = 1, n_points, 1
               s(t)%pd(jl_27,iss_6) = s(t)%pd(jl_27,iss_6) + fr_5 * s(t)%prk(jl_27,ir_5)
             enddo
+            
           enddo
           if (.true.) then
             istart_14 = nldepx(1)
             iend_14 = nldepx(2)
             do j_29 = istart_14, iend_14, 1
               js_23 = nldepx(j_29)
+              !$acc loop vector private(jl_27)
               do jl_27 = 1, n_points, 1
                 s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + (s(t)%dpd(jl_27,js_23) + s(t)%dpw(jl_27,js_23)) * s(t)%y(jl_27,js_23)
               enddo
+              
             enddo
             istart_14 = nldepx(3)
             iend_14 = nldepx(4)
             do j_29 = istart_14, iend_14, 1
               js_23 = nldepx(j_29)
+              !$acc loop vector private(jl_27)
               do jl_27 = 1, n_points, 1
                 s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + s(t)%dpd(jl_27,js_23) * s(t)%y(jl_27,js_23)
               enddo
+              
             enddo
             istart_14 = nldepx(5)
             iend_14 = nldepx(6)
             do j_29 = istart_14, iend_14, 1
               js_23 = nldepx(j_29)
+              !$acc loop vector private(jl_27)
               do jl_27 = 1, n_points, 1
                 s(t)%pd(jl_27,js_23 + jpspec) = s(t)%pd(jl_27,js_23 + jpspec) + s(t)%dpw(jl_27,js_23) * s(t)%y(jl_27,js_23)
               enddo
+              
             enddo
           end if
           do j_24 = 1, nf, 1
@@ -3736,6 +4435,7 @@ module asad_spmjpdriv_full_mod
             itr_10 = madvtr(js_18)
             gfam_2 = ifam_9 /= 0
             gtr_2 = itr_10 /= 0
+            !$acc loop vector private(jl_22)
             do jl_22 = 1, n_points, 1
               s(t)%ydot(jl_22,js_18) = s(t)%pd(jl_22,js_18) - s(t)%pd(jl_22,js_18 + jpspec)
               if (gfam_2 .AND. (.NOT.gtr_2 .OR. gtr_2 .AND. s(t)%linfam(jl_22,itr_10))) then
@@ -3745,13 +4445,14 @@ module asad_spmjpdriv_full_mod
                 s(t)%fdot(jl_22,itr_10) = s(t)%ydot(jl_22,js_18)
               end if
             enddo
+            
           enddo
           iter = 1
         end if
       end do
       s(t)%ncsteps = ncsteps_initial
       s(t)%cdt = cdt_initial
-    enddo
+  enddo
   !$ACC END PARALLEL LOOP
 
   end subroutine asad_spmjpdriv
