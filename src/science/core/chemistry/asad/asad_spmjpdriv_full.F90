@@ -758,12 +758,13 @@ module asad_spmjpdriv_full_mod
     integer :: idx_226
     integer :: idx_227
     integer :: idx_228
+    logical :: done
 
     ix = 0
     jy = 0
     nlev = 0
     n_states = SIZE(s)
-  !$ACC  PARALLEL LOOP GANG &
+  !$ACC  PARALLEL LOOP GANG VECTOR_LENGTH(32) &
   !$ACC& PRIVATE(exit_code, ncsteps_initial, iredo, js, iter, location, &
   !$ACC& solver_iter, num_iter, jit, errcode, cdt_initial, f_initial, &
   !$ACC& iter_1, jl, jtr, ifi, i, itr, count_negatives, &
@@ -1308,7 +1309,9 @@ module asad_spmjpdriv_full_mod
           enddo
           
         enddo
+        done = .false.
         do iter_1 = 1, ukca_config%nrsteps, 1
+         if (.not. done) then
           ifi = 0
           if (iter_1 == 1) then
             ifi = nitnr
@@ -2292,15 +2295,16 @@ module asad_spmjpdriv_full_mod
 
             ! PSyclone CodeBlock (unsupported code) reason:
             !  - Unsupported statement: Goto_Stmt
-            GO TO 9999
+            done = .true.
           end if
           if (iter_1 == ukca_config%nrsteps) then
             exit_code = 2
 
             ! PSyclone CodeBlock (unsupported code) reason:
             !  - Unsupported statement: Goto_Stmt
-            GO TO 9999
+            done = .true.
           end if
+          if (.not. done) then
           do idx_103 = 1, jpcspf, 1
             !$acc loop vector private(idx_104)
             do idx_104 = 1, n_points, 1
@@ -2330,8 +2334,10 @@ module asad_spmjpdriv_full_mod
 
             ! PSyclone CodeBlock (unsupported code) reason:
             !  - Unsupported statement: Goto_Stmt
-            GO TO 9999
+            done = .true.
           end if
+          end if
+          if (.not. done) then
           do jl = 1, n_points, 1
             !$acc loop vector private(jtr)
             do jtr = 1, jpcspf, 1
@@ -2344,8 +2350,10 @@ module asad_spmjpdriv_full_mod
           if (exit_code == 3) then
             ! PSyclone CodeBlock (unsupported code) reason:
             !  - Unsupported statement: Goto_Stmt
-            GO TO 9999
+            done = .true.
           end if
+          end if
+          if (.not. done) then
           do i_4 = 1, jpcspf, 1
             !$acc loop vector private(jl_6)
             do jl_6 = 1, n_points, 1
@@ -2644,9 +2652,10 @@ module asad_spmjpdriv_full_mod
 
             ! PSyclone CodeBlock (unsupported code) reason:
             !  - Unsupported statement: Goto_Stmt
-            GO TO 9999
+            done = .true.
           end if
-          if (ukca_config%l_ukca_quasinewton .AND. error_norm >= reltol_error) then
+          end if
+          if (.not. done .and. ukca_config%l_ukca_quasinewton .AND. error_norm >= reltol_error) then
             if (iter_1 >= ukca_config%i_ukca_quasinewton_start .AND. iter_1 <= ukca_config%i_ukca_quasinewton_end) then
               ifam_2 = 0
               imaj_1 = 0
@@ -3739,11 +3748,12 @@ module asad_spmjpdriv_full_mod
               enddo
             end if
           end if
+         end if
         enddo
 
         ! PSyclone CodeBlock (unsupported code) reason:
         !  - Unsupported labelled statement
-        9999 CONTINUE
+        !9999 CONTINUE
         if (exit_code /= 0) then
           do idx_210 = 1, UBOUND(s(t)%f, dim=2), 1
             !$acc loop vector private(idx_211)
@@ -4041,7 +4051,9 @@ module asad_spmjpdriv_full_mod
               end if
             enddo
           end if
+          gconv_2 = .false.
           do jit_3 = 1, nitfg, 1
+           if (.not. gconv_2) then
             if (jit_3 > 1) then
               do j_23 = 1, nstst, 1
                 js_17 = nlstst(j_23)
@@ -4304,19 +4316,16 @@ module asad_spmjpdriv_full_mod
                 EXIT
               end if
             enddo
-            if (gconv_2) then
-              ! PSyclone CodeBlock (unsupported code) reason:
-              !  - Unsupported statement: Exit_Stmt
-              EXIT
-            end if
+            if (.not. gconv_2) then
             do j_23 = 1, nstst, 1
               js_17 = nlstst(j_23)
               !$acc loop vector private(jl_21)
               do jl_21 = 1, n_points, 1
                 zy_2(jl_21,js_17) = s(t)%y(jl_21,js_17)
               enddo
-              
             enddo
+            end if
+           end if
           enddo
           do jtr_6 = 1, jpcspf, 1
             !$acc loop vector private(jl_22)
