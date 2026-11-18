@@ -166,9 +166,9 @@ REAL, ALLOCATABLE :: frpj(:)         ! fractional product array (phot)
 REAL, ALLOCATABLE :: frph(:)         ! fractional product array (het)
 REAL, ALLOCATABLE :: frpx(:)         ! fractional product array (total)
 ! sparse algebra
-INTEGER, ALLOCATABLE :: nonzero_map_unordered(:,:)  ! Map of nonzero entries
-INTEGER, ALLOCATABLE :: modified_map(:,:) ! modified map (after decomposition)
-INTEGER, ALLOCATABLE :: nonzero_map(:,:)
+INTEGER(2), ALLOCATABLE :: nonzero_map_unordered(:,:)  ! Map of nonzero entries
+INTEGER(2), ALLOCATABLE :: modified_map(:,:) ! modified map (after decomposition)
+INTEGER(2), ALLOCATABLE :: nonzero_map(:,:)
                                     ! Map of nonzero entries, before reordering
 
 INTEGER, ALLOCATABLE :: reorder(:)   ! reordering of tracers to minimize fill-in

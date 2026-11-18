@@ -258,6 +258,8 @@ USE ukca_time_mod,   ONLY: i_year, i_month, i_day, i_hour, i_minute,           &
                            i_minute_previous, i_second_previous,               &
                            set_time, set_previous_time
 
+use, intrinsic :: iso_fortran_env, only: int64, real64
+
 IMPLICIT NONE
 
 ! ----------------------------------------------------------------------
@@ -581,11 +583,16 @@ REAL(KIND=jprb)               :: zhook_handle
 TYPE(autotune_type), ALLOCATABLE, SAVE :: autotune_state
 #endif
 
+integer(int64) :: count_start, count_end, count_rate
+real(real64)   :: elapsed_time
+
 CHARACTER(LEN=*), PARAMETER :: RoutineName='UKCA_MAIN1'
 
 !- End of header
 ! ----------------------------------------------------------------------
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
+
+call system_clock(count_start, count_rate)
 
 ! ----------------------------------------------------------------------
 ! 1. Initial set up
@@ -3084,6 +3091,11 @@ IF (l_autotune_segments) THEN
   CALL autotune_return(autotune_state)
 END IF
 #endif
+
+call system_clock(count_end)
+elapsed_time = real(count_end - count_start, real64) / real(count_rate, real64)
+print '(A, F10.6, A)', 'Elapsed wall-clock time: ', elapsed_time, ' seconds'
+
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 RETURN

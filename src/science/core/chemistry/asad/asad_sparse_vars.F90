@@ -467,7 +467,7 @@ IMPLICIT NONE
 INTEGER, INTENT(IN) :: n_points
 REAL, INTENT(IN)    :: cdt
 REAL, INTENT(IN)    :: min_pivot
-INTEGER, INTENT(IN) :: nonzero_map(jpcspf,jpcspf)
+INTEGER(2), INTENT(IN) :: nonzero_map(jpcspf,jpcspf)
 REAL, INTENT(OUT)   :: spfj(n_points,spfjsize_max)
 
 ! Local variables
@@ -629,8 +629,8 @@ REAL, INTENT(IN OUT)    :: bb(n_points,jpcspf)
 REAL, INTENT(OUT)       :: xx(n_points,jpcspf)
 REAL, INTENT(IN)        :: min_pivot
 REAL, INTENT(IN)        :: max_val
-INTEGER, INTENT(IN)     :: nonzero_map_unordered(jpcspf,jpcspf)
-INTEGER, INTENT(IN OUT) :: modified_map(jpcspf,jpcspf)
+INTEGER(2), INTENT(IN)     :: nonzero_map_unordered(jpcspf,jpcspf)
+INTEGER(2), INTENT(IN OUT) :: modified_map(jpcspf,jpcspf)
 REAL, INTENT(IN OUT)    :: spfj(1:n_points,1:spfjsize_max)
 
 ! Local variables
@@ -643,11 +643,7 @@ INTEGER :: ikr
 INTEGER :: krj
 INTEGER :: ij
 
-REAL :: bb1(n_points,jpcspf)
-REAL :: xx1(n_points,jpcspf)
-
 REAL :: pivot(n_points)
-REAL :: kfact(n_points)
 
 INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
 INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -690,8 +686,7 @@ DO kr = 1, jpcspf
   DO i = kr+1, jpcspf
     ikr = modified_map(i,kr)
     IF (ikr > 0) THEN
-      kfact = spfj(:,ikr)*pivot
-      spfj(:,ikr) = kfact
+      spfj(:,ikr) = spfj(:,ikr)*pivot
       DO j = kr+1, jpcspf
         krj = modified_map(kr,j)
         IF (krj > 0) THEN
@@ -699,11 +694,11 @@ DO kr = 1, jpcspf
           ! Distinguish whether matrix element is zero or not. If not, proceed
           ! as in dense case. If it is, create new matrix element.
           IF (ij > 0) THEN
-            spfj(:,ij) = spfj(:,ij) - kfact*spfj(:,krj)
+            spfj(:,ij) = spfj(:,ij) - spfj(:,ikr)*spfj(:,krj)
           ELSE
             total1 = total1 + 1
             modified_map(i,j) = total1
-            spfj(:,total1) = -kfact*spfj(:,krj)
+            spfj(:,total1) = -spfj(:,ikr)*spfj(:,krj)
           END IF
         END IF
       END DO
@@ -760,7 +755,7 @@ INTEGER, INTENT(IN)  :: n_points
 REAL,    INTENT(IN)  :: bb(n_points,jpcspf)
 REAL,    INTENT(OUT) :: xx(n_points,jpcspf)
 REAL,    INTENT(IN)  :: min_pivot
-INTEGER, INTENT(IN)  :: modified_map(jpcspf,jpcspf)
+INTEGER(2), INTENT(IN)  :: modified_map(jpcspf,jpcspf)
 REAL,    INTENT(IN)  :: spfj(n_points,spfjsize_max)
 
 ! Maximum tolerated value for use in filtering step. Unused if negative

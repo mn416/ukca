@@ -135,7 +135,7 @@ INTEGER, INTENT(IN)  :: n_points
 REAL, INTENT(OUT)    :: f(1:n_points,1:jpcspf)
 REAL, INTENT(IN)     :: f_initial(1:n_points,1:jpcspf)
 REAL, INTENT(IN)     :: f_min
-INTEGER, INTENT(IN)  :: nonzero_map(1:jpcspf,1:jpcspf)
+INTEGER(2), INTENT(IN)  :: nonzero_map(1:jpcspf,1:jpcspf)
 REAL, INTENT(IN)     :: spfj(1:n_points,spfjsize_max)
 
 INTEGER :: jl, jtr, ip
